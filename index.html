@@ -1,0 +1,2212 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sistem Pemesanan Alat Berat PPA</title>
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#0891b2">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #334155; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .pwd-toggle:hover { color: #0891b2; }
+        .chart-bar { transition: width 0.8s ease-out; }
+    </style>
+</head>
+<body class="antialiased text-[11px] sm:text-xs">
+
+    <div id="app" class="min-h-screen"></div>
+
+<script>
+    // ================= KONFIGURASI DATABASE (SUPABASE & DRIVE) =================
+    const SUPABASE_URL = 'https://ustlhxarxxslcmjezqyu.supabase.co';
+    
+    // Gunakan Publishable Key / Legacy Anon Key Anda di sini
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVzdGxoeGFyeHhzbGNtamV6cXl1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjU3ODg2OTcsImV4cCI6MjA0MTM2NDY5N30.T4gA_PASTE_KUNCI_FULL_ANDA_DISINI'; 
+
+    // URL Google Apps Script (Untuk Upload Foto ke Google Drive)
+    const GOOGLE_SCRIPT_URL = ''; 
+
+    // ================= DATA & STATE =================
+    let currentUser = null;
+    
+    const defaultUsers = [
+        { nrp: 'admin', nama_lengkap: 'Budi Admin', jabatan: 'Dispatcher', perusahaan: 'PPA', departemen: 'Operation', section: 'Control', no_wa: '081111111', password_hash: 'admin', role: 'ADMIN', status_akun: 'ACTIVE' },
+        { nrp: 'gl', nama_lengkap: 'Achmad Hariyanto', jabatan: 'Group Leader', perusahaan: 'PPA', departemen: 'Operation', section: 'Lifting', no_wa: '082222222', password_hash: 'gl', role: 'GL', status_akun: 'ACTIVE' },
+        { nrp: 'user', nama_lengkap: 'Andi Requester', jabatan: 'Foreman', perusahaan: 'Subkon A', departemen: 'Plant', section: 'Maintenance', no_wa: '08987654321', password_hash: 'user', role: 'USER', status_akun: 'ACTIVE' },
+        { nrp: 'mp', nama_lengkap: 'Joko Operator', jabatan: 'Operator', perusahaan: 'PPA', departemen: 'Operation', section: 'Lifting', no_wa: '084444444', password_hash: 'mp', role: 'MANPOWER', status_akun: 'ACTIVE' }
+    ];
+
+    const defaultMasterData = {
+        perusahaan: ['PPA', 'Subkon A', 'Subkon B', 'PT. BIB'],
+        departemen: ['Mining', 'Plant', 'Safety', 'HR'],
+        section: ['Operation', 'Maintenance', 'HSE', 'Recruitment'],
+        unit_ct: ['CT-01', 'CT-02', 'CT-03'],
+        unit_big_crane: ['BC-01', 'BC-02'],
+        unit_lowboy: ['LB-01', 'LB-02'],
+        gl: ['Achmad Hariyanto', 'Lukmanul Hakim'],
+        operator: ['Joko Operator', 'Supriadi'],
+        rigger: ['Agus Rigger', 'Bambang', 'Candra']
+    };
+
+    if (!localStorage.getItem('lifting_users')) localStorage.setItem('lifting_users', JSON.stringify(defaultUsers));
+    if (!localStorage.getItem('lifting_master_data')) localStorage.setItem('lifting_master_data', JSON.stringify(defaultMasterData));
+    if (!localStorage.getItem('lifting_orders')) localStorage.setItem('lifting_orders', JSON.stringify([]));
+
+    const defaultSettings = { bgUrl: '', logoUrl: '', iconCTUrl: '', iconBCUrl: '', iconLBUrl: '' };
+    if (!localStorage.getItem('lifting_settings')) localStorage.setItem('lifting_settings', JSON.stringify(defaultSettings));
+    
+    function getSettings() { return JSON.parse(localStorage.getItem('lifting_settings')) || defaultSettings; }
+    function saveSettings(settings) { localStorage.setItem('lifting_settings', JSON.stringify(settings)); }
+
+    let currentTab = 'monitoring'; 
+    let currentMpPanel = 'ON PROGRESS';
+    let userOrderFleetMode = null; 
+    let mpFleetMode = null; 
+    let sortColumn = 'timestamp';
+    let sortDirection = 'desc';
+
+    // ================= SUPABASE SYNC LOGIC =================
+    async function fetchFromSupabase() {
+        try {
+            const res = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*`, {
+                headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if(data && Array.isArray(data)) {
+                    localStorage.setItem('lifting_orders', JSON.stringify(data));
+                }
+            }
+        } catch(e) { console.error("Mode Offline: Gagal load data dari Supabase", e); }
+    }
+
+    async function syncToSupabase(orders) {
+        try {
+            if(orders.length === 0) return;
+            await fetch(`${SUPABASE_URL}/rest/v1/orders`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': SUPABASE_KEY,
+                    'Authorization': `Bearer ${SUPABASE_KEY}`,
+                    'Prefer': 'resolution=merge-duplicates'
+                },
+                body: JSON.stringify(orders)
+            });
+        } catch (e) {
+            console.error("Data tersimpan lokal. Menunggu koneksi internet untuk sync ke Supabase.", e);
+        }
+    }
+
+    function getOrders() { return JSON.parse(localStorage.getItem('lifting_orders')) || []; }
+    function saveOrders(orders) { 
+        localStorage.setItem('lifting_orders', JSON.stringify(orders)); 
+        syncToSupabase(orders); 
+    }
+    function getUsers() { return JSON.parse(localStorage.getItem('lifting_users')) || []; }
+    function saveUsers(users) { localStorage.setItem('lifting_users', JSON.stringify(users)); }
+    function getMasterData() { return JSON.parse(localStorage.getItem('lifting_master_data')); }
+
+    window.onload = () => {
+        fetchFromSupabase().then(() => {
+            renderApp();
+        });
+    };
+
+    function handleSort(col) {
+        if (sortColumn === col) {
+            sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            sortColumn = col;
+            sortDirection = 'asc';
+        }
+        renderApp();
+    }
+
+    function getSortIcon(col) {
+        if (sortColumn !== col) return '<i class="fa-solid fa-sort text-slate-300 ml-1"></i>';
+        return sortDirection === 'asc' 
+            ? '<i class="fa-solid fa-sort-up text-cyan-600 ml-1"></i>' 
+            : '<i class="fa-solid fa-sort-down text-cyan-600 ml-1"></i>';
+    }
+
+    function showToast(message, type = 'success') {
+        const toast = document.createElement('div');
+        toast.className = `fixed top-2 right-2 z-[100] px-3 py-1.5 rounded shadow-md text-white text-[10px] font-medium transition-opacity duration-300 ${type === 'success' ? 'bg-emerald-500' : 'bg-red-500'}`;
+        toast.innerHTML = `<i class="fa-solid ${type === 'success' ? 'fa-check-circle' : 'fa-circle-exclamation'} mr-1"></i>${message}`;
+        document.body.appendChild(toast);
+        setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3000);
+    }
+
+    function togglePassword(inputId, iconId) {
+        let input = document.getElementById(inputId);
+        let icon = document.getElementById(iconId);
+        if (input.type === "password") {
+            input.type = "text";
+            icon.classList.remove('fa-eye');
+            icon.classList.add('fa-eye-slash');
+        } else {
+            input.type = "password";
+            icon.classList.remove('fa-eye-slash');
+            icon.classList.add('fa-eye');
+        }
+    }
+
+    function copyText(text, label) {
+        const el = document.createElement('textarea');
+        el.value = text;
+        el.setAttribute('readonly', '');
+        el.style.position = 'absolute';
+        el.style.left = '-9999px';
+        document.body.appendChild(el);
+        el.select();
+        try { document.execCommand('copy'); showToast(label + ' disalin!'); } 
+        catch (err) { showToast('Gagal menyalin', 'error'); }
+        document.body.removeChild(el);
+    }
+
+    function copyJobToWA(wo) {
+        let job = getOrders().find(j => j.no_wo === wo);
+        if(!job) return;
+        let waText = `*DETAIL PEKERJAAN LIFTING*\n*NO WO:* ${job.no_wo}\n*Status:* ${job.status}\n\n*Pemohon:* ${job.nama_pemohon} (${job.departemen})\n*Kontak WA:* ${job.no_wa}\n\n*Armada:* ${job.kategori} ${job.unit ? '('+job.unit+')' : ''}\n*Tanggal:* ${job.tgl_pelaksanaan} ${job.jam_pelaksanaan ? '| Jam: '+job.jam_pelaksanaan : ''}\n*Lokasi:* ${job.lokasi_angkat || '-'} ➔ ${job.lokasi_tujuan || '-'}\n*Deskripsi:* ${job.deskripsi}`;
+        copyText(waText, 'Job');
+    }
+
+    function generateWO(kategori) {
+        const date = new Date();
+        const yyyy = date.getFullYear();
+        const mm = String(date.getMonth() + 1).padStart(2, '0');
+        const dd = String(date.getDate()).padStart(2, '0');
+        
+        let prefix = 'CT-';
+        if (kategori === 'Big Crane') prefix = 'BC-';
+        if (kategori === 'Lowboy') prefix = 'LB-';
+
+        const datePrefix = `${prefix}${yyyy}${mm}${dd}-`;
+        const orders = getOrders();
+        let maxNumber = 0;
+        
+        orders.forEach(job => {
+            if (job.no_wo && job.no_wo.startsWith(datePrefix)) {
+                const parts = job.no_wo.split('-');
+                if (parts.length >= 3) {
+                    const numPart = parts[2];
+                    if (numPart) {
+                        const num = parseInt(numPart.split('-L')[0], 10);
+                        if (!isNaN(num) && num > maxNumber) maxNumber = num;
+                    }
+                }
+            }
+        });
+        
+        const nextNumber = maxNumber + 1;
+        // Penomoran natural tanpa padding 0
+        return `${datePrefix}${nextNumber}`;
+    }
+
+    function renderApp() {
+        const app = document.getElementById('app');
+        const user = JSON.parse(localStorage.getItem('lifting_user'));
+        const settings = getSettings();
+
+        if (!user) {
+            app.innerHTML = getAuthView();
+            return;
+        }
+
+        const isMobile = window.innerWidth < 768;
+
+        const logoHtmlMobile = settings.logoUrl ? 
+            `<img src="${settings.logoUrl}" alt="Logo" class="w-5 h-5 object-contain">` : 
+            `<div class="bg-cyan-600 text-white p-1 rounded-sm flex items-center justify-center"><i class="fa-solid fa-truck-moving text-[10px]"></i></div>`;
+
+        app.innerHTML = `
+            <div class="flex h-screen bg-slate-50 overflow-hidden">
+                ${!isMobile ? getDesktopSidebar(user, settings) : ''}
+                <div class="flex-1 flex flex-col h-screen overflow-hidden relative">
+                    ${isMobile ? `
+                    <div class="bg-white shadow-sm px-3 py-2 flex items-center justify-between shrink-0 z-10 border-b border-slate-200">
+                        <div class="flex items-center gap-1.5 text-cyan-700 font-bold text-xs uppercase tracking-tight">
+                            ${logoHtmlMobile}
+                            ${user.role === 'MANPOWER' ? 'PANEL LAPANGAN' : 'Support Equipment'}
+                        </div>
+                        ${user.role === 'MANPOWER' ? `
+                        <div class="flex items-center gap-2">
+                            <span class="text-[9px] font-semibold text-slate-600 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-sm">${user.nama_lengkap}</span>
+                        </div>` : ''}
+                    </div>` : ''}
+                    
+                    <div class="flex-1 overflow-y-auto p-2 sm:p-3 pb-16 sm:pb-3 relative w-full hide-scrollbar">
+                        ${currentTab === 'dashboard' && (user.role === 'ADMIN' || user.role === 'GL') ? getDashboardView() : ''}
+                        ${currentTab === 'monitoring' ? (user.role === 'MANPOWER' ? getManpowerWorkflow() : getMonitoringView()) : ''}
+                        ${currentTab === 'order' ? getOrderFormView() : ''}
+                        ${currentTab === 'master' && user.role === 'ADMIN' ? getMasterDataView() : ''}
+                        ${currentTab === 'profile' ? getProfileView() : ''}
+                    </div>
+                    ${isMobile ? getMobileNav(user) : ''}
+                </div>
+            </div>
+
+            <!-- Global Confirm Modal -->
+            <div id="globalConfirmModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[100] hidden p-3">
+                <div class="bg-white rounded-md shadow-xl w-full max-w-[280px] overflow-hidden flex flex-col">
+                    <div class="p-4 text-center border-b border-slate-100 shrink-0">
+                        <div class="w-10 h-10 rounded-full border-[3px] border-orange-200 text-orange-500 flex items-center justify-center mx-auto mb-2 text-xl font-bold"><i class="fa-solid fa-question"></i></div>
+                        <h2 class="text-xs font-bold text-slate-700" id="confirmTitle">Konfirmasi</h2>
+                        <p class="text-[10px] text-slate-500 mt-1" id="confirmMessage">Apakah Anda yakin?</p>
+                    </div>
+                    <div class="flex gap-0" id="confirmButtons"></div>
+                </div>
+            </div>
+        `;
+        
+        setTimeout(() => {
+            const bars = document.querySelectorAll('.chart-bar');
+            bars.forEach(bar => {
+                const w = bar.getAttribute('data-width');
+                if(w) bar.style.width = w;
+            });
+        }, 50);
+    }
+
+    function switchTab(tab) {
+        if(tab === 'order') userOrderFleetMode = null; 
+        if(tab === 'monitoring') mpFleetMode = null;
+        currentTab = tab;
+        renderApp();
+    }
+
+    function getDesktopSidebar(user, settings) {
+        const isAdmin = user.role === 'ADMIN';
+        const isGL = user.role === 'GL';
+        const isUSER = user.role === 'USER';
+        const isMP = user.role === 'MANPOWER';
+
+        const logoHtmlDesktop = settings.logoUrl ? 
+            `<img src="${settings.logoUrl}" alt="Logo" class="w-6 h-6 object-contain rounded-sm shadow-sm">` : 
+            `<div class="bg-cyan-600 text-white p-1.5 rounded shadow-sm flex items-center justify-center"><i class="fa-solid fa-truck-moving text-[10px]"></i></div>`;
+
+        return `
+        <div class="w-44 bg-white border-r border-slate-200 flex flex-col h-full shrink-0 z-20">
+            <div class="p-3 border-b border-slate-100 flex items-center gap-2 shrink-0">
+                ${logoHtmlDesktop}
+                <h1 class="font-bold text-slate-800 tracking-tight text-[11px] leading-tight uppercase">Support Equipment</h1>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto py-3 px-2 flex flex-col gap-0.5 hide-scrollbar">
+                <div class="text-[9px] font-bold text-slate-400 tracking-wider mb-1 ml-1 uppercase">${isMP ? 'Panel Lapangan' : 'Menu Utama'}</div>
+                
+                ${(isAdmin || isGL) ? `
+                <button onclick="switchTab('dashboard')" class="w-full text-left px-2 py-1.5 rounded-sm text-[11px] font-medium transition-all flex items-center gap-2 ${currentTab === 'dashboard' ? 'bg-cyan-50 text-cyan-700 border-l-2 border-cyan-600 font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-2 border-transparent'}">
+                    <i class="fa-solid fa-chart-pie w-3 text-center text-[10px]"></i> Dashboard
+                </button>` : ''}
+
+                <button onclick="switchTab('monitoring')" class="w-full text-left px-2 py-1.5 rounded-sm text-[11px] font-medium transition-all flex items-center gap-2 mt-0.5 ${currentTab === 'monitoring' ? 'bg-cyan-50 text-cyan-700 border-l-2 border-cyan-600 font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-2 border-transparent'}">
+                    <i class="fa-solid ${isMP ? 'fa-hard-hat' : 'fa-list-check'} w-3 text-center text-[10px]"></i> ${isMP ? 'Tugas Aktif' : 'Data Order'}
+                </button>
+                
+                ${(isUSER || isAdmin || isGL) ? `
+                <button onclick="switchTab('order')" class="w-full text-left px-2 py-1.5 rounded-sm text-[11px] font-medium transition-all flex items-center gap-2 mt-0.5 ${currentTab === 'order' ? 'bg-cyan-50 text-cyan-700 border-l-2 border-cyan-600 font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-2 border-transparent'}">
+                    <i class="fa-solid fa-plus w-3 text-center text-[10px]"></i> Buat Order
+                </button>` : ''}
+                
+                <div class="text-[9px] font-bold text-slate-400 tracking-wider mt-4 mb-1 ml-1 uppercase">Akun</div>
+                
+                ${isAdmin ? `
+                <button onclick="switchTab('master')" class="w-full text-left px-2 py-1.5 rounded-sm text-[11px] font-medium transition-all flex items-center gap-2 ${currentTab === 'master' ? 'bg-cyan-50 text-cyan-700 border-l-2 border-cyan-600 font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-2 border-transparent'}">
+                    <i class="fa-solid fa-database w-3 text-center text-[10px]"></i> Master Data
+                </button>` : ''}
+                
+                <button onclick="switchTab('profile')" class="w-full text-left px-2 py-1.5 rounded-sm text-[11px] font-medium transition-all flex items-center gap-2 mt-0.5 ${currentTab === 'profile' ? 'bg-cyan-50 text-cyan-700 border-l-2 border-cyan-600 font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-2 border-transparent'}">
+                    <i class="fa-solid fa-user w-3 text-center text-[10px]"></i> Profil Saya
+                </button>
+            </div>
+
+            <div class="p-3 border-t border-slate-200 mt-auto shrink-0 flex items-center justify-between bg-slate-50">
+                <div class="overflow-hidden pr-1">
+                    <div class="text-xs font-bold text-slate-800 leading-tight truncate">${user.nama_lengkap}</div>
+                    <div class="text-[9px] font-bold text-slate-400 tracking-wider mt-0.5">${user.role}</div>
+                </div>
+            </div>
+        </div>`;
+    }
+
+    function getMobileNav(user) {
+        return `
+        <div class="fixed bottom-0 w-full bg-white border-t border-slate-200 px-2 py-0.5 flex justify-around items-center z-40 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+            ${(user.role === 'ADMIN' || user.role === 'GL') ? `
+            <button onclick="switchTab('dashboard')" class="flex flex-col items-center p-1 ${currentTab === 'dashboard' ? 'text-cyan-600' : 'text-slate-400'}">
+                <i class="fa-solid fa-chart-pie text-base mb-0"></i>
+                <span class="text-[8px] font-medium">Dashboard</span>
+            </button>` : ''}
+            
+            <button onclick="switchTab('monitoring')" class="flex flex-col items-center p-1 ${currentTab === 'monitoring' ? 'text-cyan-600' : 'text-slate-400'}">
+                <i class="fa-solid ${user.role === 'MANPOWER' ? 'fa-hard-hat' : 'fa-list-check'} text-base mb-0"></i>
+                <span class="text-[8px] font-medium">${user.role === 'MANPOWER' ? 'Tugas Aktif' : 'Data'}</span>
+            </button>
+            
+            ${(user.role === 'USER' || user.role === 'ADMIN' || user.role === 'GL') ? `
+            <button onclick="switchTab('order')" class="relative flex flex-col items-center -mt-4">
+                <div class="w-8 h-8 rounded-full flex items-center justify-center border-2 border-white shadow-sm ${currentTab === 'order' ? 'bg-cyan-600 text-white' : 'bg-cyan-500 text-white'}">
+                    <i class="fa-solid fa-plus text-sm"></i>
+                </div>
+                <span class="text-[8px] font-medium text-slate-500 mt-0.5">Order</span>
+            </button>` : ''}
+            
+            ${user.role === 'ADMIN' ? `
+            <button onclick="switchTab('master')" class="flex flex-col items-center p-1 ${currentTab === 'master' ? 'text-cyan-600' : 'text-slate-400'}">
+                <i class="fa-solid fa-database text-base mb-0"></i>
+                <span class="text-[8px] font-medium">Master</span>
+            </button>` : ''}
+            
+            <button onclick="switchTab('profile')" class="flex flex-col items-center p-1 ${currentTab === 'profile' ? 'text-cyan-600' : 'text-slate-400'}">
+                <i class="fa-solid fa-user text-base mb-0"></i>
+                <span class="text-[8px] font-medium">Profil</span>
+            </button>
+        </div>`;
+    }
+
+    function getAuthView() {
+        const settings = getSettings();
+        const bgStyle = settings.bgUrl ? `background-image: url('${settings.bgUrl}'); background-size: cover; background-position: center;` : 'background-color: #1e293b;';
+        const logoHtml = settings.logoUrl ? 
+            `<img src="${settings.logoUrl}" alt="Logo" class="w-12 h-12 object-contain mx-auto mb-2 relative z-10">` : 
+            `<div class="w-10 h-10 bg-cyan-500 flex items-center justify-center mx-auto mb-2 relative z-10 rounded-sm"><i class="fa-solid fa-truck-moving text-xl text-white"></i></div>`;
+        const overlay = settings.bgUrl ? `<div class="absolute inset-0 bg-slate-900/80"></div>` : '';
+
+        return `
+        <div class="min-h-screen flex items-center justify-center p-3 bg-slate-50 relative">
+            <div id="authForm" class="bg-white border border-slate-300 w-full max-w-[280px] overflow-hidden rounded-none shadow-xl z-10">
+                <div class="relative p-5 text-center border-b border-slate-300" style="${bgStyle}">
+                    ${overlay}
+                    <div class="relative z-10">
+                        ${logoHtml}
+                        <h1 class="text-base font-bold text-white tracking-tight uppercase">Order Lifting</h1>
+                        <p class="text-cyan-400 text-[9px] mt-0.5 font-medium tracking-wide">Support Equipment</p>
+                    </div>
+                </div>
+                <div class="p-4">
+                    <form onsubmit="handleLogin(event)" class="space-y-3">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 mb-1">NRP / ID Pengguna</label>
+                            <input type="text" id="loginNrp" class="w-full border border-slate-300 rounded-none px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" required>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 mb-1">Password</label>
+                            <div class="relative">
+                                <input type="password" id="loginPwd" class="w-full border border-slate-300 rounded-none px-2 py-1.5 pr-6 text-xs focus:outline-none focus:border-cyan-500" required>
+                                <i id="toggleLoginPwd" class="fa-regular fa-eye absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer pwd-toggle text-[10px]" onclick="togglePassword('loginPwd', 'toggleLoginPwd')"></i>
+                            </div>
+                            <p id="loginErrorMsg" class="text-red-500 font-bold text-[10px] mt-1.5 hidden"></p>
+                        </div>
+                        <button type="submit" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-1.5 rounded-none text-xs transition-colors mt-2">Masuk</button>
+                    </form>
+                    <div class="mt-4 text-center text-[10px] text-slate-500">
+                        Belum punya akun? <span class="text-cyan-600 font-bold cursor-pointer hover:underline" onclick="toggleAuthMode()">Daftar (User)</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="signupForm" class="bg-white border border-slate-300 shadow-xl w-full max-w-[280px] overflow-hidden rounded-none hidden z-10">
+                <div class="p-3 text-center relative border-b border-slate-300" style="${bgStyle}">
+                    ${overlay}
+                    <h2 class="text-sm font-bold text-white relative z-10">Buat Akun User</h2>
+                </div>
+                <div class="p-3">
+                    <form onsubmit="handleSignup(event)" class="space-y-2">
+                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">NRP</label><input type="text" id="regNrp" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Nama Lengkap</label><input type="text" id="regName" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                        
+                        <datalist id="listPerusahaan">${getMasterData().perusahaan.map(p=>`<option value="${p}">`).join('')}</datalist>
+                        <datalist id="listDepartemen">${getMasterData().departemen.map(d=>`<option value="${d}">`).join('')}</datalist>
+                        <datalist id="listSection">${getMasterData().section.map(s=>`<option value="${s}">`).join('')}</datalist>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Perusahaan</label><input list="listPerusahaan" id="regPerusahaan" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Departemen</label><input list="listDepartemen" id="regDepartemen" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Section</label><input list="listSection" id="regSection" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Jabatan</label><input type="text" id="regJabatan" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                        </div>
+
+                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">No WhatsApp</label><input type="number" id="regWa" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                        <div>
+                            <label class="block text-[9px] font-bold text-slate-500 mb-0.5">Password</label>
+                            <div class="relative">
+                                <input type="password" id="regPwd" class="w-full border border-slate-300 rounded-none px-2 py-1 pr-6 text-xs focus:outline-none focus:border-cyan-500" required>
+                                <i id="toggleRegPwd" class="fa-regular fa-eye absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer pwd-toggle text-[10px]" onclick="togglePassword('regPwd', 'toggleRegPwd')"></i>
+                            </div>
+                        </div>
+                        <button type="submit" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-1.5 rounded-none text-xs mt-2 transition-colors">Daftar Akun</button>
+                    </form>
+                    <div class="mt-3 text-center text-[10px] text-slate-500">
+                        Sudah punya akun? <span class="text-cyan-600 font-bold cursor-pointer hover:underline" onclick="toggleAuthMode()">Masuk</span>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    }
+
+    function toggleAuthMode() {
+        document.getElementById('authForm').classList.toggle('hidden');
+        document.getElementById('signupForm').classList.toggle('hidden');
+    }
+
+    function handleLogin(e) {
+        e.preventDefault();
+        const nrp = document.getElementById('loginNrp').value.trim();
+        const pwd = document.getElementById('loginPwd').value;
+        const users = getUsers();
+        const user = users.find(u => u.nrp === nrp && u.password_hash === pwd && u.status_akun === 'ACTIVE');
+        const errorMsg = document.getElementById('loginErrorMsg');
+        
+        if (user) {
+            localStorage.setItem('lifting_user', JSON.stringify(user));
+            currentTab = (user.role === 'ADMIN' || user.role === 'GL') ? 'dashboard' : 'monitoring';
+            userOrderFleetMode = null;
+            mpFleetMode = null;
+            renderApp();
+        } else {
+            errorMsg.innerHTML = '<i class="fa-solid fa-circle-exclamation mr-1"></i>NRP atau Password salah!';
+            errorMsg.classList.remove('hidden');
+        }
+    }
+
+    function handleLogout() {
+        localStorage.removeItem('lifting_user');
+        renderApp();
+    }
+
+    function handleSignup(e) {
+        e.preventDefault();
+        const users = getUsers();
+        const nrp = document.getElementById('regNrp').value.trim();
+        if (users.find(u => u.nrp === nrp)) return showToast('NRP terdaftar!', 'error');
+
+        const newUser = {
+            nrp: nrp, nama_lengkap: document.getElementById('regName').value, jabatan: document.getElementById('regJabatan').value,
+            perusahaan: document.getElementById('regPerusahaan').value, departemen: document.getElementById('regDepartemen').value,
+            section: document.getElementById('regSection').value, no_wa: document.getElementById('regWa').value,
+            password_hash: document.getElementById('regPwd').value, role: 'USER', status_akun: 'ACTIVE'
+        };
+        users.push(newUser);
+        saveUsers(users);
+        showToast('Pendaftaran sukses!');
+        toggleAuthMode();
+    }
+
+    function openCustomConfirm(title, message, onConfirm) {
+        document.getElementById('confirmTitle').innerText = title;
+        document.getElementById('confirmMessage').innerText = message;
+        
+        const btnContainer = document.getElementById('confirmButtons');
+        btnContainer.innerHTML = `
+            <button class="flex-1 bg-slate-100 text-slate-600 font-bold py-2 text-[10px] hover:bg-slate-200 transition-colors border-t border-slate-200" id="btnConfirmCancel">Batal</button>
+            <button class="flex-1 bg-red-500 text-white font-bold py-2 text-[10px] hover:bg-red-600 transition-colors border-t border-red-500" id="btnConfirmOk">Ya, Lanjutkan</button>
+        `;
+        
+        document.getElementById('globalConfirmModal').classList.remove('hidden');
+        
+        document.getElementById('btnConfirmCancel').onclick = () => {
+            document.getElementById('globalConfirmModal').classList.add('hidden');
+        };
+        
+        document.getElementById('btnConfirmOk').onclick = () => {
+            document.getElementById('globalConfirmModal').classList.add('hidden');
+            onConfirm();
+        };
+    }
+
+    function getDashboardView() {
+        let jobs = getOrders();
+        
+        let tglMulai = document.getElementById('dash_tgl_mulai') ? document.getElementById('dash_tgl_mulai').value : '';
+        let tglSelesai = document.getElementById('dash_tgl_selesai') ? document.getElementById('dash_tgl_selesai').value : '';
+        
+        if (tglMulai && tglSelesai) {
+            jobs = jobs.filter(j => j.tgl_pelaksanaan >= tglMulai && j.tgl_pelaksanaan <= tglSelesai);
+        }
+
+        let cntOrder = jobs.length;
+        let cntProg = jobs.filter(j => j.status === 'ON PROGRESS').length;
+        let cntPend = jobs.filter(j => j.status === 'PENDING' || j.status === 'SCHEDULED' || j.status === 'UNSCHEDULED').length;
+        let cntDone = jobs.filter(j => j.status === 'COMPLETED').length;
+        let cntCancel = jobs.filter(j => j.status === 'CANCELED').length;
+
+        let cntCT = jobs.filter(j => j.kategori === 'Crane Truck').length;
+        let cntBC = jobs.filter(j => j.kategori === 'Big Crane').length;
+        let cntLB = jobs.filter(j => j.kategori === 'Lowboy').length;
+        let totalUnits = cntCT + cntBC + cntLB || 1; 
+
+        let pctCT = Math.round((cntCT / totalUnits) * 100) || 0;
+        let pctBC = Math.round((cntBC / totalUnits) * 100) || 0;
+        let pctLB = Math.round((cntLB / totalUnits) * 100) || 0;
+        let degCT = (pctCT / 100) * 360;
+        let degBC = degCT + ((pctBC / 100) * 360);
+        let pieStyle = `background: conic-gradient(#0891b2 0deg ${degCT}deg, #6366f1 ${degCT}deg ${degBC}deg, #94a3b8 ${degBC}deg 360deg);`;
+
+        function getTopData(field) {
+            let counts = {};
+            jobs.forEach(j => { if(j[field]) counts[j[field]] = (counts[j[field]] || 0) + 1; });
+            return Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0, 5);
+        }
+        
+        let topPerusahaan = getTopData('perusahaan');
+        let topDept = getTopData('departemen');
+        let topSection = getTopData('section');
+
+        function renderBarList(data, colorClass) {
+            if(data.length === 0) return `<div class="text-[9px] text-slate-400 italic mt-2">Data kosong</div>`;
+            let maxVal = Math.max(...data.map(d=>d[1])) || 1;
+            return data.map(d => `
+                <div class="mb-1.5 mt-2">
+                    <div class="flex justify-between text-[9px] mb-0.5">
+                        <span class="font-semibold text-slate-700 truncate mr-2">${d[0]}</span>
+                        <span class="font-bold text-slate-500">${d[1]}</span>
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                        <div class="${colorClass} h-1.5 rounded-full chart-bar w-0" data-width="${(d[1]/maxVal)*100}%"></div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        let riggerHours = {};
+        jobs.filter(j => j.status === 'COMPLETED' && j.rigger && j.durasi_aktual).forEach(j => {
+            riggerHours[j.rigger] = (riggerHours[j.rigger] || 0) + parseFloat(j.durasi_aktual);
+            if(j.rigger2) riggerHours[j.rigger2] = (riggerHours[j.rigger2] || 0) + parseFloat(j.durasi_aktual);
+        });
+        let topRiggers = Object.entries(riggerHours).sort((a,b)=>b[1]-a[1]).slice(0, 5);
+
+        return `
+        <div class="max-w-6xl mx-auto space-y-3">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                <h2 class="text-sm font-bold text-slate-800"><i class="fa-solid fa-chart-pie mr-1.5 text-cyan-600"></i>Dashboard Analytics</h2>
+                <div class="flex items-center gap-1 text-[10px] w-full sm:w-auto bg-white border border-slate-200 rounded-md p-1 shadow-sm">
+                    <i class="fa-regular fa-calendar ml-1 text-slate-400"></i>
+                    <input type="date" id="dash_tgl_mulai" class="bg-transparent px-1 py-0.5 text-slate-700 focus:outline-none" value="${tglMulai}" onchange="renderApp()">
+                    <span class="text-slate-400">-</span>
+                    <input type="date" id="dash_tgl_selesai" class="bg-transparent px-1 py-0.5 text-slate-700 focus:outline-none" value="${tglSelesai}" onchange="renderApp()">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                <div class="bg-white border border-slate-200 rounded-md p-3 text-center shadow-sm flex flex-col justify-center">
+                    <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Order</div>
+                    <div class="text-xl font-bold text-slate-800">${cntOrder}</div>
+                </div>
+                <div class="bg-blue-50 border border-blue-200 rounded-md p-3 text-center shadow-sm flex flex-col justify-center">
+                    <div class="text-[9px] font-bold text-blue-500 uppercase tracking-wider mb-1">Progres</div>
+                    <div class="text-xl font-bold text-blue-700">${cntProg}</div>
+                </div>
+                <div class="bg-orange-50 border border-orange-200 rounded-md p-3 text-center shadow-sm flex flex-col justify-center">
+                    <div class="text-[9px] font-bold text-orange-500 uppercase tracking-wider mb-1">Pending</div>
+                    <div class="text-xl font-bold text-orange-600">${cntPend}</div>
+                </div>
+                <div class="bg-emerald-50 border border-emerald-200 rounded-md p-3 text-center shadow-sm flex flex-col justify-center">
+                    <div class="text-[9px] font-bold text-emerald-500 uppercase tracking-wider mb-1">Selesai</div>
+                    <div class="text-xl font-bold text-emerald-600">${cntDone}</div>
+                </div>
+                <div class="bg-red-50 border border-red-200 rounded-md p-3 text-center shadow-sm flex flex-col justify-center col-span-2 sm:col-span-1">
+                    <div class="text-[9px] font-bold text-red-500 uppercase tracking-wider mb-1">Batal</div>
+                    <div class="text-xl font-bold text-red-600">${cntCancel}</div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm flex items-center justify-between">
+                    <div class="flex items-center gap-2 text-slate-500"><i class="fa-solid fa-truck-moving text-base"></i><span class="text-[11px] font-bold">Crane Truck</span></div>
+                    <div class="text-lg font-bold text-slate-800">${cntCT}</div>
+                </div>
+                <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm flex items-center justify-between">
+                    <div class="flex items-center gap-2 text-slate-500"><i class="fa-solid fa-truck-ramp-box text-base"></i><span class="text-[11px] font-bold">Big Crane</span></div>
+                    <div class="text-lg font-bold text-slate-800">${cntBC}</div>
+                </div>
+                <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm flex items-center justify-between">
+                    <div class="flex items-center gap-2 text-slate-500"><i class="fa-solid fa-trailer text-base"></i><span class="text-[11px] font-bold">Lowboy</span></div>
+                    <div class="text-lg font-bold text-slate-800">${cntLB}</div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm flex flex-col items-center justify-center">
+                    <h3 class="text-[10px] font-bold text-slate-600 mb-3 w-full text-left">Distribusi Unit</h3>
+                    ${totalUnits > 1 ? `
+                    <div class="w-24 h-24 rounded-full mb-4 shadow-inner" style="${pieStyle}"></div>
+                    <div class="w-full space-y-1.5 text-[9px] font-semibold text-slate-600">
+                        <div class="flex justify-between items-center"><div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 rounded-sm bg-cyan-600"></div>Crane Truck</div><span>${pctCT}%</span></div>
+                        <div class="flex justify-between items-center"><div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 rounded-sm bg-indigo-500"></div>Big Crane</div><span>${pctBC}%</span></div>
+                        <div class="flex justify-between items-center"><div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 rounded-sm bg-slate-400"></div>Lowboy</div><span>${pctLB}%</span></div>
+                    </div>
+                    ` : `<div class="text-[9px] text-slate-400 italic my-auto">Data kosong</div>`}
+                </div>
+                
+                <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm flex flex-col">
+                    <h3 class="text-[10px] font-bold text-slate-600 border-b border-slate-100 pb-1.5">Top Perusahaan</h3>
+                    ${renderBarList(topPerusahaan, 'bg-cyan-500')}
+                </div>
+                <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm flex flex-col">
+                    <h3 class="text-[10px] font-bold text-slate-600 border-b border-slate-100 pb-1.5">Top Departemen</h3>
+                    ${renderBarList(topDept, 'bg-indigo-400')}
+                </div>
+                <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm flex flex-col">
+                    <h3 class="text-[10px] font-bold text-slate-600 border-b border-slate-100 pb-1.5">Top Section</h3>
+                    ${renderBarList(topSection, 'bg-teal-400')}
+                </div>
+            </div>
+
+            <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm">
+                <h3 class="text-[10px] font-bold text-slate-600 border-b border-slate-100 pb-1.5 mb-2">Performa Rigger (Total Jam Kerja)</h3>
+                ${topRiggers.length === 0 ? `<div class="text-[9px] text-slate-400 italic">Data kosong</div>` : `
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2">
+                    ${topRiggers.map(r => {
+                        let maxHr = topRiggers[0][1] || 1;
+                        return `
+                        <div>
+                            <div class="flex justify-between text-[9px] mb-0.5">
+                                <span class="font-semibold text-slate-700 truncate">${r[0]}</span>
+                                <span class="font-bold text-emerald-600">${r[1].toFixed(1)} Jam</span>
+                            </div>
+                            <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                                <div class="bg-emerald-500 h-1.5 rounded-full chart-bar w-0" data-width="${(r[1]/maxHr)*100}%"></div>
+                            </div>
+                        </div>`;
+                    }).join('')}
+                </div>`}
+            </div>
+        </div>`;
+    }
+
+    function getMonitoringView() {
+        let currentUser = JSON.parse(localStorage.getItem('lifting_user'));
+        let jobs = getOrders();
+        
+        if (currentUser.role === 'ADMIN' || currentUser.role === 'GL') {
+            let tglMulai = document.getElementById('filter_tgl_mulai') ? document.getElementById('filter_tgl_mulai').value : '';
+            let tglSelesai = document.getElementById('filter_tgl_selesai') ? document.getElementById('filter_tgl_selesai').value : '';
+            let filterShift = document.getElementById('filter_shift') ? document.getElementById('filter_shift').value : 'ALL';
+            let filterKategori = document.getElementById('filter_admin_kategori') ? document.getElementById('filter_admin_kategori').value : 'ALL';
+
+            if (tglMulai && tglSelesai) jobs = jobs.filter(j => j.tgl_pelaksanaan >= tglMulai && j.tgl_pelaksanaan <= tglSelesai);
+            if (filterShift !== 'ALL') jobs = jobs.filter(j => j.shift === filterShift);
+            if (filterKategori !== 'ALL') jobs = jobs.filter(j => j.kategori === filterKategori);
+
+            jobs.sort((a, b) => {
+                let valA = (a[sortColumn] || '').toString().toLowerCase();
+                let valB = (b[sortColumn] || '').toString().toLowerCase();
+                if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
+                if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
+                return 0;
+            });
+
+            // Pending khusus Lanjutan yg perlu di validasi ulang di hitung
+            let pendingCount = jobs.filter(j => j.status === 'SCHEDULED' || j.status === 'UNSCHEDULED' || (j.status === 'PENDING' && (!j.operator || !j.rigger))).length;
+
+            let html = `
+            <div class="bg-white rounded-md shadow-sm border border-slate-200 flex flex-col h-full overflow-hidden">
+                <div class="p-2 border-b border-slate-200 flex flex-col sm:flex-row gap-2 justify-between bg-slate-50/50 shrink-0">
+                    <div class="flex items-center justify-between sm:justify-start gap-2 w-full sm:w-auto">
+                        <h2 class="text-sm font-bold text-slate-800 shrink-0"><i class="fa-solid fa-database mr-1.5 text-cyan-600"></i>Data Order</h2>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            ${pendingCount > 0 ? `<div class="bg-red-50 text-red-600 border border-red-200 px-1.5 py-0.5 rounded-sm font-semibold text-[10px]">Validasi: ${pendingCount}</div>` : ''}
+                            <button onclick="downloadCSV()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-0.5 rounded-sm transition-colors flex items-center gap-1 shadow-sm text-[10px]"><i class="fa-solid fa-file-excel"></i> Export</button>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1 text-[10px] w-full sm:w-auto overflow-x-auto hide-scrollbar pb-0.5 sm:pb-0">
+                        <input type="date" id="filter_tgl_mulai" class="border border-slate-300 rounded-sm px-1 py-0.5 text-slate-700 focus:outline-none focus:border-cyan-500 shrink-0" value="${tglMulai}" onchange="renderApp()">
+                        <span class="text-slate-400 shrink-0">-</span>
+                        <input type="date" id="filter_tgl_selesai" class="border border-slate-300 rounded-sm px-1 py-0.5 text-slate-700 focus:outline-none focus:border-cyan-500 shrink-0" value="${tglSelesai}" onchange="renderApp()">
+                        <select id="filter_shift" class="border border-slate-300 rounded-sm px-1 py-0.5 text-slate-700 focus:outline-none focus:border-cyan-500 shrink-0 ml-1" onchange="renderApp()">
+                            <option value="ALL" ${filterShift === 'ALL' ? 'selected' : ''}>All Shift</option>
+                            <option value="Shift 1" ${filterShift === 'Shift 1' ? 'selected' : ''}>S 1</option>
+                            <option value="Shift 2" ${filterShift === 'Shift 2' ? 'selected' : ''}>S 2</option>
+                        </select>
+                        <select id="filter_admin_kategori" class="border border-slate-300 rounded-sm px-1 py-0.5 text-slate-700 focus:outline-none focus:border-cyan-500 shrink-0 ml-1" onchange="renderApp()">
+                            <option value="ALL" ${filterKategori === 'ALL' ? 'selected' : ''}>Semua Armada</option>
+                            <option value="Crane Truck" ${filterKategori === 'Crane Truck' ? 'selected' : ''}>Crane Truck</option>
+                            <option value="Big Crane" ${filterKategori === 'Big Crane' ? 'selected' : ''}>Big Crane</option>
+                            <option value="Lowboy" ${filterKategori === 'Lowboy' ? 'selected' : ''}>Lowboy</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto overflow-y-auto flex-1 w-full bg-white">
+                    <table class="w-full text-left border-collapse min-w-[900px]">
+                        <thead class="bg-slate-100 text-slate-600 text-[10px] border-b border-slate-200 sticky top-0 z-10 shadow-sm">
+                            <tr>
+                                <th class="px-1 md:px-2 py-1.5 text-center font-semibold w-16">Aksi</th>
+                                <th class="px-2 py-1.5 font-semibold w-32 cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('no_wo')">No LIFT & Waktu ${getSortIcon('no_wo')}</th>
+                                <th class="px-2 py-1.5 font-semibold w-24 cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('nama_pemohon')">Pemohon ${getSortIcon('nama_pemohon')}</th>
+                                <th class="px-2 py-1.5 font-semibold w-24 cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('tgl_pelaksanaan')">Jadwal ${getSortIcon('tgl_pelaksanaan')}</th>
+                                <th class="px-2 py-1.5 font-semibold w-32 cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('lokasi_angkat')">Lokasi / Tugas ${getSortIcon('lokasi_angkat')}</th>
+                                <th class="px-2 py-1.5 text-center font-semibold w-24 cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('status')">Status ${getSortIcon('status')}</th>
+                                <th class="px-2 py-1.5 font-semibold min-w-[140px] w-40 cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('unit')">Penugasan ${getSortIcon('unit')}</th>
+                                <th class="px-2 py-1.5 font-semibold w-24 cursor-pointer hover:bg-slate-200 select-none transition-colors text-center whitespace-nowrap" onclick="handleSort('jam_start_aktual')">Waktu Aktual ${getSortIcon('jam_start_aktual')}</th>
+                                <th class="px-2 py-1.5 text-center font-semibold w-16 cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('durasi_aktual')">Durasi ${getSortIcon('durasi_aktual')}</th>
+                                <th class="px-2 py-1.5 font-semibold min-w-[120px]">Kendala</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 text-[11px]">
+                            ${jobs.map(job => {
+                                let statusColor = job.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
+                                                  (job.status === 'ON PROGRESS' ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                                                  (job.status === 'PENDING' ? 'bg-orange-100 text-orange-700 border-orange-200' :
+                                                  (job.status === 'CANCELED' ? 'bg-red-100 text-red-700 border-red-200' : 'bg-slate-100 text-slate-700 border-slate-200')));
+                                
+                                let isNeedValidation = (job.status === 'SCHEDULED' || job.status === 'UNSCHEDULED' || (job.status === 'PENDING' && (!job.operator || !job.rigger)));
+                                let editColorClass = isNeedValidation ? 'bg-purple-50 hover:bg-purple-100 text-purple-600 border-purple-200' : 'bg-orange-50 hover:bg-orange-100 text-orange-600 border-orange-200';
+
+                                let kendalaHtml = '';
+                                if(job.final_inspeksi) kendalaHtml += `<div class="text-[9px] bg-green-50 text-green-700 border border-green-200 rounded-sm px-1 py-0.5 mb-0.5 w-full"><i class="fa-solid fa-check-circle mr-0.5"></i>Insp: ${job.final_inspeksi}</div>`;
+                                if(job.alasan_telat) kendalaHtml += `<div class="text-[9px] bg-red-50 text-red-600 border border-red-200 rounded-sm px-1 py-0.5 mb-0.5 whitespace-normal leading-tight w-full"><i class="fa-solid fa-circle-exclamation mr-0.5"></i>Telat: ${job.alasan_telat}</div>`;
+                                if(job.alasan_overtime) kendalaHtml += `<div class="text-[9px] bg-red-50 text-red-600 border border-red-200 rounded-sm px-1 py-0.5 mb-0.5 whitespace-normal leading-tight w-full"><i class="fa-solid fa-circle-exclamation mr-0.5"></i>Over: ${job.alasan_overtime}</div>`;
+                                if(!job.final_inspeksi && !job.alasan_telat && !job.alasan_overtime) kendalaHtml = '<span class="text-slate-400">-</span>';
+
+                                return `
+                                <tr class="hover:bg-slate-50 transition-colors">
+                                    <td class="px-1 md:px-2 py-1.5 text-center align-top">
+                                        <div class="flex flex-col md:flex-row items-center justify-center gap-1">
+                                            <button onclick="copyJobToWA('${job.no_wo}')" class="bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] p-1 rounded-sm border border-slate-200 shadow-sm w-full md:w-auto flex justify-center" title="Salin Job"><i class="fa-regular fa-copy"></i></button>
+                                            <button onclick="openAdminEditJob('${job.no_wo}')" class="${editColorClass} text-[10px] p-1 rounded-sm border shadow-sm w-full md:w-auto flex justify-center" title="Edit/Validasi Job"><i class="fa-solid fa-pen"></i></button>
+                                            ${currentUser.role === 'ADMIN' ? `<button onclick="confirmHapusOrder('${job.no_wo}')" class="bg-red-50 hover:bg-red-100 text-red-600 text-[10px] p-1 rounded-sm border border-red-200 shadow-sm w-full md:w-auto flex justify-center" title="Hapus Job"><i class="fa-solid fa-trash"></i></button>` : ''}
+                                        </div>
+                                    </td>
+                                    <td class="px-2 py-1.5 align-top">
+                                        <div class="font-bold text-cyan-700 text-[9px] md:text-[10px] cursor-pointer hover:underline leading-tight" onclick="viewJobDetail('${job.no_wo}')">${job.no_wo}</div>
+                                        <div class="text-[8px] md:text-[9px] text-slate-500 mb-1 leading-tight">${job.timestamp.split('T')[0]} ${job.timestamp.split('T')[1].substring(0,5)}</div>
+                                    </td>
+                                    <td class="px-2 py-1.5 align-top">
+                                        <div class="font-semibold text-slate-800 text-[9px] md:text-[10px] uppercase truncate max-w-[70px] md:max-w-none leading-tight" title="${job.nama_pemohon}">${job.nama_pemohon}</div>
+                                        <div class="text-[8px] md:text-[9px] text-slate-500 truncate max-w-[70px] md:max-w-none leading-tight" title="${job.perusahaan} - ${job.departemen}">${job.departemen}</div>
+                                    </td>
+                                    <td class="px-2 py-1.5 align-top">
+                                        <div class="font-bold text-slate-700 text-[10px]">${job.tgl_pelaksanaan}</div>
+                                        <div class="text-[9px] text-slate-500">${job.shift} | Req: ${job.jam_pelaksanaan || '-'} (${job.durasi_request})</div>
+                                    </td>
+                                    <td class="px-2 py-1.5 align-top">
+                                        ${job.kategori !== 'Big Crane' ? `<div class="text-[9px] md:text-[10px] text-orange-600 font-semibold flex items-start gap-1 mb-0.5 leading-tight"><i class="fa-solid fa-location-dot mt-0.5"></i> <span>${job.lokasi_angkat || '-'} <i class="fa-solid fa-arrow-right text-[7px] mx-0.5 text-slate-400"></i> ${job.lokasi_tujuan || '-'}</span></div>` : ''}
+                                        <div class="text-[9px] text-emerald-700 flex items-start gap-1"><i class="fa-solid fa-flag-checkered mt-0.5"></i> <span class="leading-tight truncate max-w-[100px]" title="${job.deskripsi}">${job.deskripsi}</span></div>
+                                    </td>
+                                    <td class="px-2 py-1.5 text-center align-top">
+                                        <span class="${statusColor} border text-[9px] px-1.5 py-0.5 rounded-sm font-semibold whitespace-nowrap inline-block">${job.status}</span>
+                                    </td>
+                                    <td class="px-2 py-1.5 text-[9px] align-top text-slate-600 leading-tight">
+                                        <div class="flex flex-col gap-0.5">
+                                            <div><span class="text-slate-400">GL:</span> <span class="font-semibold text-slate-800">${job.gl || '-'}</span></div>
+                                            <div><span class="text-slate-400">Unit:</span> <span class="font-semibold text-slate-800">${job.unit || '-'}</span></div>
+                                            <div><span class="text-slate-400">OP:</span> <span class="font-semibold text-slate-800">${job.operator || '-'}</span></div>
+                                            <div><span class="text-slate-400">Rg:</span> <span class="font-semibold text-slate-800">${job.rigger || '-'}${job.rigger2 ? ', ' + job.rigger2 : ''}</span></div>
+                                        </div>
+                                    </td>
+                                    <td class="px-2 py-1.5 text-[9px] align-top text-center text-slate-600 font-mono tracking-tighter whitespace-nowrap">
+                                        ${job.jam_start_aktual || '--:--'} s/d ${job.jam_end_aktual || '--:--'}
+                                    </td>
+                                    <td class="px-2 py-1.5 text-center text-[10px] font-semibold text-slate-800 align-top">
+                                        ${job.durasi_aktual ? job.durasi_aktual + ' J' : '-'}
+                                    </td>
+                                    <td class="px-2 py-1.5 align-top">
+                                        <div class="flex flex-col">${kendalaHtml}</div>
+                                    </td>
+                                </tr>`;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div id="editJobModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex justify-center items-center z-50 hidden p-3">
+                <div class="bg-white rounded-md shadow-xl w-full max-w-sm overflow-hidden flex flex-col max-h-[90vh]">
+                    <div class="p-3 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
+                        <h3 class="font-bold text-slate-800 text-xs"><i class="fa-solid fa-pen-to-square mr-1.5 text-cyan-600"></i>Edit / Validasi Job</h3>
+                        <button onclick="document.getElementById('editJobModal').classList.add('hidden')" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-sm"></i></button>
+                    </div>
+                    <div class="p-3 overflow-y-auto" id="editJobContent"></div>
+                </div>
+            </div>
+            
+            <div id="detailJobModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[60] hidden p-3">
+                <div class="bg-white rounded-md shadow-xl w-full max-w-sm overflow-hidden flex flex-col max-h-[90vh]">
+                    <div class="p-2 border-b border-slate-200 flex justify-between items-center shrink-0">
+                        <h3 class="font-bold text-slate-800 text-xs">Detail Pekerjaan</h3>
+                        <button onclick="document.getElementById('detailJobModal').classList.add('hidden')" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-sm"></i></button>
+                    </div>
+                    <div class="p-3 overflow-y-auto" id="detailJobContent"></div>
+                </div>
+            </div>`;
+            return html;
+        }
+
+        // USER FILTERING
+        jobs = jobs.filter(j => j.nrp_pemohon === currentUser.nrp);
+
+        let filterCat = document.getElementById('filter_kategori') ? document.getElementById('filter_kategori').value : 'ALL';
+        if (filterCat !== 'ALL') jobs = jobs.filter(j => j.kategori === filterCat);
+        
+        let html = `<h2 class="text-sm font-bold text-slate-800 mb-2"><i class="fa-solid fa-list-check mr-1.5 text-cyan-600"></i>Data Order Pekerjaan</h2>`;
+
+        if (jobs.length === 0) {
+            html += `<div class="bg-white rounded-md p-6 text-center border border-slate-200 shadow-sm"><i class="fa-solid fa-folder-open text-3xl text-slate-300 mb-2"></i><p class="text-slate-400 text-xs">Belum ada data.</p></div>`;
+            return html;
+        }
+
+        jobs.forEach(job => {
+            let statusColor = job.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
+                              (job.status === 'ON PROGRESS' ? 'bg-blue-50 text-blue-600 border-blue-200' :
+                              (job.status === 'PENDING' ? 'bg-orange-50 text-orange-600 border-orange-200' :
+                              (job.status === 'CANCELED' ? 'bg-red-50 text-red-600 border-red-200' : 'bg-slate-50 text-slate-600 border-slate-200')));
+
+            html += `
+            <div class="bg-white rounded-md p-2.5 mb-2 border border-slate-200 shadow-sm relative text-[11px]">
+                <div class="absolute top-2 right-2 ${statusColor} border px-1.5 py-0.5 rounded-sm text-[8px] font-bold tracking-wider">${job.status}</div>
+                
+                <div class="text-[9px] text-slate-400 font-mono mb-1">${job.no_wo}</div>
+                <div class="flex items-center gap-1.5 mb-1.5">
+                    <span class="font-bold text-slate-800 text-xs">${job.kategori}</span>
+                    <span class="text-slate-300">|</span>
+                    <span class="text-slate-500 text-[10px]">${job.tgl_pelaksanaan} ${job.jam_pelaksanaan || ''}</span>
+                </div>
+
+                <div class="bg-slate-50 rounded-sm border border-slate-100 p-1.5 grid grid-cols-3 gap-1.5 mb-1.5 text-[10px]">
+                    <div><div class="text-slate-400 text-[9px]">Durasi Req</div><div class="font-bold text-slate-700">${job.durasi_request}</div></div>
+                    <div><div class="text-slate-400 text-[9px]">Lokasi</div><div class="font-medium text-slate-600 truncate">${job.lokasi_angkat || '-'} <i class="fa-solid fa-arrow-right text-[8px] text-slate-400 mx-0.5"></i> ${job.lokasi_tujuan || '-'}</div></div>
+                    <div><div class="text-slate-400 text-[9px]">Unit</div><div class="font-bold text-cyan-600">${job.unit || 'Belum ada'}</div></div>
+                </div>
+                
+                <div class="text-[10px] text-slate-500 mb-2 pl-1 border-l-2 border-slate-300 truncate">${job.deskripsi}</div>
+
+                <div class="pt-1.5 border-t border-slate-100 flex items-center justify-between">
+                    <div class="text-[9px] text-slate-400"><i class="fa-solid fa-user-circle mr-1"></i>${job.nama_pemohon}</div>
+                    <div class="flex gap-1.5">
+                        <button onclick="copyJobToWA('${job.no_wo}')" class="text-[9px] font-semibold text-slate-600 hover:text-slate-800 bg-slate-100 px-1.5 py-1 rounded-sm border border-slate-200"><i class="fa-regular fa-copy"></i></button>
+                        <button onclick="viewJobDetail('${job.no_wo}')" class="text-[9px] font-semibold text-cyan-600 hover:text-cyan-800 bg-cyan-50 px-1.5 py-1 rounded-sm border border-cyan-100">Detail</button>
+                    </div>
+                </div>
+            </div>`;
+        });
+
+        html += `
+        <div id="detailJobModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 hidden p-3">
+            <div class="bg-white rounded-md shadow-xl w-full max-w-sm overflow-hidden flex flex-col max-h-[90vh]">
+                <div class="p-2 border-b border-slate-200 flex justify-between items-center shrink-0">
+                    <h3 class="font-bold text-slate-800 text-xs">Detail Pekerjaan</h3>
+                    <button onclick="document.getElementById('detailJobModal').classList.add('hidden')" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-sm"></i></button>
+                </div>
+                <div class="p-3 overflow-y-auto" id="detailJobContent"></div>
+            </div>
+        </div>`;
+        return html;
+    }
+
+    function confirmHapusOrder(wo) {
+        openCustomConfirm('Hapus Data', `Apakah Anda yakin ingin menghapus order ${wo}?`, () => {
+            let jobs = getOrders().filter(j => j.no_wo !== wo);
+            saveOrders(jobs);
+            showToast('Data dihapus!');
+            renderApp();
+        });
+    }
+
+    function downloadCSV() {
+        const jobs = getOrders();
+        if(jobs.length === 0) return showToast("Tidak ada data", "error");
+        
+        let csvContent = "data:text/csv;charset=utf-8,";
+        csvContent += "No WO,Status,Pemohon,Dept,Kategori,Tgl Pelaksanaan,Jam Req,Shift,Durasi Req,Lokasi Angkat,Lokasi Tujuan,Deskripsi,GL,Unit,Operator,Rigger,Jam Start,Jam End,Durasi Aktual,Final Inspeksi,Alasan Telat,Alasan Overtime\n";
+        
+        jobs.forEach(j => {
+            let riggerCombined = j.rigger || '';
+            if (j.rigger2) riggerCombined += ' & ' + j.rigger2;
+            let row = [
+                j.no_wo, j.status, j.nama_pemohon, j.departemen, j.kategori,
+                j.tgl_pelaksanaan, j.jam_pelaksanaan||'', j.shift, j.durasi_request,
+                `"${(j.lokasi_angkat||'').replace(/"/g, '""')}"`, `"${(j.lokasi_tujuan||'').replace(/"/g, '""')}"`, `"${(j.deskripsi||'').replace(/"/g, '""')}"`,
+                j.gl||'', j.unit||'', j.operator||'', `"${riggerCombined}"`,
+                j.jam_start_aktual||'', j.jam_end_aktual||'', j.durasi_aktual||'',
+                j.final_inspeksi||'', `"${(j.alasan_telat||'').replace(/"/g, '""')}"`, `"${(j.alasan_overtime||'').replace(/"/g, '""')}"`
+            ].join(",");
+            csvContent += row + "\n";
+        });
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `Data_Lifting_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    function openAdminEditJob(wo) {
+        // PERBAIKAN: Hanya update yang BUKAN completed/canceled
+        const job = getOrders().find(j => j.no_wo === wo && j.status !== 'COMPLETED' && j.status !== 'CANCELED');
+        if(!job) return;
+        
+        const m = getMasterData();
+        let unitOptions = '';
+        if (job.kategori === 'Crane Truck') unitOptions = m.unit_ct.map(u => `<option value="${u}" ${job.unit===u?'selected':''}>${u}</option>`).join('');
+        else if (job.kategori === 'Big Crane') unitOptions = m.unit_big_crane.map(u => `<option value="${u}" ${job.unit===u?'selected':''}>${u}</option>`).join('');
+        else unitOptions = m.unit_lowboy.map(u => `<option value="${u}" ${job.unit===u?'selected':''}>${u}</option>`).join('');
+
+        const glOptions = m.gl.map(g => `<option value="${g}" ${job.gl===g?'selected':''}>${g}</option>`).join('');
+        const opOptions = m.operator.map(o => `<option value="${o}" ${job.operator===o?'selected':''}>${o}</option>`).join('');
+        const rigOptions1 = m.rigger.map(r => `<option value="${r}" ${job.rigger===r?'selected':''}>${r}</option>`).join('');
+        const rigOptions2 = m.rigger.map(r => `<option value="${r}" ${job.rigger2===r?'selected':''}>${r}</option>`).join('');
+
+        let riggerHTML = '';
+        if (job.kategori === 'Big Crane') {
+            riggerHTML = `
+                <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Rigger 1 *</label><select id="edit_rig" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500" required><option value="">-- Pilih --</option>${rigOptions1}</select></div>
+                <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Rigger 2 *</label><select id="edit_rig2" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500" required><option value="">-- Pilih --</option>${rigOptions2}</select></div>
+            `;
+        } else {
+             riggerHTML = `
+                <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Rigger ${job.kategori === 'Lowboy' ? '*' : '(Opsional)'}</label><select id="edit_rig" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500" ${job.kategori === 'Lowboy' ? 'required' : ''}><option value="">-- Pilih --</option>${rigOptions1}</select></div>
+            `;
+        }
+
+        document.getElementById('editJobContent').innerHTML = `
+            <form onsubmit="saveAdminEditJob(event, '${wo}')" class="space-y-2">
+                <div class="bg-cyan-50 border border-cyan-100 p-1.5 rounded-sm mb-1 text-center">
+                    <p class="text-[10px] font-bold text-cyan-700">${job.no_wo} (${job.kategori})</p>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Tgl Pelaksanaan</label><input type="date" id="edit_tgl" value="${job.tgl_pelaksanaan}" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                    <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Jam Req</label><input type="time" id="edit_jam" value="${job.jam_pelaksanaan || ''}" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500" ${job.kategori==='Crane Truck'?'required':''}></div>
+                </div>
+                ${job.kategori !== 'Big Crane' ? `
+                <div class="grid grid-cols-2 gap-2">
+                    <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Lokasi Asal</label><input type="text" id="edit_lok_asal" value="${job.lokasi_angkat || ''}" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                    <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Lokasi Tujuan</label><input type="text" id="edit_lok_tujuan" value="${job.lokasi_tujuan || ''}" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                </div>` : ''}
+                <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Deskripsi / Beban</label><input type="text" id="edit_deskripsi" value="${job.deskripsi || ''}" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
+
+                <hr class="my-2 border-slate-200">
+                <div class="text-[9px] font-bold text-slate-400 tracking-wider mb-1">PENUGASAN (GL)</div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 mb-0.5">Group Leader *</label>
+                        <select id="edit_gl" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500" required><option value="">-- Pilih --</option>${glOptions}</select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 mb-0.5">Unit *</label>
+                        <select id="edit_unit" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500" required><option value="">-- Pilih --</option>${unitOptions}</select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2 mt-2">
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 mb-0.5">Operator ${job.kategori !== 'Crane Truck' ? '*' : '(Opsional)'}</label>
+                        <select id="edit_op" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500" ${job.kategori !== 'Crane Truck' ? 'required' : ''}><option value="">-- Pilih --</option>${opOptions}</select>
+                    </div>
+                    ${riggerHTML}
+                </div>
+                <button type="submit" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-1.5 rounded-sm text-[11px] mt-2 transition-colors">Simpan & Validasi</button>
+            </form>
+        `;
+        document.getElementById('editJobModal').classList.remove('hidden');
+    }
+
+    function saveAdminEditJob(e, wo) {
+        e.preventDefault();
+        let jobs = getOrders();
+        
+        let idx = jobs.findIndex(j => j.no_wo === wo && j.status !== 'COMPLETED' && j.status !== 'CANCELED');
+        if(idx === -1) return alert("Data order aktif tidak ditemukan!");
+
+        jobs[idx].tgl_pelaksanaan = document.getElementById('edit_tgl').value;
+        jobs[idx].jam_pelaksanaan = document.getElementById('edit_jam').value;
+        if(jobs[idx].kategori === 'Crane Truck' && jobs[idx].jam_pelaksanaan) {
+            let h = parseInt(jobs[idx].jam_pelaksanaan.split(':')[0]);
+            jobs[idx].shift = (h >= 5 && h < 17) ? 'Shift 1' : 'Shift 2';
+        }
+        
+        if (jobs[idx].kategori !== 'Big Crane') {
+            jobs[idx].lokasi_angkat = document.getElementById('edit_lok_asal').value;
+            jobs[idx].lokasi_tujuan = document.getElementById('edit_lok_tujuan').value;
+        }
+        jobs[idx].deskripsi = document.getElementById('edit_deskripsi').value;
+        
+        const selectedGL = document.getElementById('edit_gl').value;
+        const selectedUnit = document.getElementById('edit_unit').value;
+        const op = document.getElementById('edit_op').value;
+        const rig = document.getElementById('edit_rig').value;
+        const rig2 = document.getElementById('edit_rig2') ? document.getElementById('edit_rig2').value : '';
+        
+        jobs[idx].gl = selectedGL;
+        jobs[idx].unit = selectedUnit;
+        jobs[idx].operator = op;
+        jobs[idx].rigger = rig;
+        jobs[idx].rigger2 = rig2;
+
+        let isValidated = false;
+        if (jobs[idx].kategori === 'Big Crane') {
+            isValidated = (selectedGL && selectedUnit && op && rig && rig2);
+        } else if (jobs[idx].kategori === 'Lowboy') {
+            isValidated = (selectedGL && selectedUnit && op && rig);
+        } else {
+            isValidated = (selectedGL && selectedUnit);
+        }
+
+        if (isValidated && (jobs[idx].status === 'SCHEDULED' || jobs[idx].status === 'UNSCHEDULED' || jobs[idx].status === 'PENDING')) {
+            jobs[idx].status = 'ON PROGRESS';
+            showToast('Job divalidasi!');
+        } else {
+            showToast('Disimpan!');
+        }
+
+        saveOrders(jobs);
+        document.getElementById('editJobModal').classList.add('hidden');
+        renderApp();
+    }
+
+    function getOrderFormView() {
+        const user = JSON.parse(localStorage.getItem('lifting_user'));
+        const m = getMasterData();
+        const isAdminGL = user.role === 'ADMIN' || user.role === 'GL';
+        const settings = getSettings();
+        
+        const styleCard = (url) => url 
+            ? `style="background-image: url('${url}'); background-size: cover; background-position: center;"` 
+            : ``;
+            
+        const contentCardCT = settings.iconCTUrl
+            ? `<div class="absolute inset-0 bg-slate-900/30 group-hover:bg-slate-900/10 transition-colors"></div><span class="font-bold text-white text-sm uppercase relative z-10 tracking-widest drop-shadow-lg">Crane Truck</span>`
+            : `<div class="w-10 h-10 rounded-full bg-slate-50 group-hover:bg-cyan-50 flex items-center justify-center transition-colors"><i class="fa-solid fa-truck-moving text-xl text-slate-400 group-hover:text-cyan-600"></i></div><span class="font-bold text-slate-700 text-[10px] uppercase tracking-wide">Crane Truck</span>`;
+
+        const contentCardBC = settings.iconBCUrl
+            ? `<div class="absolute inset-0 bg-slate-900/30 group-hover:bg-slate-900/10 transition-colors"></div><span class="font-bold text-white text-sm uppercase relative z-10 tracking-widest drop-shadow-lg">Big Crane</span>`
+            : `<div class="w-10 h-10 rounded-full bg-slate-50 group-hover:bg-cyan-50 flex items-center justify-center transition-colors"><i class="fa-solid fa-truck-ramp-box text-xl text-slate-400 group-hover:text-cyan-600"></i></div><span class="font-bold text-slate-700 text-[10px] uppercase tracking-wide">Big Crane</span>`;
+
+        const contentCardLB = settings.iconLBUrl
+            ? `<div class="absolute inset-0 bg-slate-900/30 group-hover:bg-slate-900/10 transition-colors"></div><span class="font-bold text-white text-sm uppercase relative z-10 tracking-widest drop-shadow-lg">Lowboy</span>`
+            : `<div class="w-10 h-10 rounded-full bg-slate-50 group-hover:bg-cyan-50 flex items-center justify-center transition-colors"><i class="fa-solid fa-trailer text-xl text-slate-400 group-hover:text-cyan-600"></i></div><span class="font-bold text-slate-700 text-[10px] uppercase tracking-wide">Lowboy</span>`;
+
+        const btnCT = `<button onclick="userOrderFleetMode='Crane Truck'; renderApp();" class="relative bg-white border border-slate-200 hover:border-cyan-500 rounded-md flex flex-col items-center justify-center gap-2 shadow-sm transition-all group h-28 overflow-hidden" ${styleCard(settings.iconCTUrl)}>${contentCardCT}</button>`;
+        const btnBC = `<button onclick="userOrderFleetMode='Big Crane'; renderApp();" class="relative bg-white border border-slate-200 hover:border-cyan-500 rounded-md flex flex-col items-center justify-center gap-2 shadow-sm transition-all group h-28 overflow-hidden" ${styleCard(settings.iconBCUrl)}>${contentCardBC}</button>`;
+        const btnLB = `<button onclick="userOrderFleetMode='Lowboy'; renderApp();" class="relative bg-white border border-slate-200 hover:border-cyan-500 rounded-md flex flex-col items-center justify-center gap-2 shadow-sm transition-all group h-28 overflow-hidden" ${styleCard(settings.iconLBUrl)}>${contentCardLB}</button>`;
+
+        if (!userOrderFleetMode) {
+            return `
+            <div class="min-h-[70vh] flex flex-col items-center justify-center max-w-[800px] mx-auto w-full px-4">
+                <h2 class="text-sm font-bold text-slate-800 mb-4 text-center"><i class="fa-solid fa-list-check mr-1.5 text-cyan-600"></i>Pilih Unit</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full">
+                    ${btnCT}
+                    ${btnBC}
+                    ${btnLB}
+                </div>
+            </div>`;
+        }
+
+        const cat = userOrderFleetMode;
+        let formFields = '';
+        if (cat === 'Crane Truck') {
+            formFields = `
+                <div class="grid grid-cols-2 gap-2">
+                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Tgl Pelaksanaan *</label><input type="date" id="tgl_pelaksanaan" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Jam Req (HH:mm) *</label><input type="time" id="jam_pelaksanaan" onchange="calculateShift()" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Shift Kerja</label><input type="text" id="shift" class="w-full border border-slate-200 bg-slate-50 rounded-sm px-2 py-1.5 text-xs text-slate-500 cursor-not-allowed" placeholder="Otomatis" readonly></div>
+                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Durasi (Jam) *</label><input type="number" id="durasi_req" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                </div>
+                <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Lokasi Angkat *</label><input type="text" id="lok_angkat" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" placeholder="Muat..." required></div>
+                <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Lokasi Tujuan *</label><input type="text" id="lok_tujuan" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" placeholder="Bongkar..." required></div>
+                <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Deskripsi & Tonase Beban *</label><textarea id="deskripsi" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500 h-14" placeholder="Rincian..." required></textarea></div>
+                <div>
+                    <label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Upload Foto Bukti (Opsional)</label>
+                    <input type="file" id="foto_evidence" accept="image/*" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] focus:outline-none focus:border-cyan-500 file:mr-2 file:py-0.5 file:px-2 file:rounded-sm file:border-0 file:text-[9px] file:font-semibold file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100 cursor-pointer">
+                </div>
+            `;
+        } else if (cat === 'Big Crane') {
+            formFields = `
+                <div class="grid grid-cols-2 gap-2">
+                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Tgl Pelaksanaan *</label><input type="date" id="tgl_pelaksanaan" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Durasi *</label>
+                        <div class="flex gap-1">
+                            <input type="number" id="durasi_req" class="w-2/3 border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" required>
+                            <select id="satuan_durasi" class="w-1/3 border border-slate-300 rounded-sm px-1 py-1.5 text-xs focus:outline-none focus:border-cyan-500"><option value="JAM">Jam</option><option value="HARI">Hari</option></select>
+                        </div>
+                    </div>
+                </div>
+                <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Deskripsi Pekerjaan *</label><textarea id="deskripsi" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500 h-14" placeholder="Rincian..." required></textarea></div>
+                <div>
+                    <label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Upload Foto Bukti (Opsional)</label>
+                    <input type="file" id="foto_evidence" accept="image/*" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] focus:outline-none focus:border-cyan-500 file:mr-2 file:py-0.5 file:px-2 file:rounded-sm file:border-0 file:text-[9px] file:font-semibold file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100 cursor-pointer">
+                </div>
+            `;
+        } else if (cat === 'Lowboy') {
+             formFields = `
+                <div class="grid grid-cols-2 gap-2">
+                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Tgl Pelaksanaan *</label><input type="date" id="tgl_pelaksanaan" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Durasi *</label>
+                        <div class="flex gap-1">
+                            <input type="number" id="durasi_req" class="w-2/3 border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" required>
+                            <select id="satuan_durasi" class="w-1/3 border border-slate-300 rounded-sm px-1 py-1.5 text-xs focus:outline-none focus:border-cyan-500"><option value="JAM">Jam</option><option value="HARI">Hari</option></select>
+                        </div>
+                    </div>
+                </div>
+                <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Rute Naikan Barang *</label><input type="text" id="lok_angkat" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" placeholder="Titik muat..." required></div>
+                <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Rute Turunkan Barang *</label><input type="text" id="lok_tujuan" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" placeholder="Titik bongkar..." required></div>
+                <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Deskripsi Pekerjaan *</label><textarea id="deskripsi" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500 h-14" placeholder="Rincian..." required></textarea></div>
+                <div>
+                    <label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Upload Foto Bukti (Opsional)</label>
+                    <input type="file" id="foto_evidence" accept="image/*" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] focus:outline-none focus:border-cyan-500 file:mr-2 file:py-0.5 file:px-2 file:rounded-sm file:border-0 file:text-[9px] file:font-semibold file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100 cursor-pointer">
+                </div>
+            `;
+        }
+
+        let requesterHtml = '';
+        if (isAdminGL) {
+            requesterHtml = `
+            <div class="bg-cyan-50 border border-cyan-200 rounded-sm p-2 mb-3">
+                <p class="text-[9px] font-bold text-cyan-700 mb-1 uppercase tracking-wider"><i class="fa-solid fa-user-pen mr-1"></i>Delegasi: Info Pemohon</p>
+                <div class="grid grid-cols-2 gap-2 text-[10px]">
+                    <input type="text" id="del_nama" placeholder="Nama Pemohon..." value="${user.nama_lengkap}" class="w-full border border-slate-300 rounded-sm px-1.5 py-1" required>
+                    <input list="profListDepartemen" id="del_dept" placeholder="Departemen..." value="${user.departemen}" class="w-full border border-slate-300 rounded-sm px-1.5 py-1" required>
+                    <input list="profListPerusahaan" id="del_vendor" placeholder="Perusahaan/Vendor..." value="${user.perusahaan}" class="w-full border border-slate-300 rounded-sm px-1.5 py-1" required>
+                    <input type="number" id="del_wa" placeholder="No WA..." value="${user.no_wa}" class="w-full border border-slate-300 rounded-sm px-1.5 py-1" required>
+                </div>
+            </div>`;
+        } else {
+            requesterHtml = `
+            <div class="bg-slate-50 border border-slate-200 rounded-sm p-2 mb-3">
+                <p class="text-[9px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Info Pemohon</p>
+                <div class="grid grid-cols-2 gap-y-1 gap-x-2 text-[10px]">
+                    <div><p class="text-slate-500 text-[9px]">Nama:</p><p class="font-semibold text-slate-800">${user.nama_lengkap}</p></div>
+                    <div><p class="text-slate-500 text-[9px]">Dept:</p><p class="font-semibold text-slate-800">${user.departemen}</p></div>
+                    <div><p class="text-slate-500 text-[9px]">No. WA:</p><p class="font-semibold text-slate-800">${user.no_wa}</p></div>
+                    <div><p class="text-slate-500 text-[9px]">Vendor:</p><p class="font-semibold text-slate-800">${user.perusahaan}</p></div>
+                </div>
+            </div>`;
+        }
+
+        return `
+        <div class="max-w-md mx-auto bg-white rounded-md shadow-sm border border-slate-200 overflow-hidden mt-2">
+            <div class="p-2 border-b border-slate-100 flex items-center gap-2">
+                <button onclick="userOrderFleetMode=null; renderApp();" class="w-6 h-6 rounded-sm border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50"><i class="fa-solid fa-arrow-left text-[10px]"></i></button>
+                <h2 class="text-sm font-bold text-slate-800">Order: <span class="text-cyan-600">${cat}</span></h2>
+            </div>
+            <div class="p-3">
+                <datalist id="profListPerusahaan">${m.perusahaan.map(p=>`<option value="${p}">`).join('')}</datalist>
+                <datalist id="profListDepartemen">${m.departemen.map(d=>`<option value="${d}">`).join('')}</datalist>
+                ${requesterHtml}
+                <form onsubmit="submitOrder(event)" class="space-y-2">
+                    ${formFields}
+                    <div class="pt-2 mt-3 border-t border-slate-100">
+                        <button id="btnSubmitOrder" type="submit" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-1.5 rounded-sm transition-colors text-xs shadow-sm">Submit Order</button>
+                    </div>
+                </form>
+            </div>
+        </div>`;
+    }
+
+    function calculateShift() {
+        const jamInput = document.getElementById('jam_pelaksanaan');
+        if (!jamInput || !jamInput.value) return;
+        const shiftField = document.getElementById('shift');
+        if(!shiftField) return;
+        const h = parseInt(jamInput.value.split(':')[0]);
+        if (h >= 5 && h < 17) shiftField.value = "Shift 1";
+        else shiftField.value = "Shift 2";
+    }
+
+    function submitOrder(e) {
+        e.preventDefault();
+        
+        document.getElementById('btnSubmitOrder').disabled = true;
+        document.getElementById('btnSubmitOrder').innerText = "Memproses...";
+
+        const user = JSON.parse(localStorage.getItem('lifting_user'));
+        const cat = userOrderFleetMode;
+        const isAdminGL = user.role === 'ADMIN' || user.role === 'GL';
+        
+        let tgl = document.getElementById('tgl_pelaksanaan')?.value || '';
+        let jam = document.getElementById('jam_pelaksanaan')?.value || '';
+        let statusTag = 'SCHEDULED';
+        
+        if (tgl) {
+            let reqDate = new Date(`${tgl}T00:00:00`);
+            let now = new Date();
+            now.setHours(0,0,0,0);
+            let diffDays = (reqDate - now) / (1000 * 60 * 60 * 24);
+
+            if (cat === 'Big Crane') {
+                if (diffDays < 3) statusTag = 'UNSCHEDULED';
+            } else if (cat === 'Crane Truck' && jam) {
+                let reqTime = new Date(`${tgl}T${jam}:00`);
+                let diffHours = (reqTime - new Date()) / (1000 * 60 * 60);
+                if (diffHours < 6) statusTag = 'UNSCHEDULED';
+            }
+        }
+
+        let durasiVal = document.getElementById('durasi_req')?.value || '';
+        let satuan = document.getElementById('satuan_durasi')?.value || 'JAM';
+        
+        let reqName = isAdminGL ? document.getElementById('del_nama').value : user.nama_lengkap;
+        let reqDept = isAdminGL ? document.getElementById('del_dept').value : user.departemen;
+        let reqVend = isAdminGL ? document.getElementById('del_vendor').value : user.perusahaan;
+        let reqWa   = isAdminGL ? document.getElementById('del_wa').value : user.no_wa;
+
+        const baseOrder = {
+            no_wo: generateWO(cat),
+            timestamp: new Date().toISOString(),
+            kategori: cat,
+            nrp_pemohon: user.nrp, nama_pemohon: reqName,
+            perusahaan: reqVend, departemen: reqDept, no_wa: reqWa,
+            tgl_pelaksanaan: tgl, jam_pelaksanaan: jam,
+            shift: document.getElementById('shift')?.value || '-',
+            durasi_request: `${durasiVal} ${satuan}`,
+            lokasi_angkat: document.getElementById('lok_angkat')?.value || '',
+            lokasi_tujuan: document.getElementById('lok_tujuan')?.value || '',
+            deskripsi: document.getElementById('deskripsi')?.value || '',
+            status: statusTag,
+            foto_evidence: '', gl: '', unit: '', operator: '', rigger: '', rigger2: '', jam_start_aktual: '', jam_end_aktual: '', durasi_aktual: '', final_inspeksi: '', alasan_telat: '', alasan_overtime: '', alasan_pending: ''
+        };
+
+        const fotoInput = document.getElementById('foto_evidence');
+        if (fotoInput && fotoInput.files.length > 0) {
+            const file = fotoInput.files[0];
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const img = new Image();
+                img.onload = async function() {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 800; const MAX_HEIGHT = 800;
+                    let width = img.width; let height = img.height;
+
+                    if (width > height) {
+                        if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+                    } else {
+                        if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
+                    }
+                    canvas.width = width; canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    let compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
+
+                    if (GOOGLE_SCRIPT_URL) {
+                        document.getElementById('btnSubmitOrder').innerText = "Mengupload Foto ke Drive...";
+                        try {
+                            let base64Data = compressedBase64.split(',')[1];
+                            let response = await fetch(GOOGLE_SCRIPT_URL, {
+                                method: 'POST',
+                                body: JSON.stringify({
+                                    fileName: `Bukti_${baseOrder.no_wo}.jpg`,
+                                    mimeType: 'image/jpeg',
+                                    data: base64Data
+                                })
+                            });
+                            let result = await response.json();
+                            if(result.status === 'success') {
+                                baseOrder.foto_evidence = result.fileUrl; 
+                            } else {
+                                baseOrder.foto_evidence = compressedBase64; 
+                            }
+                        } catch(e) {
+                            baseOrder.foto_evidence = compressedBase64; 
+                        }
+                    } else {
+                        baseOrder.foto_evidence = compressedBase64; 
+                    }
+                    finishSubmitOrder(baseOrder, user);
+                }
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        } else {
+            finishSubmitOrder(baseOrder, user);
+        }
+    }
+
+    function finishSubmitOrder(newOrder, user) {
+        const orders = getOrders();
+        orders.unshift(newOrder);
+        saveOrders(orders); // Trigger background sync ke Supabase
+        showToast('Pemesanan disubmit!');
+        currentTab = (user.role === 'ADMIN' || user.role === 'GL') ? 'dashboard' : 'monitoring';
+        userOrderFleetMode = null;
+        renderApp();
+    }
+
+    function getManpowerWorkflow() {
+        const settings = getSettings() || {};
+        
+        const styleCard = (url) => url 
+            ? `style="background-image: url('${url}'); background-size: cover; background-position: center;"` 
+            : ``;
+            
+        const contentCardCT = settings.iconCTUrl
+            ? `<div class="absolute inset-0 bg-slate-900/30 group-hover:bg-slate-900/10 transition-colors"></div><span class="font-bold text-white text-sm uppercase relative z-10 tracking-widest drop-shadow-lg">Crane Truck</span>`
+            : `<div class="w-10 h-10 rounded-full bg-slate-50 group-hover:bg-cyan-50 flex items-center justify-center transition-colors"><i class="fa-solid fa-truck-moving text-xl text-slate-400 group-hover:text-cyan-600"></i></div><span class="font-bold text-slate-700 text-[10px] uppercase tracking-wide">Crane Truck</span>`;
+
+        const contentCardBC = settings.iconBCUrl
+            ? `<div class="absolute inset-0 bg-slate-900/30 group-hover:bg-slate-900/10 transition-colors"></div><span class="font-bold text-white text-sm uppercase relative z-10 tracking-widest drop-shadow-lg">Big Crane</span>`
+            : `<div class="w-10 h-10 rounded-full bg-slate-50 group-hover:bg-cyan-50 flex items-center justify-center transition-colors"><i class="fa-solid fa-truck-ramp-box text-xl text-slate-400 group-hover:text-cyan-600"></i></div><span class="font-bold text-slate-700 text-[10px] uppercase tracking-wide">Big Crane</span>`;
+
+        const contentCardLB = settings.iconLBUrl
+            ? `<div class="absolute inset-0 bg-slate-900/30 group-hover:bg-slate-900/10 transition-colors"></div><span class="font-bold text-white text-sm uppercase relative z-10 tracking-widest drop-shadow-lg">Lowboy</span>`
+            : `<div class="w-10 h-10 rounded-full bg-slate-50 group-hover:bg-cyan-50 flex items-center justify-center transition-colors"><i class="fa-solid fa-trailer text-xl text-slate-400 group-hover:text-cyan-600"></i></div><span class="font-bold text-slate-700 text-[10px] uppercase tracking-wide">Lowboy</span>`;
+
+        const btnCT = `<button onclick="mpFleetMode='Crane Truck'; renderApp();" class="relative bg-white border border-slate-200 hover:border-cyan-500 rounded-md flex flex-col items-center justify-center gap-2 shadow-sm transition-all group h-28 overflow-hidden" ${styleCard(settings.iconCTUrl)}>${contentCardCT}</button>`;
+        const btnBC = `<button onclick="mpFleetMode='Big Crane'; renderApp();" class="relative bg-white border border-slate-200 hover:border-cyan-500 rounded-md flex flex-col items-center justify-center gap-2 shadow-sm transition-all group h-28 overflow-hidden" ${styleCard(settings.iconBCUrl)}>${contentCardBC}</button>`;
+        const btnLB = `<button onclick="mpFleetMode='Lowboy'; renderApp();" class="relative bg-white border border-slate-200 hover:border-cyan-500 rounded-md flex flex-col items-center justify-center gap-2 shadow-sm transition-all group h-28 overflow-hidden" ${styleCard(settings.iconLBUrl)}>${contentCardLB}</button>`;
+
+        if (!mpFleetMode) {
+            return `
+            <div class="min-h-[70vh] flex flex-col items-center justify-center max-w-[800px] mx-auto w-full px-4">
+                <h2 class="text-sm font-bold text-slate-800 mb-4 text-center"><i class="fa-solid fa-list-check mr-1.5 text-cyan-600"></i>Pilih Unit</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full">
+                    ${btnCT}
+                    ${btnBC}
+                    ${btnLB}
+                </div>
+            </div>`;
+        }
+
+        const m = getMasterData();
+        let unitOptions = [];
+        if (mpFleetMode === 'Crane Truck') unitOptions = m.unit_ct;
+        else if (mpFleetMode === 'Big Crane') unitOptions = m.unit_big_crane;
+        else if (mpFleetMode === 'Lowboy') unitOptions = m.unit_lowboy;
+
+        let filterUnit = document.getElementById('mp_filter_unit') ? document.getElementById('mp_filter_unit').value : 'ALL';
+        
+        let jobs = getOrders().filter(j => j.kategori === mpFleetMode);
+        
+        if (currentMpPanel === 'PENDING') {
+            jobs = jobs.filter(j => j.status === 'PENDING' && j.operator);
+        } else {
+            jobs = jobs.filter(j => j.status === currentMpPanel);
+        }
+        
+        if (filterUnit !== 'ALL') jobs = jobs.filter(j => j.unit === filterUnit);
+
+        let html = `
+        <div class="flex items-center gap-2 mb-2 mt-2">
+            <button onclick="mpFleetMode=null; renderApp();" class="w-6 h-6 rounded-sm border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 bg-white shadow-sm"><i class="fa-solid fa-arrow-left text-[10px]"></i></button>
+            <h2 class="text-xs font-bold text-slate-800">Tugas: <span class="text-cyan-600">${mpFleetMode}</span></h2>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <div class="flex gap-1 overflow-x-auto hide-scrollbar bg-white p-0.5 rounded-full shadow-sm border border-slate-200">
+                ${['ON PROGRESS', 'PENDING', 'COMPLETED', 'CANCELED'].map(panel => `
+                    <button onclick="currentMpPanel='${panel}'; renderApp()" class="px-2.5 py-1 rounded-full text-[9px] font-bold whitespace-nowrap transition-colors ${currentMpPanel === panel ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}">${panel}</button>
+                `).join('')}
+            </div>
+            
+            <select id="mp_filter_unit" onchange="renderApp()" class="text-[9px] font-bold bg-white border border-slate-300 text-slate-700 rounded-full px-2 py-1 outline-none shadow-sm focus:border-cyan-500">
+                <option value="ALL">Semua Unit</option>
+                ${unitOptions.map(u => `<option value="${u}" ${filterUnit === u ? 'selected' : ''}>${u}</option>`).join('')}
+            </select>
+        </div>
+        
+        <div class="space-y-2 pb-4">`;
+
+        if (jobs.length === 0) {
+            html += `<div class="bg-white rounded-md p-4 text-center border shadow-sm"><p class="text-slate-400 text-[11px]">Kosong.</p></div>`;
+        }
+
+        jobs.forEach(job => {
+            html += `
+            <div class="bg-white rounded-md p-2.5 border border-slate-200 shadow-sm relative text-[11px]">
+                <div class="flex justify-between items-start mb-1.5">
+                    <div class="text-[9px] font-mono text-slate-400">${job.no_wo}</div>
+                    <div class="text-[9px] bg-cyan-50 text-cyan-700 border border-cyan-100 px-1.5 py-0.5 rounded-sm font-semibold">Unit: ${job.unit || '-'}</div>
+                </div>
+                <div class="font-bold text-slate-800 text-xs mb-0.5">Req: ${job.tgl_pelaksanaan} ${job.jam_pelaksanaan || ''}</div>
+                ${job.kategori !== 'Big Crane' ? `<div class="text-[10px] text-slate-500 mb-2 truncate">Lokasi: ${job.lokasi_angkat||'-'} ➔ ${job.lokasi_tujuan||'-'}</div>` : `<div class="text-[10px] text-slate-500 mb-2 truncate border-l-2 border-slate-300 pl-1">${job.deskripsi}</div>`}
+                
+                <div class="flex gap-1.5">
+                    ${job.status === 'ON PROGRESS' ? `
+                    <button onclick="openManpowerAction('${job.no_wo}')" class="flex-1 bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-1 rounded-sm text-[10px] transition-colors shadow-sm">
+                        Eksekusi
+                    </button>` : ''}
+                    
+                    ${job.status === 'PENDING' ? `
+                    <button onclick="promptLanjutPending('${job.no_wo}')" class="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-bold py-1 rounded-sm text-[10px] transition-colors shadow-sm">
+                        <i class="fa-solid fa-forward mr-1"></i> Lanjut Job
+                    </button>` : ''}
+
+                    <button onclick="copyJobToWA('${job.no_wo}')" class="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold px-2 py-1 rounded-sm text-[10px] transition-colors border border-slate-200 shadow-sm" title="Salin Job">
+                        <i class="fa-regular fa-copy"></i>
+                    </button>
+                    <button onclick="viewJobDetail('${job.no_wo}')" class="bg-slate-100 hover:bg-slate-200 text-cyan-600 font-bold px-2 py-1 rounded-sm text-[10px] transition-colors border border-slate-200 shadow-sm" title="Detail">
+                        <i class="fa-solid fa-eye"></i>
+                    </button>
+                </div>
+            </div>`;
+        });
+
+        html += `</div>
+
+        <div id="mpActionModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[70] hidden p-3">
+            <div class="bg-white rounded-md shadow-xl w-full max-w-[280px] overflow-hidden flex flex-col max-h-[90vh]">
+                <div class="p-3 text-center border-b border-slate-100 shrink-0 relative">
+                    <button onclick="document.getElementById('mpActionModal').classList.add('hidden')" class="absolute top-3 right-3 text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-sm"></i></button>
+                    <h2 class="text-sm font-bold text-slate-700 tracking-tight mt-1">Konfirmasi Job</h2>
+                </div>
+                <div class="p-3 overflow-y-auto" id="mpActionContent"></div>
+            </div>
+        </div>
+        
+        <div id="kendalaModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex justify-center items-center z-[80] hidden p-3">
+            <div class="bg-white rounded-md shadow-xl w-full max-w-[280px] overflow-hidden flex flex-col">
+                <div class="p-4 text-center shrink-0">
+                    <div class="w-10 h-10 rounded-full border-[3px] border-orange-200 text-orange-400 flex items-center justify-center mx-auto mb-2 text-xl font-bold">!</div>
+                    <h2 class="text-xs font-bold text-slate-700">Kendala Waktu Terdeteksi!</h2>
+                </div>
+                <div class="px-4 pb-4 overflow-y-auto" id="kendalaContent"></div>
+            </div>
+        </div>
+        
+        <div id="cancelPromptModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex justify-center items-center z-[80] hidden p-3">
+            <div class="bg-white rounded-md shadow-xl w-full max-w-[280px] overflow-hidden flex flex-col">
+                <div class="p-4 border-b border-slate-100">
+                    <h2 class="text-xs font-bold text-red-600 mb-1"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Batalkan Job</h2>
+                    <p class="text-[9px] text-slate-500">Silakan masukkan alasan pembatalan pekerjaan ini.</p>
+                </div>
+                <div class="p-3">
+                    <textarea id="cancelReasonInput" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-[10px] focus:outline-none focus:border-red-500 h-16" placeholder="Alasan..."></textarea>
+                    <div class="flex gap-1.5 mt-2">
+                        <button onclick="document.getElementById('cancelPromptModal').classList.add('hidden')" class="flex-1 bg-slate-100 text-slate-600 font-bold py-1.5 rounded-sm text-[10px]">Tutup</button>
+                        <button id="btnSubmitCancelJob" class="flex-1 bg-red-500 text-white font-bold py-1.5 rounded-sm text-[10px]">Konfirmasi Batal</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="pendingPromptModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex justify-center items-center z-[80] hidden p-3">
+            <div class="bg-white rounded-md shadow-xl w-full max-w-[280px] overflow-hidden flex flex-col">
+                <div class="p-4 border-b border-slate-100">
+                    <h2 class="text-xs font-bold text-orange-600 mb-1"><i class="fa-solid fa-pause mr-1"></i>Pending Pekerjaan</h2>
+                    <p class="text-[9px] text-slate-500 leading-tight">Kerja hari/shift ini akan direkam dan menetap di tab Pending.</p>
+                </div>
+                <div class="p-3">
+                    <textarea id="pendingReasonInput" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-[10px] focus:outline-none focus:border-orange-500 h-16" placeholder="Alasan pending (contoh: Shift habis, hujan, perbaikan)..."></textarea>
+                    <div class="flex gap-1.5 mt-2">
+                        <button onclick="document.getElementById('pendingPromptModal').classList.add('hidden'); document.getElementById('mpActionModal').classList.remove('hidden');" class="flex-1 bg-slate-100 text-slate-600 font-bold py-1.5 rounded-sm text-[10px]">Batal</button>
+                        <button onclick="submitPendingJob()" class="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-bold py-1.5 rounded-sm text-[10px] transition-colors">Simpan PENDING</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        `;
+        return html;
+    }
+
+    function viewJobDetail(wo) {
+        let job = getOrders().find(j => j.no_wo === wo);
+        if(!job) return;
+
+        let fotoHtml = '';
+        if (job.foto_evidence) {
+            if (job.foto_evidence.startsWith('data:image') || job.foto_evidence.startsWith('http')) {
+                fotoHtml = `
+                <div class="mb-3">
+                    <div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">LAMPIRAN FOTO</div>
+                    <div class="bg-slate-50 border border-slate-200 rounded-sm p-1">
+                        <img src="${job.foto_evidence}" class="w-full max-h-48 object-contain rounded-sm shadow-sm" alt="Lampiran Foto">
+                    </div>
+                </div>`;
+            } else {
+                fotoHtml = `
+                <div class="mb-3">
+                    <div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">LAMPIRAN FOTO</div>
+                    <div class="bg-blue-50 border border-blue-100 p-1.5 rounded-sm text-[9px] text-blue-700 flex items-center gap-1 font-medium"><i class="fa-solid fa-image text-xs"></i> ${job.foto_evidence}</div>
+                </div>`;
+            }
+        }
+
+        document.getElementById('detailJobContent').innerHTML = `
+            <div class="bg-cyan-50 border border-cyan-100 rounded-sm p-2 mb-3 relative">
+                <div class="text-[8px] font-bold text-cyan-600 mb-0.5">PEMOHON</div>
+                <div class="font-bold text-cyan-900 text-[11px] mb-0.5">${job.nama_pemohon}</div>
+                <div class="text-[10px] text-cyan-800 flex items-center gap-1 mb-0.5">
+                    <i class="fa-brands fa-whatsapp w-3 text-center"></i> ${job.no_wa} 
+                    <span onclick="copyText('${job.no_wa}', 'Nomor WA')" class="cursor-pointer ml-1 bg-white border border-cyan-200 rounded-sm px-1 py-0.5 hover:bg-cyan-100 shadow-sm"><i class="fa-regular fa-copy text-[8px]"></i></span>
+                </div>
+                <div class="text-[9px] text-cyan-700 flex items-center gap-1"><i class="fa-regular fa-building w-3 text-center"></i> ${job.departemen} | ${job.perusahaan}</div>
+            </div>
+            <div class="grid grid-cols-2 gap-y-2 gap-x-2 text-[10px] mb-3">
+                <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">NO. WO</div><div class="font-mono text-[9px] font-semibold text-slate-700">${job.no_wo}</div></div>
+                <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">STATUS</div><div class="font-bold text-cyan-600 text-[9px]">${job.status}</div></div>
+                <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">GROUP LEADER</div><div class="font-bold text-slate-700">${job.gl || '-'}</div></div>
+                <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">UNIT</div><div class="font-bold text-slate-700">${job.unit || '-'}</div></div>
+                <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">TGL & JAM</div><div class="font-bold text-slate-700">${job.tgl_pelaksanaan} ${job.jam_pelaksanaan||''}</div></div>
+                <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">DURASI REQ</div><div class="font-bold text-slate-700">${job.durasi_request}</div></div>
+                <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">OPERATOR</div><div class="font-bold text-slate-700">${job.operator || '-'}</div></div>
+                <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">RIGGER</div><div class="font-bold text-slate-700">${job.rigger || '-'}${job.rigger2 ? ', ' + job.rigger2 : ''}</div></div>
+            </div>
+            ${job.kategori !== 'Big Crane' ? `
+            <div class="mb-2">
+                <div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">RUTE / LOKASI</div>
+                <div class="bg-slate-50 border border-slate-100 p-1.5 rounded-sm text-[10px] font-semibold text-slate-600">${job.lokasi_angkat||'-'} <i class="fa-solid fa-arrow-right mx-1 text-[8px] text-slate-400"></i> ${job.lokasi_tujuan||'-'}</div>
+            </div>` : ''}
+            <div class="mb-3">
+                <div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">DESKRIPSI</div>
+                <div class="bg-slate-50 border border-slate-100 p-1.5 rounded-sm text-[10px] text-slate-600">${job.deskripsi}</div>
+            </div>
+            ${fotoHtml}
+            <button onclick="document.getElementById('detailJobModal').classList.add('hidden')" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-1.5 rounded-sm text-[10px]">Tutup Detail</button>
+        `;
+        document.getElementById('detailJobModal').classList.remove('hidden');
+    }
+
+    function openManpowerAction(wo) {
+        const job = getOrders().find(j => j.no_wo === wo);
+        const m = getMasterData();
+        let opOptions = m.operator.map(o => `<option value="${o}">${o}</option>`).join('');
+        let rigOptions = m.rigger.map(r => `<option value="${r}">${r}</option>`).join('');
+
+        let mpRiggerHtml = `
+            <div>
+                <label class="block text-[9px] text-slate-500 mb-0.5">Rigger 1</label>
+                <select id="mp_rig" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px]"><option value="">-- Pilih --</option>${rigOptions}</select>
+            </div>
+        `;
+        if (job.kategori === 'Big Crane') {
+             mpRiggerHtml += `
+             <div>
+                <label class="block text-[9px] text-slate-500 mb-0.5">Rigger 2</label>
+                <select id="mp_rig2" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px]"><option value="">-- Pilih --</option>${rigOptions}</select>
+            </div>
+             `;
+        }
+
+        document.getElementById('mpActionContent').innerHTML = `
+            <div class="bg-blue-50 border border-blue-100 text-blue-700 p-1.5 text-[9px] rounded-sm mb-2">
+                <strong>Target:</strong> Jam ${job.jam_pelaksanaan || '-'} | Durasi ${job.durasi_request}
+            </div>
+            <div id="mpFormError" class="bg-red-50 border border-red-200 text-red-600 font-bold p-1.5 text-[9px] rounded-sm mb-2 hidden"></div>
+            <form id="formMpAction" class="space-y-2">
+                <div>
+                    <label class="block text-[9px] text-slate-500 mb-0.5">Operator</label>
+                    <select id="mp_op" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px]"><option value="">-- Pilih --</option>${opOptions}</select>
+                </div>
+                <div class="grid grid-cols-${job.kategori === 'Big Crane' ? '2' : '1'} gap-2">
+                    ${mpRiggerHtml}
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div><label class="block text-[9px] text-slate-500 mb-0.5">Mulai Aktual</label><input type="time" id="mp_start" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px]"></div>
+                    <div><label class="block text-[9px] text-slate-500 mb-0.5">Selesai Aktual</label><input type="time" id="mp_end" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px]"></div>
+                </div>
+                <div class="mt-1 mb-2">
+                    <label class="block text-[9px] font-bold text-green-700 mb-0.5"><i class="fa-solid fa-clipboard-check mr-0.5"></i>Final Inspeksi</label>
+                    <input type="time" id="mp_inspeksi" class="w-full border border-green-300 bg-green-50 rounded-sm px-1.5 py-1 text-[10px] focus:border-green-500 outline-none">
+                </div>
+                <div class="grid grid-cols-3 gap-1.5 pt-2 border-t border-slate-100">
+                    <button type="button" onclick="processMpAction(event, '${wo}', 'COMPLETED')" class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-1.5 rounded-sm text-[9px]"><i class="fa-solid fa-check"></i> Selesai</button>
+                    <button type="button" onclick="initiatePendingJob('${wo}')" class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-1.5 rounded-sm text-[9px]"><i class="fa-solid fa-pause"></i> Pending</button>
+                    <button type="button" onclick="initiateCancelJob('${wo}')" class="bg-red-500 hover:bg-red-600 text-white font-bold py-1.5 rounded-sm text-[9px]"><i class="fa-solid fa-xmark"></i> Batal</button>
+                </div>
+            </form>
+        `;
+        document.getElementById('mpActionModal').classList.remove('hidden');
+    }
+
+    let tempMpData = null; 
+    let activeCancelWo = null;
+
+    function initiateCancelJob(wo) {
+        activeCancelWo = wo;
+        document.getElementById('cancelReasonInput').value = '';
+        document.getElementById('cancelPromptModal').classList.remove('hidden');
+        document.getElementById('mpActionModal').classList.add('hidden');
+        
+        document.getElementById('btnSubmitCancelJob').onclick = function() {
+            let alasan = document.getElementById('cancelReasonInput').value.trim();
+            if(!alasan) return showToast('Alasan wajib diisi!', 'error');
+            
+            let jobs = getOrders();
+            let idx = jobs.findIndex(j => j.no_wo === activeCancelWo);
+            jobs[idx].status = 'CANCELED';
+            jobs[idx].alasan_telat = "Dibatalkan: " + alasan;
+            saveOrders(jobs);
+            showToast('Dibatalkan!');
+            document.getElementById('cancelPromptModal').classList.add('hidden');
+            renderApp();
+        };
+    }
+
+    function processMpAction(e, wo, targetStatus) {
+        e.preventDefault();
+        const job = getOrders().find(j => j.no_wo === wo);
+        if(!job) return;
+
+        const elStart = document.getElementById('mp_start');
+        const elEnd = document.getElementById('mp_end');
+        const elOp = document.getElementById('mp_op');
+        const elRig = document.getElementById('mp_rig');
+        const elRig2 = document.getElementById('mp_rig2');
+        const errorBox = document.getElementById('mpFormError');
+
+        let isMissing = false;
+        const markError = (el) => {
+            if(!el) return false;
+            if(!el.value) {
+                el.classList.add('border-red-500', 'bg-red-50', 'text-red-600');
+                el.classList.remove('border-slate-300');
+                return true;
+            } else {
+                el.classList.remove('border-red-500', 'bg-red-50', 'text-red-600');
+                el.classList.add('border-slate-300');
+                return false;
+            }
+        };
+
+        if (markError(elStart)) isMissing = true;
+        if (markError(elEnd)) isMissing = true;
+        if (markError(elOp)) isMissing = true;
+        if (markError(elRig)) isMissing = true;
+        if (job.kategori === 'Big Crane' && markError(elRig2)) isMissing = true;
+
+        if (isMissing) {
+            errorBox.innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-1"></i> Mohon lengkapi seluruh form waktu dan personal!';
+            errorBox.classList.remove('hidden');
+            return;
+        } else {
+            errorBox.classList.add('hidden');
+        }
+
+        const start = elStart.value;
+        const end = elEnd.value;
+        const op = elOp.value;
+        const rig = elRig.value;
+        const rig2 = elRig2 ? elRig2.value : '';
+        const inspeksi = document.getElementById('mp_inspeksi').value;
+
+        let dStart = new Date(`2000-01-01T${start}:00`);
+        let dEnd = new Date(`2000-01-01T${end}:00`);
+        if(dEnd < dStart) dEnd = new Date(`2000-01-02T${end}:00`);
+        let actualMins = (dEnd - dStart) / (1000 * 60);
+
+        let reqMins = 0;
+        if(job.durasi_request.includes('JAM')) reqMins = parseFloat(job.durasi_request) * 60;
+        else if(job.durasi_request.includes('HARI')) reqMins = parseFloat(job.durasi_request) * 24 * 60;
+
+        let diffStartMins = 0;
+        if(job.jam_pelaksanaan) {
+            let reqStart = new Date(`2000-01-01T${job.jam_pelaksanaan}:00`);
+            diffStartMins = (dStart - reqStart) / (1000 * 60);
+        }
+
+        let isLate = diffStartMins > 15;
+        let isOvertime = actualMins > (reqMins + 15);
+
+        tempMpData = { wo, start, end, op, rig, rig2, inspeksi, actualMins, isLate, isOvertime, diffStartMins, diffOvertime: actualMins - reqMins, status: targetStatus };
+
+        if(isLate || isOvertime) showKendalaModal();
+        else saveMpFinal(null, null); 
+    }
+
+    function showKendalaModal() {
+        document.getElementById('mpActionModal').classList.add('hidden');
+        let html = `<div class="bg-red-50 border border-red-200 text-red-600 p-1.5 text-[9px] rounded-sm mb-2"><strong>Wajib Diisi:</strong> Jam aktual > toleransi.</div>`;
+        html += `<form onsubmit="submitKendala(event)" class="space-y-2">`;
+        if(tempMpData.isLate) html += `<div><label class="block text-[9px] font-bold text-red-600 mb-0.5"><i class="fa-regular fa-clock mr-1"></i>Alasan Telat (${Math.round(tempMpData.diffStartMins)} Menit):</label><textarea id="alasan_telat" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px]" required></textarea></div>`;
+        if(tempMpData.isOvertime) html += `<div><label class="block text-[9px] font-bold text-red-600 mb-0.5"><i class="fa-solid fa-stopwatch mr-1"></i>Alasan Over (${Math.round(tempMpData.diffOvertime)} Menit):</label><textarea id="alasan_over" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px]" required></textarea></div>`;
+        html += `<div class="flex gap-1.5 pt-1 mt-1 border-t border-slate-100">
+                    <button type="button" onclick="document.getElementById('kendalaModal').classList.add('hidden'); document.getElementById('mpActionModal').classList.remove('hidden');" class="flex-1 bg-slate-100 text-slate-600 font-bold py-1.5 rounded-sm text-[10px]">Cancel</button>
+                    <button type="submit" class="flex-1 bg-red-500 text-white font-bold py-1.5 rounded-sm text-[10px]">Simpan Kendala</button>
+                 </div></form>`;
+        document.getElementById('kendalaContent').innerHTML = html;
+        document.getElementById('kendalaModal').classList.remove('hidden');
+    }
+
+    function submitKendala(e) {
+        e.preventDefault();
+        let aTelat = tempMpData.isLate ? document.getElementById('alasan_telat').value : null;
+        let aOver = tempMpData.isOvertime ? document.getElementById('alasan_over').value : null;
+        saveMpFinal(aTelat, aOver);
+        document.getElementById('kendalaModal').classList.add('hidden');
+    }
+
+    function saveMpFinal(alasanTelat, alasanOvertime) {
+        let jobs = getOrders();
+        let idx = jobs.findIndex(j => j.no_wo === tempMpData.wo);
+        jobs[idx].operator = tempMpData.op;
+        jobs[idx].rigger = tempMpData.rig;
+        if (tempMpData.rig2) jobs[idx].rigger2 = tempMpData.rig2;
+        jobs[idx].jam_start_aktual = tempMpData.start;
+        jobs[idx].jam_end_aktual = tempMpData.end;
+        jobs[idx].final_inspeksi = tempMpData.inspeksi;
+        jobs[idx].durasi_aktual = (tempMpData.actualMins / 60).toFixed(2);
+        jobs[idx].status = tempMpData.status;
+        if(alasanTelat) jobs[idx].alasan_telat = alasanTelat;
+        if(alasanOvertime) jobs[idx].alasan_overtime = alasanOvertime;
+        saveOrders(jobs);
+        showToast('Tersimpan!');
+        document.getElementById('mpActionModal').classList.add('hidden');
+        renderApp();
+    }
+
+    let tempPendingData = null;
+
+    function initiatePendingJob(wo) {
+        const job = getOrders().find(j => j.no_wo === wo);
+        if(!job) return;
+
+        const elStart = document.getElementById('mp_start');
+        const elEnd = document.getElementById('mp_end');
+        const elOp = document.getElementById('mp_op');
+        const elRig = document.getElementById('mp_rig');
+        const elRig2 = document.getElementById('mp_rig2');
+        const errorBox = document.getElementById('mpFormError');
+
+        let isMissing = false;
+        
+        const markError = (el) => {
+            if(!el) return false;
+            if(!el.value) {
+                el.classList.add('border-red-500', 'bg-red-50', 'text-red-600');
+                el.classList.remove('border-slate-300');
+                return true;
+            } else {
+                el.classList.remove('border-red-500', 'bg-red-50', 'text-red-600');
+                el.classList.add('border-slate-300');
+                return false;
+            }
+        };
+
+        if (markError(elStart)) isMissing = true;
+        if (markError(elEnd)) isMissing = true;
+        if (markError(elOp)) isMissing = true;
+        if (markError(elRig)) isMissing = true;
+        if (job.kategori === 'Big Crane' && markError(elRig2)) isMissing = true;
+        
+        if (isMissing) {
+            errorBox.innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-1"></i> Isi jam aktual & personal shift ini sebelum pending!';
+            errorBox.classList.remove('hidden');
+            return;
+        } else {
+            errorBox.classList.add('hidden');
+        }
+
+        const start = elStart.value;
+        const end = elEnd.value;
+        const op = elOp.value;
+        const rig = elRig.value;
+        const rig2 = elRig2 ? elRig2.value : '';
+        const inspeksi = document.getElementById('mp_inspeksi') ? document.getElementById('mp_inspeksi').value : '';
+
+        let dStart = new Date(`2000-01-01T${start}:00`);
+        let dEnd = new Date(`2000-01-01T${end}:00`);
+        if(dEnd < dStart) dEnd = new Date(`2000-01-02T${end}:00`);
+        let actualMins = (dEnd - dStart) / (1000 * 60);
+        let durasi_aktual = (actualMins / 60).toFixed(2);
+
+        tempPendingData = { wo, start, end, op, rig, rig2, inspeksi, durasi_aktual };
+        
+        document.getElementById('pendingReasonInput').value = '';
+        document.getElementById('pendingPromptModal').classList.remove('hidden');
+    }
+
+    function submitPendingJob() {
+        let alasan = document.getElementById('pendingReasonInput').value.trim();
+        if(!alasan) return showToast('Mohon isi alasan pending!', 'error');
+
+        let jobs = getOrders();
+        let idx = jobs.findIndex(j => j.no_wo === tempPendingData.wo);
+        
+        jobs[idx].operator = tempPendingData.op;
+        jobs[idx].rigger = tempPendingData.rig;
+        if (tempPendingData.rig2) jobs[idx].rigger2 = tempPendingData.rig2;
+        jobs[idx].jam_start_aktual = tempPendingData.start;
+        jobs[idx].jam_end_aktual = tempPendingData.end;
+        jobs[idx].final_inspeksi = tempPendingData.inspeksi;
+        jobs[idx].durasi_aktual = tempPendingData.durasi_aktual;
+        jobs[idx].alasan_telat = "Dipending: " + alasan;
+        jobs[idx].status = 'PENDING';
+        
+        saveOrders(jobs);
+        showToast('Jam kerja tersimpan. Status: PENDING.');
+        
+        document.getElementById('pendingPromptModal').classList.add('hidden');
+        document.getElementById('mpActionModal').classList.add('hidden');
+        tempPendingData = null;
+        renderApp();
+    }
+
+    function promptLanjutPending(wo) {
+        openCustomConfirm('Lanjutkan Pekerjaan?', 'Shift ini akan ditutup (Completed) dan job lanjutan akan diteruskan ke Admin/GL untuk validasi shift baru.', () => {
+            processLanjutPending(wo);
+        });
+    }
+
+    function processLanjutPending(wo) {
+        let jobs = getOrders();
+        let idx = jobs.findIndex(j => j.no_wo === wo);
+        if (idx === -1) return;
+        
+        let currentJob = jobs[idx];
+        currentJob.status = 'COMPLETED';
+        
+        let newJob = JSON.parse(JSON.stringify(currentJob));
+        
+        let baseWo = currentJob.no_wo;
+        let lanjutanCount = 1;
+        if (baseWo.includes('-L')) {
+            let parts = baseWo.split('-L');
+            baseWo = parts[0]; 
+            lanjutanCount = parseInt(parts[1] || "1", 10) + 1;
+        }
+        newJob.no_wo = `${baseWo}-L${lanjutanCount}`;
+        newJob.timestamp = new Date().toISOString(); 
+        
+        let statusTag = 'SCHEDULED';
+        if (currentJob.tgl_pelaksanaan) {
+            let reqDate = new Date(`${currentJob.tgl_pelaksanaan}T00:00:00`);
+            
+            let originalCreationTime = currentJob.timestamp;
+            let findOriginal = jobs.find(j => j.no_wo === baseWo);
+            if(findOriginal) originalCreationTime = findOriginal.timestamp;
+            
+            let createdDate = new Date(originalCreationTime); 
+            createdDate.setHours(0,0,0,0);
+            let diffDays = (reqDate - createdDate) / (1000 * 60 * 60 * 24);
+
+            if (currentJob.kategori === 'Big Crane') {
+                if (diffDays < 3) statusTag = 'UNSCHEDULED';
+            } else if (currentJob.kategori === 'Crane Truck' && currentJob.jam_pelaksanaan) {
+                let reqTime = new Date(`${currentJob.tgl_pelaksanaan}T${currentJob.jam_pelaksanaan}:00`);
+                let diffHours = (reqTime - new Date(originalCreationTime)) / (1000 * 60 * 60);
+                if (diffHours < 6) statusTag = 'UNSCHEDULED';
+            }
+        }
+        newJob.status = 'PENDING'; 
+        
+        newJob.operator = ''; 
+        newJob.rigger = ''; 
+        newJob.rigger2 = '';
+        newJob.jam_start_aktual = ''; 
+        newJob.jam_end_aktual = '';
+        newJob.durasi_aktual = ''; 
+        newJob.alasan_telat = ''; 
+        newJob.alasan_overtime = ''; 
+        newJob.final_inspeksi = '';
+        
+        jobs.unshift(newJob);
+        saveOrders(jobs);
+        
+        showToast('Shift ditutup, Lanjutan dikirim ke GL!');
+        renderApp();
+    }
+
+    let currentMasterTab = 'perusahaan';
+
+    function getMasterDataView() {
+        const m = getMasterData();
+        const users = getUsers();
+        const tabs = [
+            { id: 'perusahaan', label: 'Perusahaan' }, { id: 'departemen', label: 'Departemen' }, { id: 'section', label: 'Section' },
+            { id: 'unit_ct', label: 'Unit CT' }, { id: 'unit_big_crane', label: 'Unit Big Crane' }, { id: 'unit_lowboy', label: 'Unit Lowboy' },
+            { id: 'gl', label: 'GL' }, { id: 'operator', label: 'OP' }, { id: 'rigger', label: 'Rig' },
+            { id: 'users', label: 'Pengguna' }, { id: 'branding', label: 'Branding UI' }
+        ];
+
+        let contentHtml = '';
+        if (currentMasterTab === 'branding') {
+            const settings = getSettings();
+            contentHtml = `
+            <form onsubmit="saveBranding(event)" class="space-y-3 mt-2">
+                <div class="bg-blue-50 border border-blue-200 p-2 rounded-sm mb-3">
+                    <p class="text-[9px] text-blue-700">Kostumisasi tampilan khusus perusahaan Anda. Kosongkan URL untuk mengembalikan ke tampilan bawaan.</p>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-600 mb-1">URL Foto Background Login</label>
+                    <input type="url" id="setting_bg" value="${settings.bgUrl}" placeholder="https://..." class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-600 mb-1">URL Logo Utama</label>
+                    <input type="url" id="setting_logo" value="${settings.logoUrl}" placeholder="https://..." class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500">
+                </div>
+                
+                <hr class="border-slate-100 my-2">
+                <h4 class="text-[10px] font-bold text-slate-800 mb-1">Foto Background Kartu Armada</h4>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <div>
+                        <label class="block text-[9px] font-bold text-slate-500 mb-0.5">Foto Crane Truck</label>
+                        <input type="url" id="setting_icon_ct" value="${settings.iconCTUrl || ''}" placeholder="https://..." class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] focus:outline-none focus:border-cyan-500">
+                    </div>
+                    <div>
+                        <label class="block text-[9px] font-bold text-slate-500 mb-0.5">Foto Big Crane</label>
+                        <input type="url" id="setting_icon_bc" value="${settings.iconBCUrl || ''}" placeholder="https://..." class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] focus:outline-none focus:border-cyan-500">
+                    </div>
+                    <div>
+                        <label class="block text-[9px] font-bold text-slate-500 mb-0.5">Foto Lowboy</label>
+                        <input type="url" id="setting_icon_lb" value="${settings.iconLBUrl || ''}" placeholder="https://..." class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] focus:outline-none focus:border-cyan-500">
+                    </div>
+                </div>
+
+                <button type="submit" class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold px-4 py-1.5 rounded-sm text-[10px] shadow-sm mt-3 w-full sm:w-auto">Simpan Branding</button>
+            </form>`;
+        } else if (currentMasterTab === 'users') {
+            contentHtml = `
+            <div class="overflow-x-auto border border-slate-200 rounded-sm mt-2">
+                <table class="w-full text-left">
+                    <thead class="bg-slate-50 text-slate-500 text-[9px] border-b">
+                        <tr><th class="p-2 uppercase">NRP</th><th class="p-2 uppercase">Nama Lengkap</th><th class="p-2 uppercase">Role</th><th class="p-2 uppercase text-center">Aksi</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 text-[10px]">
+                        ${users.map(u => `
+                        <tr class="hover:bg-slate-50">
+                            <td class="p-2 font-mono text-slate-600">${u.nrp}</td>
+                            <td class="p-2 font-semibold text-slate-800">${u.nama_lengkap}</td>
+                            <td class="p-2"><span class="text-[8px] font-bold px-1.5 py-0.5 rounded-sm ${u.role === 'ADMIN' ? 'bg-purple-100 text-purple-700' : (u.role === 'GL' ? 'bg-teal-100 text-teal-700' : (u.role === 'MANPOWER' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-700'))}">${u.role}</span></td>
+                            <td class="p-2 text-center"><button onclick="openResetPwd('${u.nrp}')" class="bg-cyan-50 hover:bg-cyan-100 text-cyan-600 text-[9px] font-bold px-1.5 py-1 rounded-sm"><i class="fa-solid fa-key"></i></button></td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>
+            </div>`;
+        } else {
+            let addFormHtml = '';
+            if (['gl', 'operator', 'rigger'].includes(currentMasterTab)) {
+                addFormHtml = `
+                    <form onsubmit="addAccountMasterData(event, '${currentMasterTab}')" class="flex flex-col sm:flex-row gap-1.5 mb-2 bg-slate-50 p-2 rounded-sm border border-slate-100">
+                        <input type="text" id="new_master_name" placeholder="Nama..." class="flex-1 border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required>
+                        <input type="text" id="new_master_nrp" placeholder="NRP..." class="flex-1 border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required>
+                        <div class="relative flex-1">
+                            <input type="password" id="new_master_pwd" placeholder="Pwd..." class="w-full border border-slate-300 rounded-sm px-2 py-1 pr-6 text-[10px] focus:outline-none focus:border-cyan-500" required>
+                            <i id="toggleMasterPwd" class="fa-regular fa-eye absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer pwd-toggle text-[9px]" onclick="togglePassword('new_master_pwd', 'toggleMasterPwd')"></i>
+                        </div>
+                        <button type="submit" class="bg-cyan-600 hover:bg-cyan-700 text-white font-semibold px-2.5 py-1 rounded-sm text-[10px] whitespace-nowrap"><i class="fa-solid fa-plus"></i></button>
+                    </form>`;
+            } else {
+                addFormHtml = `
+                    <form onsubmit="addMasterData(event, '${currentMasterTab}')" class="flex gap-1.5 mb-2 bg-slate-50 p-2 rounded-sm border border-slate-100">
+                        <input type="text" id="new_master_val" placeholder="Data baru..." class="flex-1 border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required>
+                        <button type="submit" class="bg-cyan-600 hover:bg-cyan-700 text-white font-semibold px-2.5 py-1 rounded-sm text-[10px] whitespace-nowrap"><i class="fa-solid fa-plus"></i> Tambah</button>
+                    </form>`;
+            }
+
+            contentHtml = `
+            ${addFormHtml}
+            <div class="overflow-x-auto border border-slate-200 rounded-sm">
+                <table class="w-full text-left">
+                    <thead class="bg-slate-50 text-slate-500 text-[9px] border-b">
+                        <tr><th class="p-2 uppercase">Nama Data</th><th class="p-2 uppercase text-right">Aksi</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 text-[10px]">
+                        ${m[currentMasterTab].map((val, idx) => `
+                        <tr class="hover:bg-slate-50">
+                            <td class="p-2 font-semibold text-slate-700">${val}</td>
+                            <td class="p-2 text-right"><button onclick="confirmDeleteMasterData('${currentMasterTab}', ${idx})" class="text-red-400 hover:text-red-600 bg-red-50 hover:bg-red-100 p-1 rounded-sm"><i class="fa-solid fa-trash-can text-[9px]"></i></button></td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>
+            </div>`;
+        }
+
+        return `
+        <div class="bg-white rounded-md shadow-sm border border-slate-200 p-1 mb-2 flex flex-wrap gap-1">
+            ${tabs.map(t => `<button onclick="currentMasterTab='${t.id}'; renderApp();" class="px-2 py-1 text-[9px] font-semibold rounded-sm transition-colors ${currentMasterTab === t.id ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}">${t.label}</button>`).join('')}
+        </div>
+        <div class="bg-white rounded-md shadow-sm border border-slate-200 p-3 min-h-[50vh]">
+            <h3 class="text-xs font-bold text-slate-800 capitalize mb-2">Data: ${currentMasterTab.replace('_', ' ')}</h3>
+            ${contentHtml}
+        </div>
+
+        <div id="resetPwdModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 hidden p-3">
+            <div class="bg-white rounded-md shadow-xl w-full max-w-[250px] overflow-hidden">
+                <div class="p-2 border-b border-slate-100 flex justify-between items-center">
+                    <h3 class="font-bold text-slate-800 text-xs">Reset Password</h3>
+                    <button onclick="document.getElementById('resetPwdModal').classList.add('hidden')" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-xs"></i></button>
+                </div>
+                <form onsubmit="processResetPassword(event)" class="p-3 space-y-2">
+                    <p class="text-[9px] text-slate-500 mb-1">NRP: <strong id="resetNrpLabel" class="text-slate-800"></strong></p>
+                    <input type="hidden" id="resetNrpVal">
+                    <div class="relative">
+                        <input type="password" id="resetPwdInput" class="w-full border border-slate-300 rounded-sm px-2 py-1 pr-6 text-[10px] focus:outline-none focus:border-cyan-500" required>
+                        <i id="toggleResetPwd" class="fa-regular fa-eye absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer pwd-toggle text-[9px]" onclick="togglePassword('resetPwdInput', 'toggleResetPwd')"></i>
+                    </div>
+                    <button type="submit" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-1.5 rounded-sm text-[10px] mt-1">Simpan</button>
+                </form>
+            </div>
+        </div>`;
+    }
+
+    function saveBranding(e) {
+        e.preventDefault();
+        let settings = getSettings();
+        settings.bgUrl = document.getElementById('setting_bg').value.trim();
+        settings.logoUrl = document.getElementById('setting_logo').value.trim();
+        settings.iconCTUrl = document.getElementById('setting_icon_ct').value.trim();
+        settings.iconBCUrl = document.getElementById('setting_icon_bc').value.trim();
+        settings.iconLBUrl = document.getElementById('setting_icon_lb').value.trim();
+        saveSettings(settings);
+        showToast('Branding UI & Foto Unit disimpan!');
+        renderApp();
+    }
+
+    function addMasterData(e, key) {
+        e.preventDefault();
+        const val = document.getElementById('new_master_val').value.trim();
+        const m = getMasterData();
+        if(m[key].includes(val)) return showToast('Data sudah ada!', 'error');
+        m[key].push(val);
+        localStorage.setItem('lifting_master_data', JSON.stringify(m));
+        showToast('Ditambahkan!');
+        renderApp();
+    }
+
+    function addAccountMasterData(e, key) {
+        e.preventDefault();
+        const name = document.getElementById('new_master_name').value.trim();
+        const nrp = document.getElementById('new_master_nrp').value.trim();
+        const pwd = document.getElementById('new_master_pwd').value;
+        const users = getUsers();
+        if (users.find(u => u.nrp === nrp)) return showToast('NRP terdaftar!', 'error');
+
+        const m = getMasterData();
+        if(m[key].includes(name)) return showToast('Nama sudah ada!', 'error');
+        m[key].push(name);
+        localStorage.setItem('lifting_master_data', JSON.stringify(m));
+
+        let role = key === 'gl' ? 'GL' : 'MANPOWER';
+        let jabatan = key === 'gl' ? 'Group Leader' : (key === 'operator' ? 'Operator' : 'Rigger');
+        users.push({ nrp: nrp, nama_lengkap: name, jabatan: jabatan, perusahaan: 'PPA', departemen: 'Operation', section: 'Lifting', no_wa: '-', password_hash: pwd, role: role, status_akun: 'ACTIVE' });
+        saveUsers(users);
+        showToast(`Akun dibuat!`);
+        renderApp();
+    }
+
+    function confirmDeleteMasterData(key, index) {
+        openCustomConfirm('Hapus Master Data', 'Yakin ingin menghapus item ini dari data master?', () => {
+            const m = getMasterData();
+            m[key].splice(index, 1);
+            localStorage.setItem('lifting_master_data', JSON.stringify(m));
+            showToast('Dihapus!');
+            renderApp();
+        });
+    }
+
+    function openResetPwd(nrp) {
+        document.getElementById('resetNrpLabel').innerText = nrp;
+        document.getElementById('resetNrpVal').value = nrp;
+        document.getElementById('resetPwdInput').value = '';
+        document.getElementById('resetPwdModal').classList.remove('hidden');
+    }
+
+    function processResetPassword(e) {
+        e.preventDefault();
+        const nrp = document.getElementById('resetNrpVal').value;
+        const newPwd = document.getElementById('resetPwdInput').value;
+        const users = getUsers();
+        const idx = users.findIndex(u => u.nrp === nrp);
+        if(idx !== -1) {
+            users[idx].password_hash = newPwd;
+            saveUsers(users);
+            showToast(`Password direset!`);
+            document.getElementById('resetPwdModal').classList.add('hidden');
+            renderApp();
+        }
+    }
+
+    function getProfileView() {
+        const user = JSON.parse(localStorage.getItem('lifting_user'));
+        return `
+        <div class="max-w-[400px] mx-auto bg-white rounded-md shadow-sm border border-slate-200 overflow-hidden mt-2">
+            <div class="p-3 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                <h2 class="text-sm font-bold text-slate-800">Profil Saya</h2>
+                <div class="bg-cyan-50 text-cyan-700 text-[9px] font-bold px-2 py-0.5 rounded-sm border border-cyan-100">${user.role}</div>
+            </div>
+            <div class="p-4">
+                <form onsubmit="saveProfile(event)" class="space-y-2 mb-4">
+                    <div class="grid grid-cols-2 gap-2">
+                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">NRP</label><input type="text" value="${user.nrp}" class="w-full border bg-slate-50 rounded-sm px-2 py-1 text-[10px] text-slate-500 cursor-not-allowed" readonly></div>
+                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Nama Lengkap</label><input type="text" id="profName" value="${user.nama_lengkap}" class="w-full border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required></div>
+                    </div>
+                    
+                    <datalist id="profListPerusahaan">${getMasterData().perusahaan.map(p=>`<option value="${p}">`).join('')}</datalist>
+                    <datalist id="profListDepartemen">${getMasterData().departemen.map(d=>`<option value="${d}">`).join('')}</datalist>
+                    <datalist id="profListSection">${getMasterData().section.map(s=>`<option value="${s}">`).join('')}</datalist>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Jabatan</label><input type="text" id="profJabatan" value="${user.jabatan}" class="w-full border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required></div>
+                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">No WhatsApp</label><input type="number" id="profWa" value="${user.no_wa}" class="w-full border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required></div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Perusahaan</label><input list="profListPerusahaan" id="profPerusahaan" value="${user.perusahaan}" class="w-full border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required></div>
+                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Departemen</label><input list="profListDepartemen" id="profDepartemen" value="${user.departemen}" class="w-full border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required></div>
+                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Section</label><input list="profListSection" id="profSection" value="${user.section}" class="w-full border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required></div>
+                    </div>
+                    <button type="submit" class="bg-slate-800 hover:bg-slate-900 text-white font-bold px-4 py-1.5 rounded-sm text-[10px] mt-2">Simpan Profil</button>
+                </form>
+
+                <hr class="border-slate-100 my-4">
+                
+                <h3 class="text-xs font-bold text-slate-800 mb-2">Ganti Password</h3>
+                <form onsubmit="savePassword(event)" class="space-y-2">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[9px] font-bold text-slate-500 mb-0.5">Password Baru</label>
+                            <div class="relative">
+                                <input type="password" id="profPwd1" class="w-full border border-slate-300 rounded-sm px-2 py-1 pr-6 text-[10px] focus:outline-none focus:border-cyan-500" required>
+                                <i id="toggleProfPwd1" class="fa-regular fa-eye absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer pwd-toggle text-[9px]" onclick="togglePassword('profPwd1', 'toggleProfPwd1')"></i>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[9px] font-bold text-slate-500 mb-0.5">Konfirmasi</label>
+                            <div class="relative">
+                                <input type="password" id="profPwd2" class="w-full border border-slate-300 rounded-sm px-2 py-1 pr-6 text-[10px] focus:outline-none focus:border-cyan-500" required>
+                                <i id="toggleProfPwd2" class="fa-regular fa-eye absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer pwd-toggle text-[9px]" onclick="togglePassword('profPwd2', 'toggleProfPwd2')"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="submit" class="bg-slate-800 hover:bg-slate-900 text-white font-bold px-4 py-1.5 rounded-sm text-[10px] mt-2">Update Password</button>
+                </form>
+
+                <hr class="border-slate-100 my-4">
+                
+                <button onclick="openCustomConfirm('Keluar Akun', 'Apakah Anda yakin ingin keluar dari sistem?', handleLogout)" class="w-full bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold px-4 py-2 rounded-sm text-[11px] flex justify-center items-center gap-2 transition-colors shadow-sm">
+                    <i class="fa-solid fa-sign-out-alt"></i> Keluar Akun (Logout)
+                </button>
+            </div>
+        </div>`;
+    }
+
+    function saveProfile(e) {
+        e.preventDefault();
+        let user = JSON.parse(localStorage.getItem('lifting_user'));
+        let users = getUsers();
+        let idx = users.findIndex(u => u.nrp === user.nrp);
+        user.nama_lengkap = document.getElementById('profName').value;
+        user.jabatan = document.getElementById('profJabatan').value;
+        user.perusahaan = document.getElementById('profPerusahaan').value;
+        user.departemen = document.getElementById('profDepartemen').value;
+        user.section = document.getElementById('profSection').value;
+        user.no_wa = document.getElementById('profWa').value;
+        users[idx] = user;
+        saveUsers(users);
+        localStorage.setItem('lifting_user', JSON.stringify(user));
+        showToast('Profil diupdate!');
+        renderApp();
+    }
+
+    function savePassword(e) {
+        e.preventDefault();
+        let pwd1 = document.getElementById('profPwd1').value;
+        let pwd2 = document.getElementById('profPwd2').value;
+        if (pwd1 !== pwd2) return showToast('Password tidak cocok!', 'error');
+        let user = JSON.parse(localStorage.getItem('lifting_user'));
+        let users = getUsers();
+        let idx = users.findIndex(u => u.nrp === user.nrp);
+        users[idx].password_hash = pwd1;
+        saveUsers(users);
+        document.getElementById('profPwd1').value = '';
+        document.getElementById('profPwd2').value = '';
+        showToast('Password diubah!');
+    }
+
+    // Trigger initial render
+    // (Data akan otomatis ditarik dari Supabase karena ada pemanggilan window.onload di awal script)
+    renderApp();
+</script>
+</body>
+</html>
