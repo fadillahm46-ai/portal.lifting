@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sistem Pemesanan Alat Berat</title>
+    <title>Sistem Pemesanan Alat Berat PPA</title>
     <link rel="manifest" href="./manifest.json">
     <meta name="theme-color" content="#0891b2">
     <script src="https://cdn.tailwindcss.com"></script>
@@ -24,7 +24,6 @@
 <script>
     // ================= KONFIGURASI DATABASE CLOUD (SUPABASE) =================
     const SUPABASE_URL = 'https://ustlhxarxxslcmjezqyu.supabase.co';
-    // TEMPELKAN KUNCI ANON PUBLIC ANDA SECARA LENGKAP DI BAWAH INI:
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVzdGxoeGFyeHhzbGNtamV6cXl1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg4NzMwMjEsImV4cCI6MjEwNDQ0OTAyMX0.sY19qVqNnDG-ttSG316CtcPZ79FvPTBpqCn37YP7nag';
 
     // Google Apps Script (Opsional: Isi URL Web App Drive jika ingin upload foto)
@@ -69,7 +68,6 @@
 
     // ================= SUPABASE ENGINE =================
     async function fetchFromSupabase() {
-        if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
         try {
             const res = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*`, {
                 headers: { 
@@ -84,15 +82,11 @@
                 }
             }
         } catch(e) { 
-            console.warn("Gagal mengambil data cloud:", e); 
+            console.warn("Mode Offline/Fallback: Menggunakan data lokal.", e); 
         }
     }
 
     async function syncToSupabase(orders) {
-        if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) {
-            console.warn("Kunci API Supabase belum diisi di index.html");
-            return;
-        }
         try {
             if (!orders || orders.length === 0) return;
             const res = await fetch(`${SUPABASE_URL}/rest/v1/orders?on_conflict=no_wo`, {
@@ -907,18 +901,15 @@
             let jobs = getOrders().filter(j => j.no_wo !== wo);
             localStorage.setItem('lifting_orders', JSON.stringify(jobs));
             
-            // Hapus juga di Supabase
-            if (SUPABASE_KEY && !SUPABASE_KEY.includes('PASTE_KUNCI')) {
-                try {
-                    await fetch(`${SUPABASE_URL}/rest/v1/orders?no_wo=eq.${wo}`, {
-                        method: 'DELETE',
-                        headers: {
-                            'apikey': SUPABASE_KEY,
-                            'Authorization': `Bearer ${SUPABASE_KEY}`
-                        }
-                    });
-                } catch(e) { console.warn(e); }
-            }
+            try {
+                await fetch(`${SUPABASE_URL}/rest/v1/orders?no_wo=eq.${wo}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`
+                    }
+                });
+            } catch(e) { console.warn(e); }
 
             showToast('Data dihapus!');
             renderApp();
@@ -2213,7 +2204,7 @@
         showToast('Password diubah!');
     }
 
-    // Inisialisasi awal
+    // Mengambil data dari cloud Supabase saat aplikasi dibuka
     window.addEventListener('load', () => {
         fetchFromSupabase().then(() => {
             renderApp();
