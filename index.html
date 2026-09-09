@@ -234,7 +234,7 @@
         document.body.removeChild(el);
     }
 
-    function copyJobToWA(wo) {
+   function copyJobToWA(wo) {
         let job = getOrders().find(j => j.no_wo === wo);
         if(!job) return;
         let waText = `*DETAIL PEKERJAAN LIFTING*\n*NO WO:* ${job.no_wo}\n*Order Unit:* ${job.kategori} ${job.unit ? '('+job.unit+')' : ''}\n*Status:* ${job.status}\n*Pemohon:* ${job.nama_pemohon}\n*Perusahaan:* ${job.perusahaan}\n*Departemen:* ${job.departemen}\n*Section:* ${job.section}\n*Kontak WA:* ${job.no_wa}\n*Tanggal:* ${job.tgl_pelaksanaan} ${job.jam_pelaksanaan ? '| Jam: '+job.jam_pelaksanaan : ''}\n*Lokasi:* ${job.lokasi_angkat || '-'} ➔ ${job.lokasi_tujuan || '-'}\n*Deskripsi:* ${job.deskripsi}`;
@@ -620,7 +620,7 @@
 
         let cntOrder = jobs.length;
         let cntProg = jobs.filter(j => j.status === 'ON PROGRESS').length;
-        let cntPend = jobs.filter(j => j.status === 'PENDING' || j.status === 'SCHEDULED' || j.status === 'UNSCHEDULED').length;
+        let cntPend = jobs.filter(j => j.status === 'PENDING').length;
         let cntDone = jobs.filter(j => j.status === 'COMPLETED').length;
         let cntCancel = jobs.filter(j => j.status === 'CANCELED').length;
 
