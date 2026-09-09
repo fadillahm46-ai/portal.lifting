@@ -6,8 +6,8 @@
     <title>Sistem Pemesanan Alat Berat PPA</title>
     
     <!-- Favicon / Logo Tab Web -->
-    <link rel="icon" href="https://lh3.googleusercontent.com/d/1hQZopiZU-_bQC9aRmyZndlmEF--k4h5U">
-    <link rel="apple-touch-icon" href="https://lh3.googleusercontent.com/d/1hQZopiZU-_bQC9aRmyZndlmEF--k4h5U">
+    <link rel="icon" href="https://drive.google.com/uc?export=view&id=1hQZopiZU-_bQC9aRmyZndlmEF--k4h5U">
+    <link rel="apple-touch-icon" href="https://drive.google.com/uc?export=view&id=1hQZopiZU-_bQC9aRmyZndlmEF--k4h5U">
     
     <link rel="manifest" href="./manifest.json">
     <meta name="theme-color" content="#0891b2">
@@ -74,22 +74,22 @@
 
     // ================= DEFAULT DATA (FALLBACK) =================
     const defaultUsers = [
-        { nrp: 'ADMIN', nama_lengkap: 'BUDI ADMIN', jabatan: 'DISPATCHER', perusahaan: 'PPA', departemen: 'OPERATION', section: 'CONTROL', no_wa: '081111111', password_hash: 'admin', role: 'ADMIN', status_akun: 'ACTIVE' },
-        { nrp: 'GL', nama_lengkap: 'ACHMAD HARIYANTO', jabatan: 'GROUP LEADER', perusahaan: 'PPA', departemen: 'OPERATION', section: 'LIFTING', no_wa: '082222222', password_hash: 'gl', role: 'GL', status_akun: 'ACTIVE' },
-        { nrp: 'USER', nama_lengkap: 'ANDI REQUESTER', jabatan: 'FOREMAN', perusahaan: 'SUBKON A', departemen: 'PLANT', section: 'MAINTENANCE', no_wa: '08987654321', password_hash: 'user', role: 'USER', status_akun: 'ACTIVE' },
-        { nrp: 'MP', nama_lengkap: 'JOKO OPERATOR', jabatan: 'OPERATOR', perusahaan: 'PPA', departemen: 'OPERATION', section: 'LIFTING', no_wa: '084444444', password_hash: 'mp', role: 'MANPOWER', status_akun: 'ACTIVE' }
+        { nrp: 'admin', nama_lengkap: 'Budi Admin', jabatan: 'Dispatcher', perusahaan: 'PPA', departemen: 'Operation', section: 'Control', no_wa: '081111111', password_hash: 'admin', role: 'ADMIN', status_akun: 'ACTIVE' },
+        { nrp: 'gl', nama_lengkap: 'Achmad Hariyanto', jabatan: 'Group Leader', perusahaan: 'PPA', departemen: 'Operation', section: 'Lifting', no_wa: '082222222', password_hash: 'gl', role: 'GL', status_akun: 'ACTIVE' },
+        { nrp: 'user', nama_lengkap: 'Andi Requester', jabatan: 'Foreman', perusahaan: 'Subkon A', departemen: 'Plant', section: 'Maintenance', no_wa: '08987654321', password_hash: 'user', role: 'USER', status_akun: 'ACTIVE' },
+        { nrp: 'mp', nama_lengkap: 'Joko Operator', jabatan: 'Operator', perusahaan: 'PPA', departemen: 'Operation', section: 'Lifting', no_wa: '084444444', password_hash: 'mp', role: 'MANPOWER', status_akun: 'ACTIVE' }
     ];
 
     const defaultMasterData = {
-        perusahaan: ['PPA', 'SUBKON A', 'SUBKON B', 'PT. BIB'],
-        departemen: ['MINING', 'PLANT', 'SAFETY', 'HR'],
-        section: ['OPERATION', 'MAINTENANCE', 'HSE', 'RECRUITMENT'],
+        perusahaan: ['PPA', 'Subkon A', 'Subkon B', 'PT. BIB'],
+        departemen: ['Mining', 'Plant', 'Safety', 'HR'],
+        section: ['Operation', 'Maintenance', 'HSE', 'Recruitment'],
         unit_ct: ['CT-01', 'CT-02', 'CT-03'],
         unit_big_crane: ['BC-01', 'BC-02'],
         unit_lowboy: ['LB-01', 'LB-02'],
-        gl: ['ACHMAD HARIYANTO', 'LUKMANUL HAKIM'],
-        operator: ['JOKO OPERATOR', 'SUPRIADI'],
-        rigger: ['AGUS RIGGER', 'BAMBANG', 'CANDRA']
+        gl: ['Achmad Hariyanto', 'Lukmanul Hakim'],
+        operator: ['Joko Operator', 'Supriadi'],
+        rigger: ['Agus Rigger', 'Bambang', 'Candra']
     };
 
     if (!localStorage.getItem('lifting_users')) localStorage.setItem('lifting_users', JSON.stringify(defaultUsers));
@@ -129,37 +129,49 @@
         try {
             let shouldRender = false;
 
+            // Sync Orders
             const resOrders = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=timestamp.desc`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
             if (resOrders.ok) {
                 const data = await resOrders.json();
                 const newData = JSON.stringify(data);
-                if (localStorage.getItem('lifting_orders') !== newData) { localStorage.setItem('lifting_orders', newData); shouldRender = true; }
+                if (localStorage.getItem('lifting_orders') !== newData) {
+                    localStorage.setItem('lifting_orders', newData); shouldRender = true; 
+                }
             }
 
+            // Sync Settings
             const resSettings = await fetch(`${SUPABASE_URL}/rest/v1/settings?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
             if (resSettings.ok) {
                 const sData = await resSettings.json();
                 if (sData && sData.length > 0) {
                     const newSettings = JSON.stringify(sData[0]);
-                    if (localStorage.getItem('lifting_settings') !== newSettings) { localStorage.setItem('lifting_settings', newSettings); shouldRender = true; }
+                    if (localStorage.getItem('lifting_settings') !== newSettings) {
+                        localStorage.setItem('lifting_settings', newSettings); shouldRender = true;
+                    }
                 }
             }
 
+            // Sync Users
             const resUsers = await fetch(`${SUPABASE_URL}/rest/v1/users?select=*`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
             if (resUsers.ok) {
                 const data = await resUsers.json();
                 if (data && data.length > 0) {
                     const newData = JSON.stringify(data);
-                    if (localStorage.getItem('lifting_users') !== newData) { localStorage.setItem('lifting_users', newData); shouldRender = true; }
+                    if (localStorage.getItem('lifting_users') !== newData) {
+                        localStorage.setItem('lifting_users', newData); shouldRender = true;
+                    }
                 }
             }
 
+            // Sync Master Data
             const resMaster = await fetch(`${SUPABASE_URL}/rest/v1/master_data?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
             if (resMaster.ok) {
                 const data = await resMaster.json();
                 if (data && data.length > 0) {
                     const newData = JSON.stringify(data[0]);
-                    if (localStorage.getItem('lifting_master_data') !== newData) { localStorage.setItem('lifting_master_data', newData); shouldRender = true; }
+                    if (localStorage.getItem('lifting_master_data') !== newData) {
+                        localStorage.setItem('lifting_master_data', newData); shouldRender = true;
+                    }
                 }
             }
 
@@ -225,6 +237,7 @@
         } catch (e) { console.error("Koneksi gagal:", e); }
     }
 
+    // Accessors
     function getOrders() { return JSON.parse(localStorage.getItem('lifting_orders')) || []; }
     function saveOrders(orders) { localStorage.setItem('lifting_orders', JSON.stringify(orders)); syncToSupabase(orders); }
     function getUsers() { return JSON.parse(localStorage.getItem('lifting_users')) || []; }
@@ -266,13 +279,14 @@
         document.body.removeChild(el);
     }
 
+    // SMART COPY KE WA
     function copyJobToWA(wo) {
         let job = getOrders().find(j => j.no_wo === wo);
         if(!job) return;
         let waText = '';
         
         if (job.status === 'SCHEDULED' || job.status === 'UNSCHEDULED') {
-            waText = `*DETAIL PEKERJAAN LIFTING*\n*NO WO:* ${job.no_wo}\n*Order Unit:* ${job.kategori} ${job.unit ? '('+job.unit+')' : ''}\n*Status:* ${job.status}\n*Pemohon:* ${job.nama_pemohon}\n*Perusahaan:* ${job.perusahaan}\n*Departemen:* ${job.departemen}\n*Section:* ${job.section}\n*Kontak WA:* ${job.no_wa}\n*Tanggal:* ${job.tgl_pelaksanaan} ${job.jam_pelaksanaan ? '| Jam: '+job.jam_pelaksanaan : ''}\n*Lokasi:* ${job.lokasi_angkat || '-'} ➔ ${job.lokasi_tujuan || '-'}\n*Deskripsi:* ${job.deskripsi}`;
+             waText = `*DETAIL PEKERJAAN LIFTING*\n*NO WO:* ${job.no_wo}\n*Order Unit:* ${job.kategori} ${job.unit ? '('+job.unit+')' : ''}\n*Status:* ${job.status}\n*Pemohon:* ${job.nama_pemohon}\n*Perusahaan:* ${job.perusahaan}\n*Departemen:* ${job.departemen}\n*Section:* ${job.section}\n*Kontak WA:* ${job.no_wa}\n*Tanggal:* ${job.tgl_pelaksanaan} ${job.jam_pelaksanaan ? '| Jam: '+job.jam_pelaksanaan : ''}\n*Lokasi:* ${job.lokasi_angkat || '-'} ➔ ${job.lokasi_tujuan || '-'}\n*Deskripsi:* ${job.deskripsi}`;
         } else {
             waText = `*PELAPORAN PROGRES JOB LIFTING*\n*Status:* ${job.status}\n\n*Nama Job:* ${job.deskripsi}\n*Jam Start:* ${job.jam_start_aktual || '-'}\n*Jam Finish:* ${job.jam_end_aktual || '-'}\n*No. Unit:* ${job.unit || '-'}\n*Nama Operator:* ${job.operator || '-'}\n*Nama Rigger:* ${job.rigger || '-'}${job.rigger2 ? ', ' + job.rigger2 : ''}\n\n*Final Inspeksi:* ${job.final_inspeksi || '-'}\n*Kendala:* ${job.alasan_telat ? 'Telat: ' + job.alasan_telat + ' ' : ''}${job.alasan_overtime ? 'Over: ' + job.alasan_overtime : ''}${(!job.alasan_telat && !job.alasan_overtime) ? '-' : ''}`;
         }
@@ -355,6 +369,7 @@
             </div>
 
             <!-- ALL GLOBAL MODALS -->
+            
             <div id="globalConfirmModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[100] hidden p-3">
                 <div class="bg-white rounded-md shadow-xl w-full max-w-[280px] overflow-hidden flex flex-col">
                     <div class="p-4 text-center border-b border-slate-100 shrink-0">
@@ -531,7 +546,7 @@
             </button>
             
             ${(user.role === 'USER' || user.role === 'ADMIN' || user.role === 'GL') ? `
-            <button onclick="switchTab('order')" class="relative flex flex-col items-center justify-center -mt-8 z-50">
+            <button onclick="switchTab('order')" class="relative flex flex-col items-center justify-center -mt-8">
                 <div class="w-14 h-14 rounded-full flex items-center justify-center border-[4px] border-white shadow-md transition-transform duration-300 ${currentTab === 'order' ? 'bg-cyan-600 text-white scale-110' : 'bg-cyan-500 text-white hover:scale-105'}">
                     <i class="fa-solid fa-plus text-3xl ${currentTab === 'order' ? 'animate-[spin_0.3s_ease-out]' : ''}"></i>
                 </div>
@@ -557,6 +572,11 @@
         const bgStyle = settings.bg_url ? `background-image: url('${settings.bg_url}'); background-size: cover; background-position: center;` : 'background-color: #1e293b;';
         const logoHtml = settings.logo_url ? `<img src="${settings.logo_url}" alt="Logo" class="w-12 h-12 object-contain mx-auto mb-2 relative z-10">` : `<div class="w-10 h-10 bg-cyan-500 flex items-center justify-center mx-auto mb-2 relative z-10 rounded-sm"><i class="fa-solid fa-truck-moving text-xl text-white"></i></div>`;
         const overlay = settings.bg_url ? `<div class="absolute inset-0 bg-slate-900/80"></div>` : '';
+
+        // Gunakan Select Dropdown murni untuk memastikan keakuratan data
+        const optPerusahaan = `<option value="" disabled selected>-- Pilih Perusahaan --</option>` + m.perusahaan.map(p=>`<option value="${p}">${p}</option>`).join('');
+        const optDepartemen = `<option value="" disabled selected>-- Pilih Departemen --</option>` + m.departemen.map(d=>`<option value="${d}">${d}</option>`).join('');
+        const optSection = `<option value="" disabled selected>-- Pilih Section --</option>` + m.section.map(s=>`<option value="${s}">${s}</option>`).join('');
 
         return `
         <div class="min-h-screen flex items-center justify-center p-3 bg-slate-50 relative page-flip-anim">
@@ -598,27 +618,23 @@
                 </div>
                 <div class="p-3">
                     <form onsubmit="handleSignup(event)" class="space-y-2">
-                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">NRP</label><input type="text" id="regNrp" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
-                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Nama Lengkap</label><input type="text" id="regName" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
-                        
-                        <datalist id="listPerusahaan">${m.perusahaan.map(p=>`<option value="${p}"></option>`).join('')}</datalist>
-                        <datalist id="listDepartemen">${m.departemen.map(d=>`<option value="${d}"></option>`).join('')}</datalist>
-                        <datalist id="listSection">${m.section.map(s=>`<option value="${s}"></option>`).join('')}</datalist>
+                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">NRP</label><input type="text" id="regNrp" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-none px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Nama Lengkap</label><input type="text" id="regName" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-none px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
 
                         <div class="grid grid-cols-2 gap-2">
-                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Perusahaan</label><input list="listPerusahaan" id="regPerusahaan" oninput="this.value = this.value.toUpperCase()" placeholder="Pilih / Ketik..." class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
-                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Departemen</label><input list="listDepartemen" id="regDepartemen" oninput="this.value = this.value.toUpperCase()" placeholder="Pilih / Ketik..." class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Perusahaan</label><select id="regPerusahaan" class="w-full border border-slate-300 rounded-none px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500 cursor-pointer bg-white" required>${optPerusahaan}</select></div>
+                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Departemen</label><select id="regDepartemen" class="w-full border border-slate-300 rounded-none px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500 cursor-pointer bg-white" required>${optDepartemen}</select></div>
                         </div>
                         <div class="grid grid-cols-2 gap-2">
-                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Section</label><input list="listSection" id="regSection" oninput="this.value = this.value.toUpperCase()" placeholder="Pilih / Ketik..." class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
-                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Jabatan</label><input type="text" id="regJabatan" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Section</label><select id="regSection" class="w-full border border-slate-300 rounded-none px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500 cursor-pointer bg-white" required>${optSection}</select></div>
+                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Jabatan</label><input type="text" id="regJabatan" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-none px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
                         </div>
 
-                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">No WhatsApp</label><input type="number" id="regWa" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">No WhatsApp</label><input type="number" id="regWa" class="w-full border border-slate-300 rounded-none px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
                         <div>
                             <label class="block text-[9px] font-bold text-slate-500 mb-0.5">Password</label>
                             <div class="relative">
-                                <input type="password" id="regPwd" class="w-full border border-slate-300 rounded-none px-2 py-1 pr-6 text-xs focus:outline-none focus:border-cyan-500" required>
+                                <input type="password" id="regPwd" class="w-full border border-slate-300 rounded-none px-1.5 py-1 pr-6 text-xs focus:outline-none focus:border-cyan-500" required>
                                 <i id="toggleRegPwd" class="fa-regular fa-eye absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer pwd-toggle text-[10px]" onclick="togglePassword('regPwd', 'toggleRegPwd')"></i>
                             </div>
                         </div>
@@ -669,20 +685,19 @@
 
         const newUser = {
             nrp: nrp, nama_lengkap: document.getElementById('regName').value.trim().toUpperCase(), jabatan: document.getElementById('regJabatan').value.trim().toUpperCase(),
-            perusahaan: document.getElementById('regPerusahaan').value.trim().toUpperCase(), departemen: document.getElementById('regDepartemen').value.trim().toUpperCase(),
-            section: document.getElementById('regSection').value.trim().toUpperCase(), no_wa: document.getElementById('regWa').value,
+            perusahaan: document.getElementById('regPerusahaan').value, departemen: document.getElementById('regDepartemen').value,
+            section: document.getElementById('regSection').value, no_wa: document.getElementById('regWa').value,
             password_hash: document.getElementById('regPwd').value, role: 'USER', status_akun: 'ACTIVE'
         };
         users.push(newUser); saveUsers(users); 
         
-        // Show success animation
         const m = document.getElementById('successRegModal');
         m.classList.remove('hidden');
         
         setTimeout(() => {
             m.classList.add('hidden');
             toggleAuthMode();
-            document.getElementById('loginNrp').value = nrp; // pre-fill
+            document.getElementById('loginNrp').value = nrp;
             document.getElementById('loginPwd').value = '';
         }, 1500);
     }
@@ -855,11 +870,9 @@
         let dashShift = document.getElementById('dash_shift').value;
         let dashUnit = document.getElementById('dash_unit').value;
 
-        // Apply Shift & Unit for charts globally
         if (dashShift !== 'ALL') allJobs = allJobs.filter(j => j.shift === dashShift);
         if (dashUnit !== 'ALL') allJobs = allJobs.filter(j => j.kategori === dashUnit);
 
-        // --- BAR CHART LOGIC ---
         let filteredJobsRange = allJobs.filter(j => j.tgl_pelaksanaan >= dashTglMulai && j.tgl_pelaksanaan <= dashTglSelesai);
         let countS1 = filteredJobsRange.filter(j => j.shift === 'Shift 1').length;
         let countS2 = filteredJobsRange.filter(j => j.shift === 'Shift 2').length;
@@ -884,10 +897,9 @@
             }
         });
 
-        // --- LINE CHART LOGIC ---
         let refDate = new Date(dashTglMulai);
         let day = refDate.getDay();
-        let diff = refDate.getDate() - day + (day === 0 ? -6 : 1); // get Monday
+        let diff = refDate.getDate() - day + (day === 0 ? -6 : 1);
         let mondayThisWeek = new Date(refDate.setDate(diff));
         
         let dataThisWeek = [];
@@ -971,7 +983,6 @@
                 return 0;
             });
 
-            // PRIORITASKAN YANG BUTUH VALIDASI DI ATAS JIKA SORT ASCENDING
             if (sortColumn === 'status' || sortColumn === 'timestamp') {
                jobs.sort((a,b) => {
                    let aNeed = (a.status === 'SCHEDULED' || a.status === 'UNSCHEDULED' || (a.status === 'PENDING' && (!a.operator || !a.rigger))) ? 1 : 0;
@@ -1205,7 +1216,6 @@
     }
 
     function openAdminEditJob(wo) {
-        // Bebaskan akses edit untuk COMPLETED
         const job = getOrders().find(j => j.no_wo === wo && j.status !== 'CANCELED');
         if(!job) return;
         const currentUser = JSON.parse(localStorage.getItem('lifting_user'));
@@ -1224,12 +1234,12 @@
         let riggerHTML = '';
         if (job.kategori === 'Big Crane') {
             riggerHTML = `
-                <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Rigger 1 *</label><select id="edit_rig" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500" required><option value="">-- Pilih --</option>${rigOptions1}</select></div>
-                <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Rigger 2 *</label><select id="edit_rig2" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500" required><option value="">-- Pilih --</option>${rigOptions2}</select></div>
+                <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Rigger 1 *</label><select id="edit_rig" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500 bg-white" required><option value="">-- Pilih --</option>${rigOptions1}</select></div>
+                <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Rigger 2 *</label><select id="edit_rig2" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500 bg-white" required><option value="">-- Pilih --</option>${rigOptions2}</select></div>
             `;
         } else {
              riggerHTML = `
-                <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Rigger ${job.kategori === 'Lowboy' ? '*' : '(Opsional)'}</label><select id="edit_rig" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500" ${job.kategori === 'Lowboy' ? 'required' : ''}><option value="">-- Pilih --</option>${rigOptions1}</select></div>
+                <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Rigger ${job.kategori === 'Lowboy' ? '*' : '(Opsional)'}</label><select id="edit_rig" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500 bg-white" ${job.kategori === 'Lowboy' ? 'required' : ''}><option value="">-- Pilih --</option>${rigOptions1}</select></div>
             `;
         }
 
@@ -1273,17 +1283,17 @@
                 <div class="grid grid-cols-2 gap-2">
                     <div>
                         <label class="block text-[10px] font-bold text-slate-500 mb-0.5">Group Leader *</label>
-                        <select id="edit_gl" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500" required><option value="">-- Pilih --</option>${glOptions}</select>
+                        <select id="edit_gl" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500 bg-white" required><option value="">-- Pilih --</option>${glOptions}</select>
                     </div>
                     <div>
                         <label class="block text-[10px] font-bold text-slate-500 mb-0.5">Unit *</label>
-                        <select id="edit_unit" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500" required><option value="">-- Pilih --</option>${unitOptions}</select>
+                        <select id="edit_unit" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500 bg-white" required><option value="">-- Pilih --</option>${unitOptions}</select>
                     </div>
                 </div>
                 <div class="grid grid-cols-2 gap-2 mt-2">
                     <div>
                         <label class="block text-[10px] font-bold text-slate-500 mb-0.5">Operator ${job.kategori !== 'Crane Truck' ? '*' : '(Opsional)'}</label>
-                        <select id="edit_op" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500" ${job.kategori !== 'Crane Truck' ? 'required' : ''}><option value="">-- Pilih --</option>${opOptions}</select>
+                        <select id="edit_op" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500 bg-white" ${job.kategori !== 'Crane Truck' ? 'required' : ''}><option value="">-- Pilih --</option>${opOptions}</select>
                     </div>
                     ${riggerHTML}
                 </div>
@@ -1360,9 +1370,23 @@
         renderApp(true); 
     }
 
+    function confirmHapusOrder(wo) {
+        openCustomConfirm('Hapus Data', `Apakah Anda yakin ingin menghapus order ${wo}?`, async () => {
+            let jobs = getOrders().filter(j => j.no_wo !== wo);
+            localStorage.setItem('lifting_orders', JSON.stringify(jobs));
+            
+            if (SUPABASE_KEY && !SUPABASE_KEY.includes('PASTE_KUNCI')) {
+                try { await fetch(`${SUPABASE_URL}/rest/v1/orders?no_wo=eq.${wo}`, { method: 'DELETE', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }); } 
+                catch(e) { console.warn(e); }
+            }
+            showToast('Data dihapus!'); 
+            document.getElementById('editJobModal').classList.add('hidden'); 
+            renderApp(true);
+        });
+    }
+
     function getOrderFormView() {
         const user = JSON.parse(localStorage.getItem('lifting_user'));
-        const m = getMasterData();
         const isAdminGL = user.role === 'ADMIN' || user.role === 'GL';
         const settings = getSettings();
         
@@ -1412,7 +1436,7 @@
             formFields = `
                 <div class="grid grid-cols-2 gap-2">
                     <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Tgl Pelaksanaan *</label><input type="date" id="tgl_pelaksanaan" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" required></div>
-                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Durasi *</label><div class="flex gap-1"><input type="number" id="durasi_req" class="w-2/3 border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" required><select id="satuan_durasi" class="w-1/3 border border-slate-300 rounded-sm px-1 py-1.5 text-xs focus:outline-none focus:border-cyan-500"><option value="JAM">Jam</option><option value="HARI">Hari</option></select></div></div>
+                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Durasi *</label><div class="flex gap-1"><input type="number" id="durasi_req" class="w-2/3 border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" required><select id="satuan_durasi" class="w-1/3 border border-slate-300 rounded-sm px-1 py-1.5 text-xs focus:outline-none focus:border-cyan-500 bg-white"><option value="JAM">Jam</option><option value="HARI">Hari</option></select></div></div>
                 </div>
                 <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Deskripsi Pekerjaan *</label><textarea id="deskripsi" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500 h-14" placeholder="Rincian..." required></textarea></div>
                 <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Upload Foto Bukti (Opsional)</label><input type="file" id="foto_evidence" accept="image/*" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] focus:outline-none focus:border-cyan-500 file:mr-2 file:py-0.5 file:px-2 file:rounded-sm file:border-0 file:text-[9px] file:font-semibold file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100 cursor-pointer"></div>
@@ -1421,7 +1445,7 @@
              formFields = `
                 <div class="grid grid-cols-2 gap-2">
                     <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Tgl Pelaksanaan *</label><input type="date" id="tgl_pelaksanaan" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" required></div>
-                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Durasi *</label><div class="flex gap-1"><input type="number" id="durasi_req" class="w-2/3 border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" required><select id="satuan_durasi" class="w-1/3 border border-slate-300 rounded-sm px-1 py-1.5 text-xs focus:outline-none focus:border-cyan-500"><option value="JAM">Jam</option><option value="HARI">Hari</option></select></div></div>
+                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Durasi *</label><div class="flex gap-1"><input type="number" id="durasi_req" class="w-2/3 border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" required><select id="satuan_durasi" class="w-1/3 border border-slate-300 rounded-sm px-1 py-1.5 text-xs focus:outline-none focus:border-cyan-500 bg-white"><option value="JAM">Jam</option><option value="HARI">Hari</option></select></div></div>
                 </div>
                 <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Rute Naikan Barang *</label><input type="text" id="lok_angkat" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" placeholder="Titik muat..." required></div>
                 <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Rute Turunkan Barang *</label><input type="text" id="lok_tujuan" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" placeholder="Titik bongkar..." required></div>
@@ -1430,13 +1454,18 @@
             `;
         }
 
+        // Form Section Pemohon dihapus, info diambil langsung dari profil user (kecuali admin delegasi)
+        const m = getMasterData();
+        const optPerusahaan = `<option value="" disabled selected>-- Pilih --</option>` + m.perusahaan.map(p=>`<option value="${p}">${p}</option>`).join('');
+        const optDepartemen = `<option value="" disabled selected>-- Pilih --</option>` + m.departemen.map(d=>`<option value="${d}">${d}</option>`).join('');
+        
         let requesterHtml = isAdminGL ? `
             <div class="bg-cyan-50 border border-cyan-200 rounded-sm p-2 mb-3">
                 <p class="text-[9px] font-bold text-cyan-700 mb-1 uppercase tracking-wider"><i class="fa-solid fa-user-pen mr-1"></i>Delegasi: Info Pemohon</p>
                 <div class="grid grid-cols-2 gap-2 text-[10px]">
                     <input type="text" id="del_nama" placeholder="Nama Pemohon..." value="${user.nama_lengkap}" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-sm px-1.5 py-1" required>
-                    <input list="profListDepartemen" id="del_dept" placeholder="Departemen..." value="${user.departemen}" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-sm px-1.5 py-1" required>
-                    <input list="profListPerusahaan" id="del_vendor" placeholder="Perusahaan/Vendor..." value="${user.perusahaan}" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-sm px-1.5 py-1" required>
+                    <select id="del_dept" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 bg-white cursor-pointer" required>${optDepartemen}</select>
+                    <select id="del_vendor" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 bg-white cursor-pointer" required>${optPerusahaan}</select>
                     <input type="number" id="del_wa" placeholder="No WA..." value="${user.no_wa}" class="w-full border border-slate-300 rounded-sm px-1.5 py-1" required>
                 </div>
                 <div class="text-[9px] text-cyan-700 mt-1 font-semibold border-t border-cyan-200 pt-1">Section: <span id="del_section">${user.section || '-'}</span> (Tarik Otomatis)</div>
@@ -1451,10 +1480,9 @@
             </div>`;
 
         return `
-        <div class="max-w-md mx-auto bg-white rounded-md shadow-sm border border-slate-200 overflow-hidden mt-2">
-            <div class="p-2 border-b border-slate-100 flex items-center gap-2"><button onclick="userOrderFleetMode=null; renderApp(false);" class="w-6 h-6 rounded-sm border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50"><i class="fa-solid fa-arrow-left text-[10px]"></i></button><h2 class="text-sm font-bold text-slate-800">Order: <span class="text-cyan-600">${cat}</span></h2></div>
+        <div class="max-w-md mx-auto bg-white rounded-md shadow-sm border border-slate-200 overflow-hidden mt-2 relative z-10">
+            <div class="p-2 border-b border-slate-100 flex items-center gap-2"><button onclick="userOrderFleetMode=null; renderApp(false);" class="w-6 h-6 rounded-sm border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 bg-white"><i class="fa-solid fa-arrow-left text-[10px]"></i></button><h2 class="text-sm font-bold text-slate-800">Order: <span class="text-cyan-600">${cat}</span></h2></div>
             <div class="p-3">
-                <datalist id="profListPerusahaan">${m.perusahaan.map(p=>`<option value="${p}"></option>`).join('')}</datalist><datalist id="profListDepartemen">${m.departemen.map(d=>`<option value="${d}"></option>`).join('')}</datalist>
                 ${requesterHtml}
                 <form onsubmit="submitOrder(event)" class="space-y-2">${formFields}<div class="pt-2 mt-3 border-t border-slate-100"><button id="btnSubmitOrder" type="submit" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-1.5 rounded-sm transition-colors text-xs shadow-sm">Submit Order</button></div></form>
             </div>
@@ -1541,7 +1569,7 @@
         const btnBC = getUnitCard('Big Crane', 'mpFleetMode', settings.icon_bc_url, 'fa-truck-ramp-box', 'Big Crane');
         const btnLB = getUnitCard('Lowboy', 'mpFleetMode', settings.icon_lb_url, 'fa-trailer', 'Lowboy');
 
-        if (!mpFleetMode) return `<div class="min-h-[70vh] flex flex-col items-center justify-center max-w-[900px] mx-auto w-full px-4 py-8"><h2 class="text-sm sm:text-base font-bold text-slate-800 mb-6 text-center"><i class="fa-solid fa-list-check mr-1.5 text-cyan-600"></i>Pilih Unit Armada</h2><div class="grid grid-cols-2 sm:flex sm:flex-row sm:justify-center gap-4 sm:gap-6 w-full max-w-2xl mx-auto">${btnCT}${btnBC}${btnLB}</div></div>`;
+        if (!mpFleetMode) return `<div class="min-h-[70vh] flex flex-col items-center justify-center max-w-[900px] mx-auto w-full px-4 py-8 relative z-10"><h2 class="text-sm sm:text-base font-bold text-slate-800 mb-6 text-center"><i class="fa-solid fa-list-check mr-1.5 text-cyan-600"></i>Pilih Unit Armada</h2><div class="grid grid-cols-2 sm:flex sm:flex-row sm:justify-center gap-4 sm:gap-6 w-full max-w-2xl mx-auto">${btnCT}${btnBC}${btnLB}</div></div>`;
 
         const m = getMasterData(); let unitOptions = [];
         if (mpFleetMode === 'Crane Truck') unitOptions = m.unit_ct; else if (mpFleetMode === 'Big Crane') unitOptions = m.unit_big_crane; else if (mpFleetMode === 'Lowboy') unitOptions = m.unit_lowboy;
@@ -1552,12 +1580,12 @@
         if (filterUnit !== 'ALL') jobs = jobs.filter(j => j.unit === filterUnit);
 
         let html = `
-        <div class="flex items-center gap-2 mb-2 mt-2"><button onclick="mpFleetMode=null; renderApp(false);" class="w-6 h-6 rounded-sm border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 bg-white shadow-sm"><i class="fa-solid fa-arrow-left text-[10px]"></i></button><h2 class="text-xs font-bold text-slate-800">Tugas: <span class="text-cyan-600">${mpFleetMode}</span></h2></div>
-        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+        <div class="flex items-center gap-2 mb-2 mt-2 relative z-10"><button onclick="mpFleetMode=null; renderApp(false);" class="w-6 h-6 rounded-sm border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 bg-white shadow-sm"><i class="fa-solid fa-arrow-left text-[10px]"></i></button><h2 class="text-xs font-bold text-slate-800">Tugas: <span class="text-cyan-600">${mpFleetMode}</span></h2></div>
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-2 relative z-10">
             <div class="flex gap-1 overflow-x-auto hide-scrollbar bg-white p-0.5 rounded-full shadow-sm border border-slate-200">${['ON PROGRESS', 'PENDING', 'COMPLETED', 'CANCELED'].map(panel => `<button onclick="currentMpPanel='${panel}'; renderApp(true)" class="px-2.5 py-1 rounded-full text-[9px] font-bold whitespace-nowrap transition-colors ${currentMpPanel === panel ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}">${panel}</button>`).join('')}</div>
-            <select id="mp_filter_unit" onchange="renderApp(true)" class="text-[9px] font-bold bg-white border border-slate-300 text-slate-700 rounded-full px-2 py-1 outline-none shadow-sm focus:border-cyan-500"><option value="ALL">Semua Unit</option>${unitOptions.map(u => `<option value="${u}" ${filterUnit === u ? 'selected' : ''}>${u}</option>`).join('')}</select>
+            <select id="mp_filter_unit" onchange="renderApp(true)" class="text-[9px] font-bold bg-white border border-slate-300 text-slate-700 rounded-full px-2 py-1 outline-none shadow-sm focus:border-cyan-500 cursor-pointer"><option value="ALL">Semua Unit</option>${unitOptions.map(u => `<option value="${u}" ${filterUnit === u ? 'selected' : ''}>${u}</option>`).join('')}</select>
         </div>
-        <div class="space-y-2 pb-4">`;
+        <div class="space-y-2 pb-4 relative z-0">`;
 
         if (jobs.length === 0) html += `<div class="bg-white rounded-md p-4 text-center border shadow-sm"><p class="text-slate-400 text-[11px]">Kosong.</p></div>`;
 
@@ -1581,14 +1609,14 @@
     function openManpowerAction(wo) {
         const job = getOrders().find(j => j.no_wo === wo); const m = getMasterData();
         let opOptions = m.operator.map(o => `<option value="${o}">${o}</option>`).join(''); let rigOptions = m.rigger.map(r => `<option value="${r}">${r}</option>`).join('');
-        let mpRiggerHtml = `<div><label class="block text-[9px] text-slate-500 mb-0.5">Rigger 1</label><select id="mp_rig" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px]"><option value="">-- Pilih --</option>${rigOptions}</select></div>`;
-        if (job.kategori === 'Big Crane') mpRiggerHtml += `<div><label class="block text-[9px] text-slate-500 mb-0.5">Rigger 2</label><select id="mp_rig2" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px]"><option value="">-- Pilih --</option>${rigOptions}</select></div>`;
+        let mpRiggerHtml = `<div><label class="block text-[9px] text-slate-500 mb-0.5">Rigger 1</label><select id="mp_rig" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] bg-white cursor-pointer"><option value="">-- Pilih --</option>${rigOptions}</select></div>`;
+        if (job.kategori === 'Big Crane') mpRiggerHtml += `<div><label class="block text-[9px] text-slate-500 mb-0.5">Rigger 2</label><select id="mp_rig2" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] bg-white cursor-pointer"><option value="">-- Pilih --</option>${rigOptions}</select></div>`;
 
         document.getElementById('mpActionContent').innerHTML = `
             <div class="bg-blue-50 border border-blue-100 text-blue-700 p-1.5 text-[9px] rounded-sm mb-2"><strong>Target:</strong> Jam ${job.jam_pelaksanaan || '-'} | Durasi ${job.durasi_request}</div>
             <div id="mpFormError" class="bg-red-50 border border-red-200 text-red-600 font-bold p-1.5 text-[9px] rounded-sm mb-2 hidden"></div>
             <form id="formMpAction" class="space-y-2">
-                <div><label class="block text-[9px] text-slate-500 mb-0.5">Operator</label><select id="mp_op" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px]"><option value="">-- Pilih --</option>${opOptions}</select></div>
+                <div><label class="block text-[9px] text-slate-500 mb-0.5">Operator</label><select id="mp_op" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] bg-white cursor-pointer"><option value="">-- Pilih --</option>${opOptions}</select></div>
                 <div class="grid grid-cols-${job.kategori === 'Big Crane' ? '2' : '1'} gap-2">${mpRiggerHtml}</div>
                 <div class="grid grid-cols-2 gap-2"><div><label class="block text-[9px] text-slate-500 mb-0.5">Mulai Aktual</label><input type="time" id="mp_start" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px]"></div><div><label class="block text-[9px] text-slate-500 mb-0.5">Selesai Aktual</label><input type="time" id="mp_end" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px]"></div></div>
                 <div class="mt-1 mb-2"><label class="block text-[9px] font-bold text-green-700 mb-0.5"><i class="fa-solid fa-clipboard-check mr-0.5"></i>Final Inspeksi</label><input type="time" id="mp_inspeksi" class="w-full border border-green-300 bg-green-50 rounded-sm px-1.5 py-1 text-[10px] focus:border-green-500 outline-none"></div>
@@ -1675,164 +1703,34 @@
         jobs.unshift(newJob); saveOrders(jobs); showToast('Shift ditutup, Lanjutan dikirim ke GL!'); renderApp(true);
     }
 
-    let currentMasterTab = 'branding';
-
-    function getMasterDataView() {
-        const m = getMasterData(); const users = getUsers();
-        const tabs = [ { id: 'branding', label: 'Branding UI' }, { id: 'perusahaan', label: 'Perusahaan' }, { id: 'departemen', label: 'Departemen' }, { id: 'section', label: 'Section' }, { id: 'unit_ct', label: 'Unit CT' }, { id: 'unit_big_crane', label: 'Unit Big Crane' }, { id: 'unit_lowboy', label: 'Unit Lowboy' }, { id: 'gl', label: 'GL' }, { id: 'operator', label: 'OP' }, { id: 'rigger', label: 'Rig' }, { id: 'users', label: 'Pengguna' } ];
-
-        let contentHtml = '';
-        if (currentMasterTab === 'branding') {
-            const settings = getSettings();
-            contentHtml = `
-            <form onsubmit="saveBranding(event)" class="space-y-3 mt-2">
-                <div class="bg-blue-50 border border-blue-200 p-2 rounded-sm mb-3">
-                    <p class="text-[9px] text-blue-700"><i class="fa-solid fa-cloud-arrow-up mr-1"></i>Setelan Branding (Logo & Background Unit) akan tersimpan di Cloud Supabase dan otomatis berubah di HP seluruh pengguna.</p>
-                </div>
-                <div><label class="block text-[10px] font-bold text-slate-600 mb-1">URL Foto Background Login</label><input type="url" id="setting_bg" value="${settings.bg_url || ''}" placeholder="https://..." class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500"></div>
-                <div><label class="block text-[10px] font-bold text-slate-600 mb-1">URL Logo Utama</label><input type="url" id="setting_logo" value="${settings.logo_url || ''}" placeholder="https://..." class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500"></div>
-                <hr class="border-slate-100 my-2"><h4 class="text-[10px] font-bold text-slate-800 mb-1">Foto Background Kartu Armada</h4>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Foto Crane Truck</label><input type="url" id="setting_icon_ct" value="${settings.icon_ct_url || ''}" placeholder="https://..." class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] focus:outline-none focus:border-cyan-500"></div>
-                    <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Foto Big Crane</label><input type="url" id="setting_icon_bc" value="${settings.icon_bc_url || ''}" placeholder="https://..." class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] focus:outline-none focus:border-cyan-500"></div>
-                    <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Foto Lowboy</label><input type="url" id="setting_icon_lb" value="${settings.icon_lb_url || ''}" placeholder="https://..." class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] focus:outline-none focus:border-cyan-500"></div>
-                </div>
-                <button type="submit" class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold px-4 py-1.5 rounded-sm text-[10px] shadow-sm mt-3 w-full sm:w-auto"><i class="fa-solid fa-cloud-arrow-up mr-1"></i> Simpan ke Cloud</button>
-            </form>`;
-        } else if (currentMasterTab === 'users') {
-            contentHtml = `<div class="overflow-x-auto border border-slate-200 rounded-sm mt-2"><table class="w-full text-left"><thead class="bg-slate-50 text-slate-500 text-[9px] border-b"><tr><th class="p-2 uppercase">NRP</th><th class="p-2 uppercase">Nama Lengkap</th><th class="p-2 uppercase">Role</th><th class="p-2 uppercase text-center">Aksi</th></tr></thead><tbody class="divide-y divide-slate-100 text-[10px]">${users.map(u => `<tr class="hover:bg-slate-50"><td class="p-2 font-mono text-slate-600">${u.nrp}</td><td class="p-2 font-semibold text-slate-800">${u.nama_lengkap}</td><td class="p-2"><span class="text-[8px] font-bold px-1.5 py-0.5 rounded-sm ${u.role === 'ADMIN' ? 'bg-purple-100 text-purple-700' : (u.role === 'GL' ? 'bg-teal-100 text-teal-700' : (u.role === 'MANPOWER' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-700'))}">${u.role}</span></td><td class="p-2"><div class="flex justify-center gap-1"><button onclick="openResetPwd('${u.nrp}')" class="bg-cyan-50 hover:bg-cyan-100 text-cyan-600 text-[9px] font-bold px-1.5 py-1 rounded-sm" title="Reset Password"><i class="fa-solid fa-key"></i></button><button onclick="confirmDeleteUser('${u.nrp}')" class="bg-red-50 hover:bg-red-100 text-red-500 text-[9px] font-bold px-1.5 py-1 rounded-sm" title="Hapus User"><i class="fa-solid fa-trash-can"></i></button></div></td></tr>`).join('')}</tbody></table></div>`;
-        } else {
-            let addFormHtml = '';
-            if (['gl', 'operator', 'rigger'].includes(currentMasterTab)) {
-                addFormHtml = `<form onsubmit="addAccountMasterData(event, '${currentMasterTab}')" class="flex flex-col sm:flex-row gap-1.5 mb-2 bg-slate-50 p-2 rounded-sm border border-slate-100"><input type="text" id="new_master_name" oninput="this.value = this.value.toUpperCase()" placeholder="Nama..." class="flex-1 border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required><input type="text" id="new_master_nrp" oninput="this.value = this.value.toUpperCase()" placeholder="NRP..." class="flex-1 border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required><div class="relative flex-1"><input type="password" id="new_master_pwd" placeholder="Pwd..." class="w-full border border-slate-300 rounded-sm px-2 py-1 pr-6 text-[10px] focus:outline-none focus:border-cyan-500" required><i id="toggleMasterPwd" class="fa-regular fa-eye absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer pwd-toggle text-[9px]" onclick="togglePassword('new_master_pwd', 'toggleMasterPwd')"></i></div><button type="submit" class="bg-cyan-600 hover:bg-cyan-700 text-white font-semibold px-2.5 py-1 rounded-sm text-[10px] whitespace-nowrap"><i class="fa-solid fa-plus"></i></button></form>`;
-            } else {
-                addFormHtml = `<form onsubmit="addMasterData(event, '${currentMasterTab}')" class="flex gap-1.5 mb-2 bg-slate-50 p-2 rounded-sm border border-slate-100"><input type="text" id="new_master_val" oninput="this.value = this.value.toUpperCase()" placeholder="Data baru..." class="flex-1 border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required><button type="submit" class="bg-cyan-600 hover:bg-cyan-700 text-white font-semibold px-2.5 py-1 rounded-sm text-[10px] whitespace-nowrap"><i class="fa-solid fa-plus"></i> Tambah</button></form>`;
-            }
-            contentHtml = `${addFormHtml}<div class="overflow-x-auto border border-slate-200 rounded-sm"><table class="w-full text-left"><thead class="bg-slate-50 text-slate-500 text-[9px] border-b"><tr><th class="p-2 uppercase">Nama Data</th><th class="p-2 uppercase text-right">Aksi</th></tr></thead><tbody class="divide-y divide-slate-100 text-[10px]">${m[currentMasterTab].map((val, idx) => `<tr class="hover:bg-slate-50"><td class="p-2 font-semibold text-slate-700">${val}</td><td class="p-2 text-right"><button onclick="confirmDeleteMasterData('${currentMasterTab}', ${idx})" class="text-red-400 hover:text-red-600 bg-red-50 hover:bg-red-100 p-1 rounded-sm"><i class="fa-solid fa-trash-can text-[9px]"></i></button></td></tr>`).join('')}</tbody></table></div>`;
-        }
-
-        return `
-        <div class="bg-white rounded-md shadow-sm border border-slate-200 p-1 mb-2 flex flex-wrap gap-1">${tabs.map(t => `<button onclick="currentMasterTab='${t.id}'; renderApp(false);" class="px-2 py-1 text-[9px] font-semibold rounded-sm transition-colors ${currentMasterTab === t.id ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}">${t.label}</button>`).join('')}</div>
-        <div class="bg-white rounded-md shadow-sm border border-slate-200 p-3 min-h-[50vh]"><h3 class="text-xs font-bold text-slate-800 capitalize mb-2">Data: ${currentMasterTab.replace('_', ' ')}</h3>${contentHtml}</div>`;
-    }
-
-    async function saveBranding(e) {
-        e.preventDefault();
-        if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return showToast('Error: API Supabase belum dipasang!', 'error');
-
-        const btn = e.target.querySelector('button[type="submit"]');
-        const originalText = btn.innerHTML; btn.innerHTML = "Menyimpan ke Cloud..."; btn.disabled = true;
-        
-        let newSettings = {
-            id: 1, 
-            bg_url: document.getElementById('setting_bg').value.trim(), 
-            logo_url: document.getElementById('setting_logo').value.trim(),
-            icon_ct_url: document.getElementById('setting_icon_ct').value.trim(), 
-            icon_bc_url: document.getElementById('setting_icon_bc').value.trim(), 
-            icon_lb_url: document.getElementById('setting_icon_lb').value.trim()
-        };
-        
-        try {
-            const res = await fetch(`${SUPABASE_URL}/rest/v1/settings?on_conflict=id`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'resolution=merge-duplicates' },
-                body: JSON.stringify(newSettings)
-            });
-            if (!res.ok) throw new Error("Gagal simpan database");
-
-            localStorage.setItem('lifting_settings', JSON.stringify(newSettings));
-            showToast('Branding berhasil disimpan ke Cloud untuk semua pengguna!'); 
-            renderApp(true);
-        } catch(err) {
-            showToast('Gagal simpan branding ke cloud!', 'error');
-        } finally { 
-            btn.innerHTML = originalText; btn.disabled = false; 
-        }
-    }
-
-    function addMasterData(e, key) { e.preventDefault(); const val = document.getElementById('new_master_val').value.trim(); const m = getMasterData(); if(m[key].includes(val)) return showToast('Data sudah ada!', 'error'); m[key].push(val); saveMasterData(m); showToast('Ditambahkan!'); renderApp(true); }
-    
-    function addAccountMasterData(e, key) { 
-        e.preventDefault(); 
-        const name = document.getElementById('new_master_name').value.trim(); 
-        const nrp = document.getElementById('new_master_nrp').value.trim(); 
-        const pwd = document.getElementById('new_master_pwd').value; 
-        
-        const users = getUsers(); 
-        if (users.find(u => u.nrp === nrp)) return showToast('NRP terdaftar!', 'error'); 
-        
-        const m = getMasterData(); 
-        if(m[key].includes(name)) return showToast('Nama sudah ada!', 'error'); 
-        
-        m[key].push(name); 
-        saveMasterData(m); 
-        
-        let role = key === 'gl' ? 'GL' : 'MANPOWER'; 
-        let jabatan = key === 'gl' ? 'Group Leader' : (key === 'operator' ? 'Operator' : 'Rigger'); 
-        
-        users.push({ nrp: nrp, nama_lengkap: name, jabatan: jabatan, perusahaan: 'PPA', departemen: 'Operation', section: 'Lifting', no_wa: '-', password_hash: pwd, role: role, status_akun: 'ACTIVE' }); 
-        saveUsers(users); 
-        
-        showToast(`Akun dibuat & Master diupdate!`); 
-        renderApp(true); 
-    }
-    
-    function confirmDeleteMasterData(key, index) { 
-        openCustomConfirm('Hapus Master Data', 'Yakin ingin menghapus item ini dari data master?', () => { 
-            const m = getMasterData(); 
-            m[key].splice(index, 1); 
-            saveMasterData(m); 
-            showToast('Dihapus!'); 
-            renderApp(true); 
-        }); 
-    }
-
-    function confirmDeleteUser(nrp) {
-        const currentUser = JSON.parse(localStorage.getItem('lifting_user'));
-        if(currentUser.nrp === nrp) return showToast('Tidak bisa menghapus akun Anda sendiri!', 'error');
-
-        openCustomConfirm('Hapus Pengguna', `Hapus permanen akun dengan NRP: ${nrp}?`, async () => {
-            let users = getUsers().filter(u => u.nrp !== nrp);
-            localStorage.setItem('lifting_users', JSON.stringify(users)); 
-            
-            if (SUPABASE_KEY && !SUPABASE_KEY.includes('PASTE_KUNCI')) {
-                try { 
-                    await fetch(`${SUPABASE_URL}/rest/v1/users?nrp=eq.${nrp}`, { 
-                        method: 'DELETE', 
-                        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } 
-                    }); 
-                } catch(e) { console.warn(e); }
-            }
-            
-            showToast('Akun berhasil dihapus!'); 
-            renderApp(true);
-        });
-    }
-
-    function openResetPwd(nrp) { document.getElementById('resetNrpLabel').innerText = nrp; document.getElementById('resetNrpVal').value = nrp; document.getElementById('resetPwdInput').value = ''; document.getElementById('resetPwdModal').classList.remove('hidden'); }
-    function processResetPassword(e) { e.preventDefault(); const nrp = document.getElementById('resetNrpVal').value; const newPwd = document.getElementById('resetPwdInput').value; const users = getUsers(); const idx = users.findIndex(u => u.nrp === nrp); if(idx !== -1) { users[idx].password_hash = newPwd; saveUsers(users); showToast(`Password direset!`); document.getElementById('resetPwdModal').classList.add('hidden'); renderApp(true); } }
-
     function getProfileView() {
         const user = JSON.parse(localStorage.getItem('lifting_user'));
         const m = getMasterData();
+
+        // Native Select murni untuk Data Master
+        const optProfPerusahaan = `<option value="" disabled>-- Pilih Perusahaan --</option>` + m.perusahaan.map(p=>`<option value="${p}" ${user.perusahaan === p ? 'selected' : ''}>${p}</option>`).join('');
+        const optProfDepartemen = `<option value="" disabled>-- Pilih Departemen --</option>` + m.departemen.map(d=>`<option value="${d}" ${user.departemen === d ? 'selected' : ''}>${d}</option>`).join('');
+        const optProfSection = `<option value="" disabled>-- Pilih Section --</option>` + m.section.map(s=>`<option value="${s}" ${user.section === s ? 'selected' : ''}>${s}</option>`).join('');
+
         return `
-        <div class="max-w-[400px] mx-auto bg-white rounded-md shadow-sm border border-slate-200 overflow-hidden mt-2">
+        <div class="max-w-[400px] mx-auto bg-white rounded-md shadow-sm border border-slate-200 overflow-hidden mt-2 relative z-10">
             <div class="p-3 border-b border-slate-100 flex items-center justify-between bg-slate-50"><h2 class="text-sm font-bold text-slate-800">Profil Saya</h2><div class="bg-cyan-50 text-cyan-700 text-[9px] font-bold px-2 py-0.5 rounded-sm border border-cyan-100">${user.role}</div></div>
             <div class="p-4">
                 <form onsubmit="saveProfile(event)" class="space-y-2 mb-4">
-                    <div class="grid grid-cols-2 gap-2"><div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">NRP</label><input type="text" value="${user.nrp}" class="w-full border bg-slate-50 rounded-sm px-2 py-1 text-[10px] text-slate-500 cursor-not-allowed" readonly></div><div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Nama Lengkap</label><input type="text" id="profName" value="${user.nama_lengkap}" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required></div></div>
-                    
-                    <datalist id="profListPerusahaan">${m.perusahaan.map(p=>`<option value="${p}"></option>`).join('')}</datalist>
-                    <datalist id="profListDepartemen">${m.departemen.map(d=>`<option value="${d}"></option>`).join('')}</datalist>
-                    <datalist id="profListSection">${m.section.map(s=>`<option value="${s}"></option>`).join('')}</datalist>
-                    
-                    <div class="grid grid-cols-2 gap-2"><div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Jabatan</label><input type="text" id="profJabatan" value="${user.jabatan}" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required></div><div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">No WhatsApp</label><input type="number" id="profWa" value="${user.no_wa}" class="w-full border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required></div></div>
-                    <div class="grid grid-cols-3 gap-2">
-                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Perusahaan</label><input list="profListPerusahaan" id="profPerusahaan" value="${user.perusahaan}" oninput="this.value = this.value.toUpperCase()" placeholder="Pilih / Ketik..." class="w-full border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required></div>
-                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Departemen</label><input list="profListDepartemen" id="profDepartemen" value="${user.departemen}" oninput="this.value = this.value.toUpperCase()" placeholder="Pilih / Ketik..." class="w-full border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required></div>
-                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Section</label><input list="profListSection" id="profSection" value="${user.section}" oninput="this.value = this.value.toUpperCase()" placeholder="Pilih / Ketik..." class="w-full border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required></div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">NRP</label><input type="text" value="${user.nrp}" class="w-full border bg-slate-50 rounded-sm px-2 py-1 text-[10px] text-slate-500 cursor-not-allowed" readonly></div>
+                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Nama Lengkap</label><input type="text" id="profName" value="${user.nama_lengkap}" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required></div>
                     </div>
-                    <button type="submit" class="bg-slate-800 hover:bg-slate-900 text-white font-bold px-4 py-1.5 rounded-sm text-[10px] mt-2">Simpan Profil</button>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Jabatan</label><input type="text" id="profJabatan" value="${user.jabatan}" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required></div>
+                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">No WhatsApp</label><input type="number" id="profWa" value="${user.no_wa}" class="w-full border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required></div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Perusahaan</label><select id="profPerusahaan" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] focus:outline-none focus:border-cyan-500 bg-white cursor-pointer" required>${optProfPerusahaan}</select></div>
+                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Departemen</label><select id="profDepartemen" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] focus:outline-none focus:border-cyan-500 bg-white cursor-pointer" required>${optProfDepartemen}</select></div>
+                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Section</label><select id="profSection" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] focus:outline-none focus:border-cyan-500 bg-white cursor-pointer" required>${optProfSection}</select></div>
+                    </div>
+                    <button type="submit" class="bg-slate-800 hover:bg-slate-900 text-white font-bold px-4 py-1.5 rounded-sm text-[10px] mt-2 shadow-sm">Simpan Profil</button>
                 </form>
                 <hr class="border-slate-100 my-4"><h3 class="text-xs font-bold text-slate-800 mb-2">Ganti Password</h3>
                 <form onsubmit="savePassword(event)" class="space-y-2">
@@ -1840,7 +1738,7 @@
                         <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Password Baru</label><div class="relative"><input type="password" id="profPwd1" class="w-full border border-slate-300 rounded-sm px-2 py-1 pr-6 text-[10px] focus:outline-none focus:border-cyan-500" required><i id="toggleProfPwd1" class="fa-regular fa-eye absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer pwd-toggle text-[9px]" onclick="togglePassword('profPwd1', 'toggleProfPwd1')"></i></div></div>
                         <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Konfirmasi</label><div class="relative"><input type="password" id="profPwd2" class="w-full border border-slate-300 rounded-sm px-2 py-1 pr-6 text-[10px] focus:outline-none focus:border-cyan-500" required><i id="toggleProfPwd2" class="fa-regular fa-eye absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer pwd-toggle text-[9px]" onclick="togglePassword('profPwd2', 'toggleProfPwd2')"></i></div></div>
                     </div>
-                    <button type="submit" class="bg-slate-800 hover:bg-slate-900 text-white font-bold px-4 py-1.5 rounded-sm text-[10px] mt-2">Update Password</button>
+                    <button type="submit" class="bg-slate-800 hover:bg-slate-900 text-white font-bold px-4 py-1.5 rounded-sm text-[10px] mt-2 shadow-sm">Update Password</button>
                 </form>
                 <hr class="border-slate-100 my-4">
                 <button onclick="openCustomConfirm('Keluar Akun', 'Apakah Anda yakin ingin keluar dari sistem?', handleLogout)" class="w-full bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold px-4 py-2 rounded-sm text-[11px] flex justify-center items-center gap-2 transition-colors shadow-sm"><i class="fa-solid fa-sign-out-alt"></i> Keluar Akun (Logout)</button>
