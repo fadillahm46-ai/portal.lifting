@@ -287,7 +287,7 @@
         
         if (job.status === 'SCHEDULED' || job.status === 'UNSCHEDULED') {
             // Format Pesanan Baru
-            waText = `*DETAIL PEKERJAAN LIFTING*\n*NO WO:* ${job.no_wo}\n*Status:* ${job.status}\n\n*Pemohon:* ${job.nama_pemohon} (${job.departemen})\n*Kontak WA:* ${job.no_wa}\n\n*Armada:* ${job.kategori} ${job.unit ? '('+job.unit+')' : ''}\n*Tanggal:* ${job.tgl_pelaksanaan} ${job.jam_pelaksanaan ? '| Jam: '+job.jam_pelaksanaan : ''}\n*Lokasi:* ${job.lokasi_angkat || '-'} ➔ ${job.lokasi_tujuan || '-'}\n*Deskripsi:* ${job.deskripsi}`;
+            waText = `*DETAIL PEKERJAAN LIFTING*\n*NO WO:* ${job.no_wo}\n*Order Unit:* ${job.kategori} ${job.unit ? '('+job.unit+')' : ''}\n*Status:* ${job.status}\n*Pemohon:* ${job.nama_pemohon}\n*Perusahaan:* ${job.perusahaan}\n*Departemen:* ${job.departemen}\n*Section:* ${job.section}\n*Kontak WA:* ${job.no_wa}\n*Tanggal:* ${job.tgl_pelaksanaan} ${job.jam_pelaksanaan ? '| Jam: '+job.jam_pelaksanaan : ''}\n*Lokasi:* ${job.lokasi_angkat || '-'} ➔ ${job.lokasi_tujuan || '-'}\n*Deskripsi:* ${job.deskripsi}`;
         } else {
             // Format Pelaporan Eksekusi
             waText = `*PELAPORAN PROGRES JOB LIFTING*\n*Status:* ${job.status}\n\n*Nama Job:* ${job.deskripsi}\n*Jam Start:* ${job.jam_start_aktual || '-'}\n*Jam Finish:* ${job.jam_end_aktual || '-'}\n*No. Unit:* ${job.unit || '-'}\n*Nama Operator:* ${job.operator || '-'}\n*Nama Rigger:* ${job.rigger || '-'}${job.rigger2 ? ', ' + job.rigger2 : ''}\n\n*Final Inspeksi:* ${job.final_inspeksi || '-'}\n*Kendala:* ${job.alasan_telat ? 'Telat: ' + job.alasan_telat + ' ' : ''}${job.alasan_overtime ? 'Over: ' + job.alasan_overtime : ''}${(!job.alasan_telat && !job.alasan_overtime) ? '-' : ''}`;
