@@ -65,14 +65,10 @@
     <div id="app" class="min-h-screen"></div>
 
 <script>
-    // ================= KONFIGURASI DATABASE CLOUD =================
     const SUPABASE_URL = 'https://ustlhxarxxslcmjezqyu.supabase.co';
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVzdGxoeGFyeHhzbGNtamV6cXl1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg4NzMwMjEsImV4cCI6MjEwNDQ0OTAyMX0.sY19qVqNnDG-ttSG316CtcPZ79FvPTBpqCn37YP7nag';
-
-    // Google Apps Script (Untuk Upload Foto Bukti ke Google Drive)
     const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwioh3MCzAz6QIxsrfUKruiqq2STeONkkO5o0dcYLu0_JcsdTp2yiHxWrqQi8nUJdrI3Q/exec'; 
 
-    // ================= DEFAULT DATA (FALLBACK) =================
     const defaultUsers = [
         { nrp: 'ADMIN', nama_lengkap: 'BUDI ADMIN', jabatan: 'DISPATCHER', perusahaan: 'PPA', departemen: 'OPERATION', section: 'CONTROL', no_wa: '081111111', password_hash: 'admin', role: 'ADMIN', status_akun: 'ACTIVE' },
         { nrp: 'GL', nama_lengkap: 'ACHMAD HARIYANTO', jabatan: 'GROUP LEADER', perusahaan: 'PPA', departemen: 'OPERATION', section: 'LIFTING', no_wa: '082222222', password_hash: 'gl', role: 'GL', status_akun: 'ACTIVE' },
@@ -81,15 +77,15 @@
     ];
 
     const defaultMasterData = {
-        perusahaan: ['PPA', 'BIB', 'UT', 'KME', 'SUBKON A'],
-        departemen: ['MINING', 'PLANT', 'SAFETY', 'OPERATION'],
-        section: ['MAINTENANCE', 'LIFTING', 'CONTROL', 'HSE'],
+        perusahaan: ['PPA', 'SUBKON A', 'SUBKON B', 'PT. BIB'],
+        departemen: ['MINING', 'PLANT', 'SAFETY', 'HR'],
+        section: ['OPERATION', 'MAINTENANCE', 'HSE', 'RECRUITMENT'],
         unit_ct: ['CT-01', 'CT-02', 'CT-03'],
         unit_big_crane: ['BC-01', 'BC-02'],
         unit_lowboy: ['LB-01', 'LB-02'],
-        gl: ['Achmad Hariyanto', 'Lukmanul Hakim'],
-        operator: ['Joko Operator', 'Supriadi'],
-        rigger: ['Agus Rigger', 'Bambang', 'Candra']
+        gl: ['ACHMAD HARIYANTO', 'LUKMANUL HAKIM'],
+        operator: ['JOKO OPERATOR', 'SUPRIADI'],
+        rigger: ['AGUS RIGGER', 'BAMBANG', 'CANDRA']
     };
 
     if (!localStorage.getItem('lifting_users')) localStorage.setItem('lifting_users', JSON.stringify(defaultUsers));
@@ -110,23 +106,26 @@
     let currentMpPanel = 'ON PROGRESS';
     let userOrderFleetMode = null; 
     let mpFleetMode = null; 
+    
     let sortColumn = 'timestamp';
     let sortDirection = 'desc';
-
-    // Check if it's safe to render (don't interrupt forms/typing)
-    function isSafeToRender() {
-        const activeTabsForAutoRender = ['dashboard', 'monitoring'];
-        const isModalOpen = ['editJobModal', 'detailJobModal', 'mpActionModal', 'kendalaModal', 'cancelPromptModal', 'pendingPromptModal', 'globalConfirmModal', 'resetPwdModal', 'successModal', 'successRegModal'].some(id => {
-            const el = document.getElementById(id);
-            return el && !el.classList.contains('hidden');
-        });
-        return activeTabsForAutoRender.includes(currentTab) && !isModalOpen;
-    }
+    
+    // Variabel Filter Pengguna
+    let userSearchQuery = ''; 
+    let userRoleFilter = 'ALL'; 
+    let userSortCol = 'nama_lengkap'; 
+    let userSortDir = 'asc';
 
     setInterval(async () => {
         if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
         const user = localStorage.getItem('lifting_user');
         if (!user) return;
+
+        const isTyping = document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
+        const isModalOpen = ['editJobModal', 'detailJobModal', 'mpActionModal', 'kendalaModal', 'cancelPromptModal', 'pendingPromptModal', 'globalConfirmModal', 'resetPwdModal', 'successModal', 'successRegModal', 'profileBiodataModal', 'profileSettingsModal'].some(id => {
+            const el = document.getElementById(id);
+            return el && !el.classList.contains('hidden');
+        });
 
         try {
             let shouldRender = false;
@@ -135,7 +134,9 @@
             if (resOrders.ok) {
                 const data = await resOrders.json();
                 const newData = JSON.stringify(data);
-                if (localStorage.getItem('lifting_orders') !== newData) { localStorage.setItem('lifting_orders', newData); shouldRender = true; }
+                if (localStorage.getItem('lifting_orders') !== newData) {
+                    localStorage.setItem('lifting_orders', newData); shouldRender = true; 
+                }
             }
 
             const resSettings = await fetch(`${SUPABASE_URL}/rest/v1/settings?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
@@ -143,7 +144,9 @@
                 const sData = await resSettings.json();
                 if (sData && sData.length > 0) {
                     const newSettings = JSON.stringify(sData[0]);
-                    if (localStorage.getItem('lifting_settings') !== newSettings) { localStorage.setItem('lifting_settings', newSettings); shouldRender = true; }
+                    if (localStorage.getItem('lifting_settings') !== newSettings) {
+                        localStorage.setItem('lifting_settings', newSettings); shouldRender = true;
+                    }
                 }
             }
 
@@ -152,7 +155,9 @@
                 const data = await resUsers.json();
                 if (data && data.length > 0) {
                     const newData = JSON.stringify(data);
-                    if (localStorage.getItem('lifting_users') !== newData) { localStorage.setItem('lifting_users', newData); shouldRender = true; }
+                    if (localStorage.getItem('lifting_users') !== newData) {
+                        localStorage.setItem('lifting_users', newData); shouldRender = true;
+                    }
                 }
             }
 
@@ -161,11 +166,15 @@
                 const data = await resMaster.json();
                 if (data && data.length > 0) {
                     const newData = JSON.stringify(data[0]);
-                    if (localStorage.getItem('lifting_master_data') !== newData) { localStorage.setItem('lifting_master_data', newData); shouldRender = true; }
+                    if (localStorage.getItem('lifting_master_data') !== newData) {
+                        localStorage.setItem('lifting_master_data', newData); shouldRender = true;
+                    }
                 }
             }
 
-            if (shouldRender && isSafeToRender()) { renderApp(true); }
+            if (shouldRender && !isTyping && !isModalOpen && currentTab !== 'order' && currentTab !== 'master' && currentTab !== 'profile') {
+                renderApp(true);
+            }
         } catch(e) {}
     }, 3000);
 
@@ -192,8 +201,7 @@
         if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
         try {
             if (!orders || orders.length === 0) return;
-            const res = await fetch(`${SUPABASE_URL}/rest/v1/orders?on_conflict=no_wo`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'resolution=merge-duplicates' }, body: JSON.stringify(orders) });
-            if (!res.ok) { const errDetail = await res.text(); showToast("Gagal sync ke cloud: " + errDetail, "error"); }
+            await fetch(`${SUPABASE_URL}/rest/v1/orders?on_conflict=no_wo`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'resolution=merge-duplicates' }, body: JSON.stringify(orders) });
         } catch (e) {}
     }
 
@@ -213,17 +221,10 @@
         } catch (e) {}
     }
 
-    function getOrders() { 
-        let data = JSON.parse(localStorage.getItem('lifting_orders')); 
-        return Array.isArray(data) ? data : []; 
-    }
+    function getOrders() { return Array.isArray(JSON.parse(localStorage.getItem('lifting_orders'))) ? JSON.parse(localStorage.getItem('lifting_orders')) : []; }
     function saveOrders(orders) { localStorage.setItem('lifting_orders', JSON.stringify(orders)); syncToSupabase(orders); }
-    function getUsers() { 
-        let data = JSON.parse(localStorage.getItem('lifting_users')); 
-        return Array.isArray(data) ? data : []; 
-    }
+    function getUsers() { return Array.isArray(JSON.parse(localStorage.getItem('lifting_users'))) ? JSON.parse(localStorage.getItem('lifting_users')) : []; }
     function saveUsers(users) { localStorage.setItem('lifting_users', JSON.stringify(users)); syncUsersToSupabase(users); }
-    
     function getMasterData() { 
         let data = JSON.parse(localStorage.getItem('lifting_master_data'));
         if (!data) return defaultMasterData;
@@ -242,6 +243,17 @@
     function getSortIcon(col) {
         if (sortColumn !== col) return '<i class="fa-solid fa-sort text-slate-300 ml-1"></i>';
         return sortDirection === 'asc' ? '<i class="fa-solid fa-sort-up text-cyan-600 ml-1"></i>' : '<i class="fa-solid fa-sort-down text-cyan-600 ml-1"></i>';
+    }
+    
+    function handleUserSort(col) {
+        if (userSortCol === col) { userSortDir = userSortDir === 'asc' ? 'desc' : 'asc'; } 
+        else { userSortCol = col; userSortDir = 'asc'; }
+        renderUserTableOnly(); 
+    }
+
+    function getUserSortIcon(col) {
+        if (userSortCol !== col) return '<i class="fa-solid fa-sort text-slate-300 ml-1"></i>';
+        return userSortDir === 'asc' ? '<i class="fa-solid fa-sort-up text-cyan-600 ml-1"></i>' : '<i class="fa-solid fa-sort-down text-cyan-600 ml-1"></i>';
     }
 
     function showToast(message, type = 'success') {
@@ -272,7 +284,7 @@
         if(!job) return;
         let waText = '';
         if (job.status === 'SCHEDULED' || job.status === 'UNSCHEDULED') {
-            waText = `*DETAIL PEKERJAAN LIFTING*\n*NO WO:* ${job.no_wo}\n*Status:* ${job.status}\n\n*Pemohon:* ${job.nama_pemohon} (${job.departemen})\n*Kontak WA:* ${job.no_wa}\n\n*Armada:* ${job.kategori} ${job.unit ? '('+job.unit+')' : ''}\n*Tanggal:* ${job.tgl_pelaksanaan} ${job.jam_pelaksanaan ? '| Jam: '+job.jam_pelaksanaan : ''}\n*Lokasi:* ${job.lokasi_angkat || '-'} ➔ ${job.lokasi_tujuan || '-'}\n*Deskripsi:* ${job.deskripsi}`;
+            waText = *DETAIL PEKERJAAN LIFTING*\n*NO WO:* ${job.no_wo}\n*Order Unit:* ${job.kategori} ${job.unit ? '('+job.unit+')' : ''}\n*Status:* ${job.status}\n*Pemohon:* ${job.nama_pemohon}\n*Perusahaan:* ${job.perusahaan}\n*Departemen:* ${job.departemen}\n*Section:* ${job.section}\n*Kontak WA:* ${job.no_wa}\n*Tanggal:* ${job.tgl_pelaksanaan} ${job.jam_pelaksanaan ? '| Jam: '+job.jam_pelaksanaan : ''}\n*Lokasi:* ${job.lokasi_angkat || '-'} ➔ ${job.lokasi_tujuan || '-'}\n*Deskripsi:* ${job.deskripsi};
         } else {
             waText = `*PELAPORAN PROGRES JOB LIFTING*\n*Status:* ${job.status}\n\n*Nama Job:* ${job.deskripsi}\n*Jam Start:* ${job.jam_start_aktual || '-'}\n*Jam Finish:* ${job.jam_end_aktual || '-'}\n*No. Unit:* ${job.unit || '-'}\n*Nama Operator:* ${job.operator || '-'}\n*Nama Rigger:* ${job.rigger || '-'}${job.rigger2 ? ', ' + job.rigger2 : ''}\n\n*Final Inspeksi:* ${job.final_inspeksi || '-'}\n*Kendala:* ${job.alasan_telat ? 'Telat: ' + job.alasan_telat + ' ' : ''}${job.alasan_overtime ? 'Over: ' + job.alasan_overtime : ''}${(!job.alasan_telat && !job.alasan_overtime) ? '-' : ''}`;
         }
@@ -296,6 +308,24 @@
             }
         });
         return `${datePrefix}${maxNumber + 1}`;
+    }
+
+    function showSuccessAnim(type, title, msg) {
+        const m = document.getElementById('successModal');
+        const icon = document.getElementById('successIcon');
+        document.getElementById('successTitle').innerText = title;
+        document.getElementById('successMessage').innerText = msg;
+        
+        if (type === 'check') {
+            icon.className = "w-16 h-16 rounded-full flex items-center justify-center text-3xl mb-3 text-white bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]";
+            icon.innerHTML = '<i class="fa-solid fa-check"></i>';
+        } else if (type === 'thumb') {
+            icon.className = "w-16 h-16 rounded-full flex items-center justify-center text-3xl mb-3 text-white bg-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)]";
+            icon.innerHTML = '<i class="fa-solid fa-thumbs-up"></i>';
+        }
+        
+        m.classList.remove('hidden');
+        setTimeout(() => { m.classList.add('hidden'); }, 3000);
     }
 
     function renderApp(isSilentSync = false) {
@@ -417,9 +447,9 @@
                 </div>
             </div>
 
-            <div id="resetPwdModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 hidden p-3">
+            <div id="resetPwdModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[110] hidden p-3">
                 <div class="bg-white rounded-md shadow-xl w-full max-w-[250px] overflow-hidden">
-                    <div class="p-2 border-b border-slate-100 flex justify-between items-center">
+                    <div class="p-2 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                         <h3 class="font-bold text-slate-800 text-xs">Reset Password</h3>
                         <button onclick="document.getElementById('resetPwdModal').classList.add('hidden')" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-xs"></i></button>
                     </div>
@@ -435,21 +465,82 @@
                 </div>
             </div>
 
+            <!-- Profile Biodata Modal -->
+            <div id="profileBiodataModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[110] hidden p-3">
+                <div class="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden flex flex-col max-h-[90vh]">
+                    <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
+                        <h3 class="font-bold text-slate-800 text-sm"><i class="fa-solid fa-id-card mr-2 text-green-600"></i>Identitas Saya</h3>
+                        <button onclick="document.getElementById('profileBiodataModal').classList.add('hidden')" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-base"></i></button>
+                    </div>
+                    <div class="p-4 overflow-y-auto">
+                        <form onsubmit="saveProfile(event)" class="space-y-3">
+                            <div class="grid grid-cols-2 gap-2">
+                                <div><label class="block text-[10px] font-bold text-slate-500 mb-1">NRP</label><input type="text" value="${user.nrp}" class="w-full border border-slate-200 bg-slate-50 rounded-md px-3 py-2 text-[10px] text-slate-500 cursor-not-allowed" readonly></div>
+                                <div><label class="block text-[10px] font-bold text-slate-500 mb-1">Nama Lengkap</label><input type="text" id="profName" value="${user.nama_lengkap}" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-md px-3 py-2 text-[10px] focus:outline-none focus:border-cyan-500" required></div>
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-2">
+                                <div><label class="block text-[10px] font-bold text-slate-500 mb-1">Jabatan</label><input type="text" id="profJabatan" value="${user.jabatan}" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-md px-3 py-2 text-[10px] focus:outline-none focus:border-cyan-500" required></div>
+                                <div><label class="block text-[10px] font-bold text-slate-500 mb-1">No WhatsApp</label><input type="number" id="profWa" value="${user.no_wa}" class="w-full border border-slate-300 rounded-md px-3 py-2 text-[10px] focus:outline-none focus:border-cyan-500" required></div>
+                            </div>
+                            
+                            <div class="space-y-2">
+                                <div><label class="block text-[10px] font-bold text-slate-500 mb-1">Perusahaan</label><select id="profPerusahaan" class="w-full border border-slate-300 rounded-md px-3 py-2 text-[10px] focus:outline-none focus:border-cyan-500 bg-white cursor-pointer" required>${getMasterData().perusahaan.map(p=>`<option value="${p}" ${user.perusahaan===p?'selected':''}>${p}</option>`).join('')}</select></div>
+                                <div><label class="block text-[10px] font-bold text-slate-500 mb-1">Departemen</label><select id="profDepartemen" class="w-full border border-slate-300 rounded-md px-3 py-2 text-[10px] focus:outline-none focus:border-cyan-500 bg-white cursor-pointer" required>${getMasterData().departemen.map(d=>`<option value="${d}" ${user.departemen===d?'selected':''}>${d}</option>`).join('')}</select></div>
+                                <div><label class="block text-[10px] font-bold text-slate-500 mb-1">Section</label><select id="profSection" class="w-full border border-slate-300 rounded-md px-3 py-2 text-[10px] focus:outline-none focus:border-cyan-500 bg-white cursor-pointer" required>${getMasterData().section.map(s=>`<option value="${s}" ${user.section===s?'selected':''}>${s}</option>`).join('')}</select></div>
+                            </div>
+                            
+                            <button type="submit" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-2 rounded-md text-xs mt-4 transition-colors">Simpan Profil</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Profile Settings Password Modal -->
+            <div id="profileSettingsModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[110] hidden p-3">
+                <div class="bg-white rounded-xl shadow-xl w-full max-w-[300px] overflow-hidden flex flex-col">
+                    <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                        <h3 class="font-bold text-slate-800 text-sm"><i class="fa-solid fa-lock mr-2 text-slate-600"></i>Ubah Kata Sandi</h3>
+                        <button onclick="document.getElementById('profileSettingsModal').classList.add('hidden')" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-base"></i></button>
+                    </div>
+                    <form onsubmit="savePassword(event)" class="p-4 space-y-3">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 mb-1">Kata Sandi Baru</label>
+                            <div class="relative">
+                                <input type="password" id="profPwd1" class="w-full border border-slate-300 rounded-md px-3 py-2 pr-8 text-xs focus:outline-none focus:border-cyan-500" required>
+                                <i id="toggleProfPwd1" class="fa-regular fa-eye absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer pwd-toggle text-[10px]" onclick="togglePassword('profPwd1', 'toggleProfPwd1')"></i>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 mb-1">Konfirmasi Sandi Baru</label>
+                            <div class="relative">
+                                <input type="password" id="profPwd2" class="w-full border border-slate-300 rounded-md px-3 py-2 pr-8 text-xs focus:outline-none focus:border-cyan-500" required>
+                                <i id="toggleProfPwd2" class="fa-regular fa-eye absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer pwd-toggle text-[10px]" onclick="togglePassword('profPwd2', 'toggleProfPwd2')"></i>
+                            </div>
+                        </div>
+                        <button type="submit" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-2 rounded-md text-xs mt-2 transition-colors">Perbarui Kata Sandi</button>
+                    </form>
+                </div>
+            </div>
+
             <!-- MODAL ANIMASI SUKSES (CENTANG/JEMPOL) -->
-            <div id="successModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex justify-center items-center z-[110] hidden">
+            <div id="successModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex justify-center items-center z-[120] hidden">
                 <div class="bg-white rounded-xl shadow-2xl w-full max-w-[250px] p-6 text-center animate-pop-in flex flex-col items-center">
                     <div id="successIcon" class="w-16 h-16 rounded-full flex items-center justify-center text-3xl mb-3 text-white"></div>
                     <h2 id="successTitle" class="text-sm font-bold text-slate-800 mb-1">Berhasil</h2>
                     <p id="successMessage" class="text-[10px] text-slate-500">Tersimpan.</p>
+                    <button onclick="document.getElementById('successModal').classList.add('hidden')" class="mt-4 w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 rounded-lg text-[10px] transition-colors">Tutup</button>
                 </div>
             </div>
-
         `;
 
         setTimeout(() => { document.querySelectorAll('.chart-bar').forEach(bar => { const w = bar.getAttribute('data-width'); if(w) bar.style.width = w; }); }, 50);
 
         if (currentTab === 'dashboard' && (user.role === 'ADMIN' || user.role === 'GL')) {
             setTimeout(initDashboardCharts, 100);
+        }
+        if (currentTab === 'master' && currentMasterTab === 'users' && user.role === 'ADMIN') {
+            renderUserTableOnly();
         }
     }
 
@@ -485,6 +576,10 @@
                 
                 <button onclick="switchTab('profile')" class="w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold transition-all duration-300 flex items-center gap-2 ${currentTab === 'profile' ? 'nav-active shadow-sm' : 'text-slate-600 hover:bg-slate-50'}"><i class="fa-solid fa-user w-5 text-center text-sm"></i> Profil Saya</button>
             </div>
+            
+            <div class="p-3 border-t border-slate-200 mt-auto shrink-0 flex items-center justify-between bg-slate-50">
+                <div class="overflow-hidden pr-1"><div class="text-xs font-bold text-slate-800 leading-tight truncate">${user.nama_lengkap}</div><div class="text-[9px] font-bold text-slate-400 tracking-wider mt-0.5">${user.role}</div></div>
+            </div>
         </div>`;
     }
 
@@ -503,11 +598,11 @@
             </button>
             
             ${(user.role === 'USER' || user.role === 'ADMIN' || user.role === 'GL') ? `
-            <button onclick="switchTab('order')" class="relative flex flex-col items-center justify-center -mt-8">
+            <button onclick="switchTab('order')" class="relative flex flex-col items-center justify-center -mt-8 z-50">
                 <div class="w-14 h-14 rounded-full flex items-center justify-center border-[4px] border-white shadow-md transition-transform duration-300 ${currentTab === 'order' ? 'bg-cyan-600 text-white scale-110' : 'bg-cyan-500 text-white hover:scale-105'}">
                     <i class="fa-solid fa-plus text-3xl ${currentTab === 'order' ? 'animate-[spin_0.3s_ease-out]' : ''}"></i>
                 </div>
-                <span class="text-[10px] font-medium text-slate-500 mt-1 leading-none">Order</span>
+                <span class="text-[10px] font-medium text-slate-500 mt-1 leading-none relative z-50 bg-white px-1 rounded">Order</span>
             </button>` : ''}
             
             ${user.role === 'ADMIN' ? `
@@ -536,6 +631,7 @@
 
         return `
         <div class="min-h-screen flex items-center justify-center p-3 bg-slate-50 relative page-flip-anim">
+            <!-- 1. LOGIN FORM -->
             <div id="authForm" class="bg-white border border-slate-300 w-full max-w-[280px] overflow-hidden rounded-none shadow-xl z-10">
                 <div class="relative p-5 text-center border-b border-slate-300" style="${bgStyle}">
                     ${overlay}
@@ -561,12 +657,14 @@
                         </div>
                         <button type="submit" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-1.5 rounded-none text-xs transition-colors mt-2">Masuk</button>
                     </form>
-                    <div class="mt-4 text-center text-[10px] text-slate-500">
-                        Belum punya akun? <span class="text-cyan-600 font-bold cursor-pointer hover:underline" onclick="toggleAuthMode()">Daftar (User)</span>
+                    <div class="mt-4 text-center text-[10px] text-slate-500 flex flex-col gap-1.5">
+                        <div>Belum punya akun? <span class="text-cyan-600 font-bold cursor-pointer hover:underline" onclick="toggleAuthMode('signupForm')">Daftar (User)</span></div>
+                        <div>Lupa password? <span class="text-red-500 font-bold cursor-pointer hover:underline" onclick="toggleAuthMode('forgotPwdForm')">Reset Disini</span></div>
                     </div>
                 </div>
             </div>
             
+            <!-- 2. SIGNUP FORM -->
             <div id="signupForm" class="bg-white border border-slate-300 shadow-xl w-full max-w-[280px] overflow-hidden rounded-none hidden z-10">
                 <div class="p-3 text-center relative border-b border-slate-300" style="${bgStyle}">
                     ${overlay}
@@ -578,11 +676,11 @@
                         <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Nama Lengkap</label><input type="text" id="regName" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-none px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
 
                         <div class="grid grid-cols-2 gap-2">
-                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Perusahaan</label><select id="regPerusahaan" class="w-full border border-slate-300 rounded-none px-1.5 py-1 text-[10px] focus:outline-none focus:border-cyan-500 bg-white cursor-pointer" required>${optPerusahaan}</select></div>
-                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Departemen</label><select id="regDepartemen" class="w-full border border-slate-300 rounded-none px-1.5 py-1 text-[10px] focus:outline-none focus:border-cyan-500 bg-white cursor-pointer" required>${optDepartemen}</select></div>
+                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Perusahaan</label><select id="regPerusahaan" class="w-full border border-slate-300 rounded-none px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500 cursor-pointer bg-white" required>${optPerusahaan}</select></div>
+                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Departemen</label><select id="regDepartemen" class="w-full border border-slate-300 rounded-none px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500 cursor-pointer bg-white" required>${optDepartemen}</select></div>
                         </div>
                         <div class="grid grid-cols-2 gap-2">
-                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Section</label><select id="regSection" class="w-full border border-slate-300 rounded-none px-1.5 py-1 text-[10px] focus:outline-none focus:border-cyan-500 bg-white cursor-pointer" required>${optSection}</select></div>
+                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Section</label><select id="regSection" class="w-full border border-slate-300 rounded-none px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500 cursor-pointer bg-white" required>${optSection}</select></div>
                             <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Jabatan</label><input type="text" id="regJabatan" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-none px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
                         </div>
 
@@ -597,7 +695,46 @@
                         <button type="submit" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-1.5 rounded-none text-xs mt-2 transition-colors">Daftar Akun</button>
                     </form>
                     <div class="mt-3 text-center text-[10px] text-slate-500">
-                        Sudah punya akun? <span class="text-cyan-600 font-bold cursor-pointer hover:underline" onclick="toggleAuthMode()">Masuk</span>
+                        Sudah punya akun? <span class="text-cyan-600 font-bold cursor-pointer hover:underline" onclick="toggleAuthMode('authForm')">Masuk</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. FORGOT PASSWORD FORM -->
+            <div id="forgotPwdForm" class="bg-white border border-slate-300 shadow-xl w-full max-w-[280px] overflow-hidden rounded-none hidden z-10">
+                <div class="p-3 text-center relative border-b border-slate-300" style="${bgStyle}">
+                    ${overlay}
+                    <h2 class="text-sm font-bold text-white relative z-10">Reset Password</h2>
+                </div>
+                <div class="p-4">
+                    <div id="step1Forgot">
+                        <form onsubmit="checkForgotNrp(event)" class="space-y-3">
+                            <div><label class="block text-[10px] font-bold text-slate-500 mb-1">Masukkan NRP Anda</label><input type="text" id="forgotNrp" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-none px-2 py-1.5 text-xs focus:outline-none focus:border-red-500" required></div>
+                            <button type="submit" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-1.5 rounded-none text-xs transition-colors mt-2">Cek NRP</button>
+                        </form>
+                    </div>
+                    <div id="step2Forgot" class="hidden">
+                        <form onsubmit="submitNewPassword(event)" class="space-y-3">
+                            <input type="hidden" id="forgotTargetNrp">
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-500 mb-1">Password Baru</label>
+                                <div class="relative">
+                                    <input type="password" id="forgotPwd1" class="w-full border border-slate-300 rounded-none px-2 py-1.5 pr-6 text-xs focus:outline-none focus:border-red-500" required>
+                                    <i id="toggleFPwd1" class="fa-regular fa-eye absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer pwd-toggle text-[10px]" onclick="togglePassword('forgotPwd1', 'toggleFPwd1')"></i>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-500 mb-1">Konfirmasi Password Baru</label>
+                                <div class="relative">
+                                    <input type="password" id="forgotPwd2" class="w-full border border-slate-300 rounded-none px-2 py-1.5 pr-6 text-xs focus:outline-none focus:border-red-500" required>
+                                    <i id="toggleFPwd2" class="fa-regular fa-eye absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer pwd-toggle text-[10px]" onclick="togglePassword('forgotPwd2', 'toggleFPwd2')"></i>
+                                </div>
+                            </div>
+                            <button type="submit" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-1.5 rounded-none text-xs transition-colors mt-2">Simpan Password Baru</button>
+                        </form>
+                    </div>
+                    <div class="mt-4 text-center text-[10px] text-slate-500">
+                        Kembali ke <span class="text-cyan-600 font-bold cursor-pointer hover:underline" onclick="toggleAuthMode('authForm')">Login</span>
                     </div>
                 </div>
             </div>
@@ -608,14 +745,26 @@
                     <div class="w-16 h-16 rounded-full flex items-center justify-center text-3xl mb-3 text-white bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]">
                         <i class="fa-solid fa-check"></i>
                     </div>
-                    <h2 class="text-sm font-bold text-slate-800 mb-1">Berhasil Daftar!</h2>
+                    <h2 class="text-sm font-bold text-slate-800 mb-1">Berhasil!</h2>
                     <p class="text-[10px] text-slate-500">Silakan masuk dengan akun Anda.</p>
                 </div>
             </div>
         </div>`;
     }
 
-    function toggleAuthMode() { document.getElementById('authForm').classList.toggle('hidden'); document.getElementById('signupForm').classList.toggle('hidden'); }
+    function toggleAuthMode(targetId) { 
+        document.getElementById('authForm').classList.add('hidden'); 
+        document.getElementById('signupForm').classList.add('hidden'); 
+        document.getElementById('forgotPwdForm').classList.add('hidden'); 
+        
+        document.getElementById(targetId).classList.remove('hidden'); 
+
+        if(targetId === 'forgotPwdForm') {
+            document.getElementById('step1Forgot').classList.remove('hidden');
+            document.getElementById('step2Forgot').classList.add('hidden');
+            document.getElementById('forgotNrp').value = '';
+        }
+    }
 
     function handleLogin(e) {
         e.preventDefault();
@@ -658,10 +807,44 @@
         
         setTimeout(() => {
             m.classList.add('hidden');
-            toggleAuthMode();
+            toggleAuthMode('authForm');
             document.getElementById('loginNrp').value = nrp;
             document.getElementById('loginPwd').value = '';
         }, 1500);
+    }
+
+    function checkForgotNrp(e) {
+        e.preventDefault();
+        const nrp = document.getElementById('forgotNrp').value.trim().toUpperCase();
+        const users = getUsers();
+        const user = users.find(u => u.nrp === nrp);
+        if(user) {
+            document.getElementById('step1Forgot').classList.add('hidden');
+            document.getElementById('step2Forgot').classList.remove('hidden');
+            document.getElementById('forgotTargetNrp').value = nrp;
+        } else {
+            showToast('NRP tidak ditemukan!', 'error');
+        }
+    }
+
+    function submitNewPassword(e) {
+        e.preventDefault();
+        const nrp = document.getElementById('forgotTargetNrp').value;
+        const p1 = document.getElementById('forgotPwd1').value;
+        const p2 = document.getElementById('forgotPwd2').value;
+        if(p1 !== p2) return showToast('Password tidak cocok!', 'error');
+
+        let users = getUsers();
+        let idx = users.findIndex(u => u.nrp === nrp);
+        if(idx !== -1) {
+            users[idx].password_hash = p1;
+            saveUsers(users); 
+            showToast('Password berhasil direset!');
+            
+            const m = document.getElementById('successRegModal');
+            m.classList.remove('hidden');
+            setTimeout(() => { m.classList.add('hidden'); toggleAuthMode('authForm'); document.getElementById('loginNrp').value = nrp; }, 1500);
+        }
     }
 
     function openCustomConfirm(title, message, onConfirm) {
@@ -677,9 +860,11 @@
 
     function getDashboardView() {
         let jobs = getOrders();
+        
         let today = getLocalDateString();
         let tglMulai = document.getElementById('dash_tgl_mulai') ? document.getElementById('dash_tgl_mulai').value : today;
         let tglSelesai = document.getElementById('dash_tgl_selesai') ? document.getElementById('dash_tgl_selesai').value : today;
+        
         let dashShift = document.getElementById('dash_shift') ? document.getElementById('dash_shift').value : 'ALL';
         let dashUnit = document.getElementById('dash_unit') ? document.getElementById('dash_unit').value : 'ALL';
 
@@ -695,22 +880,62 @@
 
         let cntCT = filteredJobs.filter(j => j.kategori === 'Crane Truck').length; let cntBC = filteredJobs.filter(j => j.kategori === 'Big Crane').length; let cntLB = filteredJobs.filter(j => j.kategori === 'Lowboy').length;
         let totalUnits = cntCT + cntBC + cntLB || 1; 
+
         let pctCT = Math.round((cntCT / totalUnits) * 100) || 0; let pctBC = Math.round((cntBC / totalUnits) * 100) || 0; let pctLB = Math.round((cntLB / totalUnits) * 100) || 0;
         let degCT = (pctCT / 100) * 360; let degBC = degCT + ((pctBC / 100) * 360);
         let pieStyle = `background: conic-gradient(#0891b2 0deg ${degCT}deg, #6366f1 ${degCT}deg ${degBC}deg, #94a3b8 ${degBC}deg 360deg);`;
 
-        let m = getMasterData();
-        let allUnits = [...(m.unit_ct || []), ...(m.unit_big_crane || []), ...(m.unit_lowboy || [])];
-        let unitOptionsHtml = allUnits.map(u => `<option value="${u}" ${dashUnit===u?'selected':''}>${u}</option>`).join('');
+        function getTopData(field) { 
+            let counts = {}; 
+            filteredJobs.forEach(j => { 
+                let val = j[field];
+                if(val && val !== '-' && val !== 'N/A') counts[val] = (counts[val] || 0) + 1; 
+            }); 
+            return Object.entries(counts).sort((a,b) => b[1] - a[1]).slice(0, 5); 
+        }
+        
+        let topDept = getTopData('departemen'); let topSection = getTopData('section');
+
+        function renderBarList(data, colorClass) {
+            if(data.length === 0) return `<div class="text-[9px] text-slate-400 italic mt-2">Data kosong</div>`;
+            let maxVal = Math.max(...data.map(d=>d[1])) || 1;
+            return data.map(d => `
+                <div class="mb-1.5 mt-2">
+                    <div class="flex justify-between text-[9px] mb-0.5"><span class="font-semibold text-slate-700 truncate mr-2">${d[0]}</span><span class="font-bold text-slate-500">${d[1]}</span></div>
+                    <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden"><div class="${colorClass} h-1.5 rounded-full chart-bar w-0" data-width="${(d[1]/maxVal)*100}%"></div></div>
+                </div>
+            `).join('');
+        }
 
         return `
         <div class="max-w-6xl mx-auto space-y-3 relative z-10">
             <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-2">
                 <h2 class="text-sm font-bold text-slate-800 shrink-0"><i class="fa-solid fa-chart-pie mr-1.5 text-cyan-600"></i>Dashboard Analytics</h2>
+                
                 <div class="flex items-center text-[10px] w-full lg:w-auto bg-white border border-slate-200 rounded-md p-1 shadow-sm flex-wrap gap-y-1 relative z-20">
-                    <div class="flex items-center shrink-0 pr-1"><i class="fa-regular fa-calendar mx-1 text-slate-400"></i><input type="date" id="dash_tgl_mulai" class="bg-transparent px-1 py-0.5 text-slate-700 focus:outline-none" value="${tglMulai}" onchange="renderApp(true)"><span class="text-slate-400 mx-0.5">-</span><input type="date" id="dash_tgl_selesai" class="bg-transparent px-1 py-0.5 text-slate-700 focus:outline-none" value="${tglSelesai}" onchange="renderApp(true)"></div>
-                    <div class="flex items-center border-l border-slate-200 pl-1"><select id="dash_shift" class="bg-transparent text-slate-700 focus:outline-none cursor-pointer" onchange="renderApp(true)"><option value="ALL" ${dashShift==='ALL'?'selected':''}>All Shift</option><option value="Shift 1" ${dashShift==='Shift 1'?'selected':''}>Shift 1</option><option value="Shift 2" ${dashShift==='Shift 2'?'selected':''}>Shift 2</option></select></div>
-                    <div class="flex items-center border-l border-slate-200 pl-1"><select id="dash_unit" class="bg-transparent text-slate-700 focus:outline-none cursor-pointer" onchange="renderApp(true)"><option value="ALL" ${dashUnit==='ALL'?'selected':''}>Semua Armada</option><option value="Crane Truck" ${dashUnit==='Crane Truck'?'selected':''}>Crane Truck</option><option value="Big Crane" ${dashUnit==='Big Crane'?'selected':''}>Big Crane</option><option value="Lowboy" ${dashUnit==='Lowboy'?'selected':''}>Lowboy</option></select></div>
+                    <div class="flex items-center shrink-0 pr-1">
+                        <i class="fa-regular fa-calendar mx-1 text-slate-400"></i>
+                        <input type="date" id="dash_tgl_mulai" class="bg-transparent px-1 py-0.5 text-slate-700 focus:outline-none" value="${tglMulai}" onchange="renderApp(true)">
+                        <span class="text-slate-400 mx-0.5">-</span>
+                        <input type="date" id="dash_tgl_selesai" class="bg-transparent px-1 py-0.5 text-slate-700 focus:outline-none" value="${tglSelesai}" onchange="renderApp(true)">
+                    </div>
+                    
+                    <div class="flex items-center border-l border-slate-200 pl-1">
+                        <select id="dash_shift" class="bg-transparent text-slate-700 focus:outline-none cursor-pointer" onchange="renderApp(true)">
+                            <option value="ALL" ${dashShift==='ALL'?'selected':''}>All Shift</option>
+                            <option value="Shift 1" ${dashShift==='Shift 1'?'selected':''}>Shift 1</option>
+                            <option value="Shift 2" ${dashShift==='Shift 2'?'selected':''}>Shift 2</option>
+                        </select>
+                    </div>
+                    
+                    <div class="flex items-center border-l border-slate-200 pl-1">
+                        <select id="dash_unit" class="bg-transparent text-slate-700 focus:outline-none cursor-pointer" onchange="renderApp(true)">
+                            <option value="ALL" ${dashUnit==='ALL'?'selected':''}>Semua Armada</option>
+                            <option value="Crane Truck" ${dashUnit==='Crane Truck'?'selected':''}>Crane Truck</option>
+                            <option value="Big Crane" ${dashUnit==='Big Crane'?'selected':''}>Big Crane</option>
+                            <option value="Lowboy" ${dashUnit==='Lowboy'?'selected':''}>Lowboy</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
@@ -728,9 +953,10 @@
                 <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm flex items-center justify-between"><div class="flex items-center gap-2 text-slate-500"><i class="fa-solid fa-trailer text-base"></i><span class="text-[11px] font-bold">Lowboy</span></div><div class="text-lg font-bold text-slate-800">${cntLB}</div></div>
             </div>
 
+            <!-- CHARTS SECTION -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 mt-3">
                 <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm flex flex-col">
-                    <h3 class="text-[10px] font-bold text-slate-600 mb-2">Weekly Trend Order</h3>
+                    <h3 class="text-[10px] font-bold text-slate-600 mb-2">Weekly Trend Order (vs Minggu Lalu)</h3>
                     <div class="relative h-48 w-full"><canvas id="lineChart"></canvas></div>
                 </div>
                 <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm flex flex-col">
@@ -758,6 +984,7 @@
                 </div>
             </div>
 
+            <!-- Bagian Data Perusahaan Order & Dept Plant -->
             <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm mt-3 flex flex-col lg:flex-row gap-6 items-start">
                 <div class="w-full lg:w-1/4 flex flex-col items-center justify-center">
                     <h3 class="text-[10px] font-bold text-slate-600 mb-2 w-full text-left">Data Perusahaan</h3>
@@ -796,6 +1023,7 @@
                     </div>
                 </div>
             </div>
+            
         </div>`;
     }
 
@@ -814,7 +1042,7 @@
 
         let filteredJobsRange = allJobs.filter(j => j.tgl_pelaksanaan >= dashTglMulai && j.tgl_pelaksanaan <= dashTglSelesai);
 
-        // --- 1. DEPARTEMENT ORDER (HORIZONTAL STACKED BAR) ---
+        // --- DEPARTEMENT ORDER (HORIZONTAL STACKED BAR) ---
         let refDate = new Date(dashTglMulai);
         let mtdStartStr = refDate.getFullYear() + '-' + String(refDate.getMonth()+1).padStart(2,'0') + '-01';
         let mtdJobs = allJobs.filter(j => j.tgl_pelaksanaan >= mtdStartStr && j.tgl_pelaksanaan <= dashTglSelesai);
@@ -861,15 +1089,18 @@
             }
         });
 
-        // --- 2. LINE CHART (WEEKLY TREND) ---
-        let dataThisWeek = []; let dataLastWeek = [];
-        let labelsLine = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+        // --- LINE CHART LOGIC (Minggu -> Sabtu) ---
+        let dataThisWeek = [];
+        let dataLastWeek = [];
+        let labels = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
 
         for(let i=0; i<7; i++) {
             let dThis = new Date(sundayThisWeek); dThis.setDate(dThis.getDate() + i);
             let dLast = new Date(sundayThisWeek); dLast.setDate(dLast.getDate() - 7 + i);
+
             let strThis = dThis.getFullYear() + '-' + String(dThis.getMonth()+1).padStart(2,'0') + '-' + String(dThis.getDate()).padStart(2,'0');
             let strLast = dLast.getFullYear() + '-' + String(dLast.getMonth()+1).padStart(2,'0') + '-' + String(dLast.getDate()).padStart(2,'0');
+
             dataThisWeek.push(allJobs.filter(j => j.tgl_pelaksanaan === strThis).length);
             dataLastWeek.push(allJobs.filter(j => j.tgl_pelaksanaan === strLast).length);
         }
@@ -879,20 +1110,44 @@
         window.dashLineChart = new Chart(ctxLine, {
             type: 'line',
             data: {
-                labels: labelsLine,
+                labels: labels,
                 datasets: [
-                    { label: 'Minggu Ini', data: dataThisWeek, borderColor: '#0891b2', backgroundColor: 'rgba(8, 145, 178, 0.1)', tension: 0.4, fill: true, borderWidth: 2, pointBackgroundColor: '#fff', pointBorderColor: '#0891b2', pointBorderWidth: 2 },
-                    { label: 'Minggu Lalu', data: dataLastWeek, borderColor: '#94a3b8', borderDash: [5, 5], tension: 0.4, fill: false, borderWidth: 2, pointRadius: 0 }
+                    {
+                        label: 'Minggu Ini',
+                        data: dataThisWeek,
+                        borderColor: '#0891b2',
+                        backgroundColor: 'rgba(8, 145, 178, 0.1)',
+                        tension: 0.4,
+                        fill: true,
+                        borderWidth: 2,
+                        pointBackgroundColor: '#fff',
+                        pointBorderColor: '#0891b2',
+                        pointBorderWidth: 2
+                    },
+                    {
+                        label: 'Minggu Lalu',
+                        data: dataLastWeek,
+                        borderColor: '#94a3b8',
+                        borderDash: [5, 5],
+                        tension: 0.4,
+                        fill: false,
+                        borderWidth: 2,
+                        pointRadius: 0
+                    }
                 ]
             },
             options: {
-                responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+                responsive: true, maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
                 plugins: { legend: { labels: { font: { size: 10, family: "'Inter', sans-serif" }, usePointStyle: true, boxWidth: 8 } } },
-                scales: { y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 9 } }, grid: { color: '#f1f5f9' } }, x: { ticks: { font: { size: 9 } }, grid: { display: false } } }
+                scales: { 
+                    y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 9 } }, grid: { color: '#f1f5f9' } },
+                    x: { ticks: { font: { size: 9 } }, grid: { display: false } }
+                }
             }
         });
 
-        // --- 3. RIGGER VERTICAL STACKED BAR CHART ---
+        // --- RIGGER VERTICAL STACKED BAR CHART ---
         if(document.getElementById('riggerChart')) {
             let riggerStats = {};
             filteredJobsRange.forEach(j => {
@@ -921,9 +1176,9 @@
                 data: {
                     labels: rLabels,
                     datasets: [
-                        { label: 'Crane Truck', data: rDataCT, backgroundColor: '#ef4444' }, // Red
+                        { label: 'Crane Truck', data: rDataCT, backgroundColor: '#ef4444' }, // Merah
                         { label: 'Big Crane', data: rDataBC, backgroundColor: '#f97316' },   // Orange
-                        { label: 'Lowboy', data: rDataLB, backgroundColor: '#92400e' }       // Brown
+                        { label: 'Lowboy', data: rDataLB, backgroundColor: '#92400e' }       // Coklat
                     ]
                 },
                 options: {
@@ -934,7 +1189,7 @@
             });
         }
 
-        // --- 4. DATA PERUSAHAAN (DONUT CHART & LEGEND) ---
+        // --- DATA PERUSAHAAN (DONUT CHART & LEGEND) ---
         if(document.getElementById('companyDonutChart')) {
             let companyStats = {};
             filteredJobsRange.forEach(j => { 
@@ -1431,180 +1686,8 @@
         document.body.appendChild(link); link.click(); document.body.removeChild(link);
     }
 
-    function getOrderFormView() {
-        const user = JSON.parse(localStorage.getItem('lifting_user'));
-        const m = getMasterData();
-        const isAdminGL = user.role === 'ADMIN' || user.role === 'GL';
-        const settings = getSettings();
-        
-        const getUnitCard = (type, modeVar, iconUrl, iconClass, label) => {
-            const bgStyle = iconUrl ? `style="background-image: url('${iconUrl}'); background-size: cover; background-position: center;"` : '';
-            const content = iconUrl 
-                ? `<div class="absolute inset-0 bg-slate-900/40 group-hover:bg-slate-900/20 transition-colors"></div><span class="font-bold text-white text-sm sm:text-base uppercase relative z-10 tracking-widest drop-shadow-lg text-center leading-tight px-2">${label}</span>`
-                : `<div class="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-slate-50 group-hover:bg-cyan-50 flex items-center justify-center transition-colors"><i class="fa-solid ${iconClass} text-2xl sm:text-3xl text-slate-400 group-hover:text-cyan-600"></i></div><span class="font-bold text-slate-700 text-[11px] sm:text-xs uppercase tracking-wide text-center leading-tight mt-2 px-2">${label}</span>`;
-            
-            return `<button onclick="${modeVar}='${type}'; renderApp(false);" class="relative bg-white border border-slate-200 hover:border-cyan-500 hover:shadow-md rounded-xl flex flex-col items-center justify-center shadow-sm transition-all group aspect-square sm:aspect-[4/3] w-full sm:w-44 overflow-hidden" ${bgStyle}>${content}</button>`;
-        };
-
-        const btnCT = getUnitCard('Crane Truck', 'userOrderFleetMode', settings.icon_ct_url, 'fa-truck-moving', 'Crane Truck');
-        const btnBC = getUnitCard('Big Crane', 'userOrderFleetMode', settings.icon_bc_url, 'fa-truck-ramp-box', 'Big Crane');
-        const btnLB = getUnitCard('Lowboy', 'userOrderFleetMode', settings.icon_lb_url, 'fa-trailer', 'Lowboy');
-
-        if (!userOrderFleetMode) {
-            return `
-            <div class="min-h-[70vh] flex flex-col items-center justify-center max-w-[900px] mx-auto w-full px-4 py-8">
-                <h2 class="text-sm sm:text-base font-bold text-slate-800 mb-6 text-center"><i class="fa-solid fa-list-check mr-1.5 text-cyan-600"></i>Pilih Unit Armada</h2>
-                <div class="grid grid-cols-2 sm:flex sm:flex-row sm:justify-center gap-4 sm:gap-6 w-full max-w-2xl mx-auto">
-                    ${btnCT}
-                    ${btnBC}
-                    ${btnLB}
-                </div>
-            </div>`;
-        }
-
-        const cat = userOrderFleetMode;
-        let formFields = '';
-        if (cat === 'Crane Truck') {
-            formFields = `
-                <div class="grid grid-cols-2 gap-2">
-                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Tgl Pelaksanaan *</label><input type="date" id="tgl_pelaksanaan" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" required></div>
-                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Jam Req (HH:mm) *</label><input type="time" id="jam_pelaksanaan" onchange="calculateShift()" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" required></div>
-                </div>
-                <div class="grid grid-cols-2 gap-2">
-                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Shift Kerja</label><input type="text" id="shift" class="w-full border border-slate-200 bg-slate-50 rounded-sm px-2 py-1.5 text-xs text-slate-500 cursor-not-allowed" placeholder="Otomatis" readonly></div>
-                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Durasi (Jam) *</label><input type="number" id="durasi_req" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" required></div>
-                </div>
-                <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Lokasi Angkat *</label><input type="text" id="lok_angkat" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" placeholder="Muat..." required></div>
-                <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Lokasi Tujuan *</label><input type="text" id="lok_tujuan" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" placeholder="Bongkar..." required></div>
-                <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Deskripsi & Tonase Beban *</label><textarea id="deskripsi" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500 h-14" placeholder="Rincian..." required></textarea></div>
-                <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Upload Foto Bukti (Opsional)</label><input type="file" id="foto_evidence" accept="image/*" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] focus:outline-none focus:border-cyan-500 file:mr-2 file:py-0.5 file:px-2 file:rounded-sm file:border-0 file:text-[9px] file:font-semibold file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100 cursor-pointer"></div>
-            `;
-        } else if (cat === 'Big Crane') {
-            formFields = `
-                <div class="grid grid-cols-2 gap-2">
-                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Tgl Pelaksanaan *</label><input type="date" id="tgl_pelaksanaan" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" required></div>
-                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Durasi *</label><div class="flex gap-1"><input type="number" id="durasi_req" class="w-2/3 border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" required><select id="satuan_durasi" class="w-1/3 border border-slate-300 rounded-sm px-1 py-1.5 text-xs focus:outline-none focus:border-cyan-500"><option value="JAM">Jam</option><option value="HARI">Hari</option></select></div></div>
-                </div>
-                <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Deskripsi Pekerjaan *</label><textarea id="deskripsi" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500 h-14" placeholder="Rincian..." required></textarea></div>
-                <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Upload Foto Bukti (Opsional)</label><input type="file" id="foto_evidence" accept="image/*" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] focus:outline-none focus:border-cyan-500 file:mr-2 file:py-0.5 file:px-2 file:rounded-sm file:border-0 file:text-[9px] file:font-semibold file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100 cursor-pointer"></div>
-            `;
-        } else if (cat === 'Lowboy') {
-             formFields = `
-                <div class="grid grid-cols-2 gap-2">
-                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Tgl Pelaksanaan *</label><input type="date" id="tgl_pelaksanaan" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" required></div>
-                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Durasi *</label><div class="flex gap-1"><input type="number" id="durasi_req" class="w-2/3 border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" required><select id="satuan_durasi" class="w-1/3 border border-slate-300 rounded-sm px-1 py-1.5 text-xs focus:outline-none focus:border-cyan-500"><option value="JAM">Jam</option><option value="HARI">Hari</option></select></div></div>
-                </div>
-                <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Rute Naikan Barang *</label><input type="text" id="lok_angkat" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" placeholder="Titik muat..." required></div>
-                <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Rute Turunkan Barang *</label><input type="text" id="lok_tujuan" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" placeholder="Titik bongkar..." required></div>
-                <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Deskripsi Pekerjaan *</label><textarea id="deskripsi" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500 h-14" placeholder="Rincian..." required></textarea></div>
-                <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Upload Foto Bukti (Opsional)</label><input type="file" id="foto_evidence" accept="image/*" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] focus:outline-none focus:border-cyan-500 file:mr-2 file:py-0.5 file:px-2 file:rounded-sm file:border-0 file:text-[9px] file:font-semibold file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100 cursor-pointer"></div>
-            `;
-        }
-
-        const optProfPerusahaan = `<option value="" disabled>-- Perusahaan --</option>` + (m.perusahaan || []).map(p=>`<option value="${p}" ${user.perusahaan===p?'selected':''}>${p}</option>`).join('');
-        const optProfDepartemen = `<option value="" disabled>-- Departemen --</option>` + (m.departemen || []).map(d=>`<option value="${d}" ${user.departemen===d?'selected':''}>${d}</option>`).join('');
-
-        let requesterHtml = isAdminGL ? `
-            <div class="bg-cyan-50 border border-cyan-200 rounded-sm p-2 mb-3">
-                <p class="text-[9px] font-bold text-cyan-700 mb-1 uppercase tracking-wider"><i class="fa-solid fa-user-pen mr-1"></i>Delegasi: Info Pemohon</p>
-                <div class="grid grid-cols-2 gap-2 text-[10px]">
-                    <input type="text" id="del_nama" oninput="this.value = this.value.toUpperCase()" placeholder="Nama Pemohon..." value="${user.nama_lengkap}" class="w-full border border-slate-300 rounded-sm px-1.5 py-1" required>
-                    <select id="del_dept" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 bg-white" required>${optProfDepartemen}</select>
-                    <select id="del_vendor" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 bg-white" required>${optProfPerusahaan}</select>
-                    <input type="number" id="del_wa" placeholder="No WA..." value="${user.no_wa}" class="w-full border border-slate-300 rounded-sm px-1.5 py-1" required>
-                </div>
-            </div>` : `
-            <div class="bg-slate-50 border border-slate-200 rounded-sm p-2 mb-3 relative overflow-hidden">
-                <div class="absolute -right-4 -bottom-4 text-slate-200 opacity-50"><i class="fa-solid fa-id-badge text-6xl"></i></div>
-                <p class="text-[9px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider relative z-10 border-b border-slate-200 pb-1">Identitas Pemohon</p>
-                <div class="grid grid-cols-2 gap-y-1.5 gap-x-2 text-[10px] relative z-10">
-                    <div><p class="text-slate-400 text-[8px] uppercase">Nama Lengkap</p><p class="font-bold text-slate-800">${user.nama_lengkap}</p></div>
-                    <div><p class="text-slate-400 text-[8px] uppercase">Departemen</p><p class="font-bold text-slate-800">${user.departemen}</p></div>
-                    <div><p class="text-slate-400 text-[8px] uppercase">Section</p><p class="font-bold text-slate-800">${user.section}</p></div>
-                    <div><p class="text-slate-400 text-[8px] uppercase">Perusahaan</p><p class="font-bold text-slate-800">${user.perusahaan}</p></div>
-                </div>
-            </div>`;
-
-        return `
-        <div class="max-w-md mx-auto bg-white rounded-md shadow-sm border border-slate-200 overflow-hidden mt-2">
-            <div class="p-2 border-b border-slate-100 flex items-center gap-2"><button onclick="userOrderFleetMode=null; renderApp(false);" class="w-6 h-6 rounded-sm border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50"><i class="fa-solid fa-arrow-left text-[10px]"></i></button><h2 class="text-sm font-bold text-slate-800">Order: <span class="text-cyan-600">${cat}</span></h2></div>
-            <div class="p-3">
-                ${requesterHtml}
-                <form onsubmit="submitOrder(event)" class="space-y-2">${formFields}<div class="pt-2 mt-3 border-t border-slate-100"><button id="btnSubmitOrder" type="submit" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-1.5 rounded-sm transition-colors text-xs shadow-sm">Submit Order</button></div></form>
-            </div>
-        </div>`;
-    }
-
-    function calculateShift() {
-        const jamEl = document.getElementById('jam_pelaksanaan');
-        const shiftEl = document.getElementById('shift');
-        if (jamEl && shiftEl && jamEl.value) {
-            let h = parseInt(jamEl.value.split(':')[0]);
-            shiftEl.value = (h >= 5 && h < 17) ? 'Shift 1' : 'Shift 2';
-        }
-    }
-
-    async function submitOrder(e) {
-        e.preventDefault();
-        const btnSubmit = document.getElementById('btnSubmitOrder'); btnSubmit.disabled = true; btnSubmit.innerText = "Orderan sedang diproses...";
-        const user = JSON.parse(localStorage.getItem('lifting_user')); const cat = userOrderFleetMode; const isAdminGL = user.role === 'ADMIN' || user.role === 'GL';
-        
-        let tgl = document.getElementById('tgl_pelaksanaan')?.value || ''; let jam = document.getElementById('jam_pelaksanaan')?.value || ''; let statusTag = 'SCHEDULED';
-        if (tgl) {
-            let reqDate = new Date(`${tgl}T00:00:00`); let now = new Date(); now.setHours(0,0,0,0); let diffDays = (reqDate - now) / (1000 * 60 * 60 * 24);
-            if (cat === 'Big Crane') { if (diffDays < 3) statusTag = 'UNSCHEDULED'; } 
-            else if (cat === 'Crane Truck' && jam) { let reqTime = new Date(`${tgl}T${jam}:00`); let diffHours = (reqTime - new Date()) / (1000 * 60 * 60); if (diffHours < 6) statusTag = 'UNSCHEDULED'; }
-        }
-
-        let durasiVal = document.getElementById('durasi_req')?.value || ''; let satuan = document.getElementById('satuan_durasi')?.value || 'JAM';
-        const baseOrder = {
-            no_wo: generateWO(cat), timestamp: new Date().toISOString(), kategori: cat, nrp_pemohon: user.nrp, 
-            nama_pemohon: isAdminGL ? document.getElementById('del_nama').value.toUpperCase() : user.nama_lengkap, 
-            perusahaan: isAdminGL ? document.getElementById('del_vendor').value : user.perusahaan, 
-            departemen: isAdminGL ? document.getElementById('del_dept').value : user.departemen, 
-            section: user.section, 
-            no_wa: isAdminGL ? document.getElementById('del_wa').value : user.no_wa,
-            tgl_pelaksanaan: tgl, jam_pelaksanaan: jam, shift: document.getElementById('shift')?.value || '-', durasi_request: `${durasiVal} ${satuan}`,
-            lokasi_angkat: document.getElementById('lok_angkat')?.value.toUpperCase() || '', lokasi_tujuan: document.getElementById('lok_tujuan')?.value.toUpperCase() || '', deskripsi: document.getElementById('deskripsi')?.value.toUpperCase() || '',
-            status: statusTag, foto_evidence: '', gl: '', unit: '', operator: '', rigger: '', rigger2: '', jam_start_aktual: '', jam_end_aktual: '', durasi_aktual: '', final_inspeksi: '', alasan_telat: '', alasan_overtime: '', alasan_pending: ''
-        };
-
-        const fotoInput = document.getElementById('foto_evidence');
-        if (fotoInput && fotoInput.files.length > 0) {
-            const file = fotoInput.files[0]; const reader = new FileReader();
-            reader.onload = function(event) {
-                const img = new Image();
-                img.onload = async function() {
-                    const canvas = document.createElement('canvas'); const MAX_WIDTH = 800; const MAX_HEIGHT = 800; let width = img.width; let height = img.height;
-                    if (width > height) { if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; } } else { if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; } }
-                    canvas.width = width; canvas.height = height; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, width, height);
-                    let compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
-
-                    if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.startsWith('http')) {
-                        try {
-                            let base64Data = compressedBase64.split(',')[1];
-                            let response = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fileName: `Bukti_${baseOrder.no_wo}.jpg`, mimeType: 'image/jpeg', data: base64Data }) });
-                            let result = await response.json(); if (result.status === 'success' && result.fileUrl) { baseOrder.foto_evidence = result.fileUrl; } else { baseOrder.foto_evidence = compressedBase64; }
-                        } catch(err) { console.warn("Drive upload error, fallback to local:", err); baseOrder.foto_evidence = compressedBase64; }
-                    } else { baseOrder.foto_evidence = compressedBase64; }
-                    finishSubmitOrder(baseOrder, user);
-                };
-                img.src = event.target.result;
-            };
-            reader.readAsDataURL(file);
-        } else { finishSubmitOrder(baseOrder, user); }
-    }
-
-    function finishSubmitOrder(newOrder, user) {
-        const orders = getOrders();
-        orders.unshift(newOrder);
-        saveOrders(orders);
-        
-        currentTab = (user.role === 'ADMIN' || user.role === 'GL') ? 'dashboard' : 'monitoring';
-        userOrderFleetMode = null;
-        renderApp(false);
-        showSuccessAnim('check', 'Order Terkirim!', 'Pemesanan alat berat Anda berhasil disubmit.');
-    }
+    let tempMpData = null; let activeCancelWo = null;
+    function initiateCancelJob(wo) { activeCancelWo = wo; document.getElementById('cancelReasonInput').value = ''; document.getElementById('cancelPromptModal').classList.remove('hidden'); document.getElementById('mpActionModal').classList.add('hidden'); document.getElementById('btnSubmitCancelJob').onclick = function() { let alasan = document.getElementById('cancelReasonInput').value.trim(); if(!alasan) return showToast('Alasan wajib diisi!', 'error'); let jobs = getOrders(); let idx = jobs.findIndex(j => j.no_wo === activeCancelWo); jobs[idx].status = 'CANCELED'; jobs[idx].alasan_telat = "Dibatalkan: " + alasan; saveOrders(jobs); showToast('Dibatalkan!'); document.getElementById('cancelPromptModal').classList.add('hidden'); renderApp(true); }; }
 
     function getManpowerWorkflow() {
         const settings = getSettings() || {};
@@ -1644,7 +1727,10 @@
         jobs.forEach(job => {
             html += `
             <div class="bg-white rounded-md p-2.5 border border-slate-200 shadow-sm relative text-[11px]">
-                <div class="flex justify-between items-start mb-1.5"><div class="text-[9px] font-mono font-bold text-cyan-600 cursor-pointer hover:underline" onclick="viewJobDetail('${job.no_wo}')" title="Buka Detail">${job.no_wo}</div><div class="text-[9px] bg-cyan-50 text-cyan-700 border border-cyan-100 px-1.5 py-0.5 rounded-sm font-semibold">Unit: ${job.unit || '-'}</div></div>
+                <div class="flex justify-between items-start mb-1.5">
+                    <div class="text-[9px] font-mono font-bold text-cyan-600 cursor-pointer hover:underline" onclick="viewJobDetail('${job.no_wo}')" title="Buka Detail">${job.no_wo}</div>
+                    <div class="text-sm sm:text-base bg-cyan-100 text-cyan-800 border border-cyan-300 px-3 py-1.5 rounded-md font-black shadow-sm">Unit: ${job.unit || '-'}</div>
+                </div>
                 <div class="font-bold text-slate-800 text-xs mb-0.5">Req: ${job.tgl_pelaksanaan} ${job.jam_pelaksanaan || ''}</div>
                 ${job.kategori !== 'Big Crane' ? `<div class="text-[10px] text-slate-500 mb-2 truncate">Lokasi: ${job.lokasi_angkat||'-'} ➔ ${job.lokasi_tujuan||'-'}</div>` : `<div class="text-[10px] text-slate-500 mb-2 truncate border-l-2 border-slate-300 pl-1">${job.deskripsi}</div>`}
                 <div class="flex gap-1.5">
@@ -1680,9 +1766,6 @@
             </form>`;
         document.getElementById('mpActionModal').classList.remove('hidden');
     }
-
-    let tempMpData = null; let activeCancelWo = null;
-    function initiateCancelJob(wo) { activeCancelWo = wo; document.getElementById('cancelReasonInput').value = ''; document.getElementById('cancelPromptModal').classList.remove('hidden'); document.getElementById('mpActionModal').classList.add('hidden'); document.getElementById('btnSubmitCancelJob').onclick = function() { let alasan = document.getElementById('cancelReasonInput').value.trim(); if(!alasan) return showToast('Alasan wajib diisi!', 'error'); let jobs = getOrders(); let idx = jobs.findIndex(j => j.no_wo === activeCancelWo); jobs[idx].status = 'CANCELED'; jobs[idx].alasan_telat = "Dibatalkan: " + alasan; saveOrders(jobs); showToast('Dibatalkan!'); document.getElementById('cancelPromptModal').classList.add('hidden'); renderApp(true); }; }
 
     function processMpAction(e, wo, targetStatus) {
         e.preventDefault(); const job = getOrders().find(j => j.no_wo === wo); if(!job) return;
@@ -1753,8 +1836,53 @@
 
     let currentMasterTab = 'branding';
 
+    function renderUserTableOnly() {
+        const tbody = document.getElementById('userTableBody');
+        if(!tbody) return;
+        
+        let users = getUsers();
+        let filteredUsers = users;
+        
+        if(userSearchQuery) {
+            let q = userSearchQuery.toLowerCase();
+            filteredUsers = filteredUsers.filter(u => u.nama_lengkap.toLowerCase().includes(q) || u.nrp.toLowerCase().includes(q));
+        }
+        if(userRoleFilter !== 'ALL') {
+            filteredUsers = filteredUsers.filter(u => u.role === userRoleFilter);
+        }
+        filteredUsers.sort((a,b) => {
+            let valA = (a[userSortCol] || '').toString().toLowerCase();
+            let valB = (b[userSortCol] || '').toString().toLowerCase();
+            if(valA < valB) return userSortDir === 'asc' ? -1 : 1;
+            if(valA > valB) return userSortDir === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+        tbody.innerHTML = filteredUsers.map(u => `
+            <tr class="hover:bg-slate-50">
+                <td class="p-2 font-mono text-slate-600">${u.nrp}</td>
+                <td class="p-2 font-semibold text-slate-800">${u.nama_lengkap}</td>
+                <td class="p-2"><span class="text-[8px] font-bold px-1.5 py-0.5 rounded-sm ${u.role === 'ADMIN' ? 'bg-purple-100 text-purple-700' : (u.role === 'GL' ? 'bg-teal-100 text-teal-700' : (u.role === 'MANPOWER' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-700'))}">${u.role}</span></td>
+                <td class="p-2">
+                    <div class="flex justify-center gap-1">
+                        <button onclick="openResetPwd('${u.nrp}')" class="bg-cyan-50 hover:bg-cyan-100 text-cyan-600 text-[9px] font-bold px-1.5 py-1 rounded-sm" title="Reset Password"><i class="fa-solid fa-key"></i></button>
+                        <button onclick="confirmDeleteUser('${u.nrp}')" class="bg-red-50 hover:bg-red-100 text-red-500 text-[9px] font-bold px-1.5 py-1 rounded-sm" title="Hapus User"><i class="fa-solid fa-trash-can"></i></button>
+                    </div>
+                </td>
+            </tr>`).join('');
+            
+        // Update sort icons safely if elements exist
+        const iconNrp = document.getElementById('iconSortNrp');
+        if(iconNrp) iconNrp.innerHTML = getUserSortIcon('nrp');
+        const iconNama = document.getElementById('iconSortNama');
+        if(iconNama) iconNama.innerHTML = getUserSortIcon('nama_lengkap');
+        const iconRole = document.getElementById('iconSortRole');
+        if(iconRole) iconRole.innerHTML = getUserSortIcon('role');
+    }
+
     function getMasterDataView() {
-        const m = getMasterData(); const users = getUsers();
+        const m = getMasterData(); 
+        const users = getUsers();
         const tabs = [ { id: 'branding', label: 'Branding UI' }, { id: 'perusahaan', label: 'Perusahaan' }, { id: 'departemen', label: 'Departemen' }, { id: 'section', label: 'Section' }, { id: 'unit_ct', label: 'Unit CT' }, { id: 'unit_big_crane', label: 'Unit Big Crane' }, { id: 'unit_lowboy', label: 'Unit Lowboy' }, { id: 'gl', label: 'GL' }, { id: 'operator', label: 'OP' }, { id: 'rigger', label: 'Rig' }, { id: 'users', label: 'Pengguna' } ];
 
         let contentHtml = '';
@@ -1776,7 +1904,54 @@
                 <button type="submit" class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold px-4 py-1.5 rounded-sm text-[10px] shadow-sm mt-3 w-full sm:w-auto"><i class="fa-solid fa-cloud-arrow-up mr-1"></i> Simpan ke Cloud</button>
             </form>`;
         } else if (currentMasterTab === 'users') {
-            contentHtml = `<div class="overflow-x-auto border border-slate-200 rounded-sm mt-2"><table class="w-full text-left"><thead class="bg-slate-50 text-slate-500 text-[9px] border-b"><tr><th class="p-2 uppercase">NRP</th><th class="p-2 uppercase">Nama Lengkap</th><th class="p-2 uppercase">Role</th><th class="p-2 uppercase text-center">Aksi</th></tr></thead><tbody class="divide-y divide-slate-100 text-[10px]">${users.map(u => `<tr class="hover:bg-slate-50"><td class="p-2 font-mono text-slate-600">${u.nrp}</td><td class="p-2 font-semibold text-slate-800">${u.nama_lengkap}</td><td class="p-2"><span class="text-[8px] font-bold px-1.5 py-0.5 rounded-sm ${u.role === 'ADMIN' ? 'bg-purple-100 text-purple-700' : (u.role === 'GL' ? 'bg-teal-100 text-teal-700' : (u.role === 'MANPOWER' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-700'))}">${u.role}</span></td><td class="p-2"><div class="flex justify-center gap-1"><button onclick="openResetPwd('${u.nrp}')" class="bg-cyan-50 hover:bg-cyan-100 text-cyan-600 text-[9px] font-bold px-1.5 py-1 rounded-sm" title="Reset Password"><i class="fa-solid fa-key"></i></button><button onclick="confirmDeleteUser('${u.nrp}')" class="bg-red-50 hover:bg-red-100 text-red-500 text-[9px] font-bold px-1.5 py-1 rounded-sm" title="Hapus User"><i class="fa-solid fa-trash-can"></i></button></div></td></tr>`).join('')}</tbody></table></div>`;
+            let addUserFormHtml = `
+            <form onsubmit="addAccountManual(event)" class="flex flex-col sm:flex-row gap-1.5 bg-slate-50 p-2 rounded-sm border border-slate-100 shadow-sm mt-2">
+                <input type="text" id="new_user_nrp" oninput="this.value = this.value.toUpperCase()" placeholder="NRP..." class="flex-1 border border-slate-300 rounded-sm px-2 py-1.5 text-[10px] focus:outline-none focus:border-cyan-500" required>
+                <input type="text" id="new_user_name" oninput="this.value = this.value.toUpperCase()" placeholder="Nama Lengkap..." class="flex-1 border border-slate-300 rounded-sm px-2 py-1.5 text-[10px] focus:outline-none focus:border-cyan-500" required>
+                <select id="new_user_role" class="w-full sm:w-28 border border-slate-300 rounded-sm px-2 py-1.5 text-[10px] focus:outline-none focus:border-cyan-500 bg-white cursor-pointer" required>
+                    <option value="" disabled selected>-- Role --</option>
+                    <option value="USER">USER</option>
+                    <option value="MANPOWER">MANPOWER</option>
+                    <option value="GL">GL</option>
+                    <option value="ADMIN">ADMIN</option>
+                </select>
+                <div class="relative flex-1">
+                    <input type="password" id="new_user_pwd" placeholder="Password..." class="w-full border border-slate-300 rounded-sm px-2 py-1.5 pr-6 text-[10px] focus:outline-none focus:border-cyan-500" required>
+                    <i id="toggleUserPwd" class="fa-regular fa-eye absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer pwd-toggle text-[9px]" onclick="togglePassword('new_user_pwd', 'toggleUserPwd')"></i>
+                </div>
+                <button type="submit" class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold px-3 py-1.5 rounded-sm text-[10px] whitespace-nowrap shadow-sm"><i class="fa-solid fa-plus mr-1"></i> Tambah</button>
+            </form>`;
+
+            contentHtml = `
+            ${addUserFormHtml}
+            <div class="flex flex-col sm:flex-row gap-2 mb-3 mt-3">
+                <div class="flex-1 relative">
+                    <i class="fa-solid fa-search absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[11px]"></i>
+                    <input type="text" id="userSearchInput" value="${userSearchQuery}" oninput="userSearchQuery=this.value; renderUserTableOnly();" placeholder="Cari NRP / Nama..." class="w-full border border-slate-300 rounded-sm pl-7 pr-2 py-1.5 text-[10px] focus:outline-none focus:border-cyan-500 shadow-sm">
+                </div>
+                <select id="userRoleFilterInput" onchange="userRoleFilter=this.value; renderUserTableOnly();" class="w-full sm:w-32 border border-slate-300 rounded-sm px-2 py-1.5 text-[10px] focus:outline-none focus:border-cyan-500 bg-white shadow-sm cursor-pointer">
+                    <option value="ALL" ${userRoleFilter==='ALL'?'selected':''}>Semua Role</option>
+                    <option value="USER" ${userRoleFilter==='USER'?'selected':''}>USER</option>
+                    <option value="MANPOWER" ${userRoleFilter==='MANPOWER'?'selected':''}>MANPOWER</option>
+                    <option value="GL" ${userRoleFilter==='GL'?'selected':''}>GL</option>
+                    <option value="ADMIN" ${userRoleFilter==='ADMIN'?'selected':''}>ADMIN</option>
+                </select>
+            </div>
+            <div class="overflow-x-auto border border-slate-200 rounded-sm mt-2">
+                <table class="w-full text-left">
+                    <thead class="bg-slate-50 text-slate-500 text-[9px] border-b">
+                        <tr>
+                            <th class="p-2 uppercase cursor-pointer hover:bg-slate-100 transition-colors" onclick="handleUserSort('nrp')">NRP <span id="iconSortNrp">${getUserSortIcon('nrp')}</span></th>
+                            <th class="p-2 uppercase cursor-pointer hover:bg-slate-100 transition-colors" onclick="handleUserSort('nama_lengkap')">Nama Lengkap <span id="iconSortNama">${getUserSortIcon('nama_lengkap')}</span></th>
+                            <th class="p-2 uppercase cursor-pointer hover:bg-slate-100 transition-colors" onclick="handleUserSort('role')">Role <span id="iconSortRole">${getUserSortIcon('role')}</span></th>
+                            <th class="p-2 uppercase text-center">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="userTableBody" class="divide-y divide-slate-100 text-[10px]">
+                        <!-- Populated by renderUserTableOnly() -->
+                    </tbody>
+                </table>
+            </div>`;
         } else {
             let addFormHtml = '';
             if (['gl', 'operator', 'rigger'].includes(currentMasterTab)) {
@@ -1826,17 +2001,7 @@
         }
     }
 
-    function addMasterData(e, key) { 
-        e.preventDefault(); 
-        const val = document.getElementById('new_master_val').value.trim(); 
-        const m = getMasterData(); 
-        if (!m[key]) m[key] = []; // Fortify
-        if(m[key].includes(val)) return showToast('Data sudah ada!', 'error'); 
-        m[key].push(val); 
-        saveMasterData(m); 
-        showToast('Ditambahkan!'); 
-        renderApp(true); 
-    }
+    function addMasterData(e, key) { e.preventDefault(); const val = document.getElementById('new_master_val').value.trim(); const m = getMasterData(); if (!m[key]) m[key] = []; if(m[key].includes(val)) return showToast('Data sudah ada!', 'error'); m[key].push(val); saveMasterData(m); showToast('Ditambahkan!'); renderApp(true); }
     
     function addAccountMasterData(e, key) { 
         e.preventDefault(); 
@@ -1848,7 +2013,7 @@
         if (users.find(u => u.nrp === nrp)) return showToast('NRP terdaftar!', 'error'); 
         
         const m = getMasterData(); 
-        if (!m[key]) m[key] = []; // Fortify
+        if (!m[key]) m[key] = []; 
         if(m[key].includes(name)) return showToast('Nama sudah ada!', 'error'); 
         
         m[key].push(name); 
@@ -1863,11 +2028,28 @@
         showToast(`Akun dibuat & Master diupdate!`); 
         renderApp(true); 
     }
+
+    function addAccountManual(e) {
+        e.preventDefault();
+        const nrp = document.getElementById('new_user_nrp').value.trim();
+        const name = document.getElementById('new_user_name').value.trim();
+        const role = document.getElementById('new_user_role').value;
+        const pwd = document.getElementById('new_user_pwd').value;
+        
+        const users = getUsers();
+        if (users.find(u => u.nrp === nrp)) return showToast('NRP terdaftar!', 'error');
+        
+        let jabatan = role === 'GL' ? 'GROUP LEADER' : (role === 'MANPOWER' ? 'OPERATOR' : (role === 'ADMIN' ? 'ADMIN' : 'USER'));
+        users.unshift({ nrp: nrp, nama_lengkap: name, jabatan: jabatan, perusahaan: 'PPA', departemen: 'OPERATION', section: 'LIFTING', no_wa: '-', password_hash: pwd, role: role, status_akun: 'ACTIVE' });
+        saveUsers(users);
+        showToast('Akun Pengguna ditambahkan!');
+        renderApp(true);
+    }
     
     function confirmDeleteMasterData(key, index) { 
         openCustomConfirm('Hapus Master Data', 'Yakin ingin menghapus item ini dari data master?', () => { 
             const m = getMasterData(); 
-            if (!m[key]) m[key] = []; // Fortify
+            if (!m[key]) m[key] = []; 
             m[key].splice(index, 1); 
             saveMasterData(m); 
             showToast('Dihapus!'); 
@@ -1884,9 +2066,16 @@
             localStorage.setItem('lifting_users', JSON.stringify(users)); 
             
             if (SUPABASE_KEY && !SUPABASE_KEY.includes('PASTE_KUNCI')) {
-                try { await fetch(`${SUPABASE_URL}/rest/v1/users?nrp=eq.${nrp}`, { method: 'DELETE', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }); } catch(e) {}
+                try { 
+                    await fetch(`${SUPABASE_URL}/rest/v1/users?nrp=eq.${nrp}`, { 
+                        method: 'DELETE', 
+                        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } 
+                    }); 
+                } catch(e) { console.warn(e); }
             }
-            showToast('Akun berhasil dihapus!'); renderApp(true);
+            
+            showToast('Akun berhasil dihapus!'); 
+            renderApp(true);
         });
     }
 
@@ -1896,110 +2085,88 @@
     function getProfileView() {
         const user = JSON.parse(localStorage.getItem('lifting_user'));
         const m = getMasterData();
-        
-        const optProfPerusahaan = `<option value="" disabled>-- Pilih --</option>` + (m.perusahaan || []).map(p=>`<option value="${p}" ${user.perusahaan===p?'selected':''}>${p}</option>`).join('');
-        const optProfDepartemen = `<option value="" disabled>-- Pilih --</option>` + (m.departemen || []).map(d=>`<option value="${d}" ${user.departemen===d?'selected':''}>${d}</option>`).join('');
-        const optProfSection = `<option value="" disabled>-- Pilih --</option>` + (m.section || []).map(s=>`<option value="${s}" ${user.section===s?'selected':''}>${s}</option>`).join('');
 
         return `
-        <div class="max-w-sm mx-auto mt-4 pb-10">
-            <!-- Top Card Identity -->
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col items-center justify-center text-center mb-4">
-                <div class="w-16 h-16 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center text-3xl mb-3 shadow-inner">
-                    <i class="fa-solid fa-user"></i>
-                </div>
-                <h2 class="text-sm sm:text-base font-bold text-slate-800 uppercase tracking-tight">${user.nama_lengkap}</h2>
-                <p class="text-[10px] sm:text-[11px] font-semibold text-slate-500 uppercase mt-0.5 tracking-wide">${user.jabatan} | ${user.departemen}</p>
-                <p class="text-[10px] text-slate-400 mt-1 uppercase tracking-wider">NRP: ${user.nrp}</p>
+        <div class="max-w-md mx-auto mt-4">
+            <!-- Profile Card -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6 flex flex-col items-center mb-4 relative z-10">
+                <div class="w-16 h-16 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center text-3xl mb-3"><i class="fa-solid fa-user"></i></div>
+                <h2 class="font-bold text-slate-800 text-base">${user.nama_lengkap}</h2>
+                <p class="text-xs text-slate-500 uppercase tracking-widest mt-1">${user.role} ${user.departemen}</p>
+                <p class="text-[10px] text-slate-400 mt-1">NRP: ${user.nrp}</p>
             </div>
-            
-            <!-- Menu Cards -->
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-4">
-                <button onclick="document.getElementById('profileBiodataModal').classList.remove('hidden')" class="w-full flex items-center justify-between p-4 hover:bg-slate-50 border-b border-slate-50 transition-colors group">
-                    <div class="flex items-center gap-3">
-                        <div class="w-9 h-9 rounded-xl bg-emerald-50 group-hover:bg-emerald-100 text-emerald-600 flex items-center justify-center transition-colors"><i class="fa-solid fa-address-card text-sm"></i></div>
-                        <div class="text-left"><p class="text-xs font-bold text-slate-800">Identitas Saya</p><p class="text-[9px] text-slate-500">Ubah detail informasi personal Anda</p></div>
-                    </div>
+
+            <!-- Menus -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden flex flex-col mb-4 relative z-0">
+                <button onclick="document.getElementById('profileBiodataModal').classList.remove('hidden')" class="flex items-center justify-between p-4 hover:bg-slate-50 border-b border-slate-50 transition-colors w-full text-left">
+                    <div class="flex items-center gap-3"><div class="w-8 h-8 rounded-md bg-green-50 text-green-600 flex items-center justify-center shrink-0"><i class="fa-solid fa-id-card"></i></div><div class="text-left"><p class="text-xs font-bold text-slate-700">My Identity</p><p class="text-[9px] text-slate-400">Informasi detail personal</p></div></div>
                     <i class="fa-solid fa-chevron-right text-slate-300 text-xs"></i>
                 </button>
-                <button onclick="document.getElementById('profileSettingsModal').classList.remove('hidden')" class="w-full flex items-center justify-between p-4 hover:bg-slate-50 transition-colors group">
-                    <div class="flex items-center gap-3">
-                        <div class="w-9 h-9 rounded-xl bg-slate-50 group-hover:bg-slate-100 text-slate-600 flex items-center justify-center transition-colors"><i class="fa-solid fa-gear text-sm"></i></div>
-                        <div class="text-left"><p class="text-xs font-bold text-slate-800">Pengaturan Sandi</p><p class="text-[9px] text-slate-500">Kelola kata sandi & keamanan akun</p></div>
-                    </div>
+                <button onclick="document.getElementById('profileSettingsModal').classList.remove('hidden')" class="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors w-full text-left">
+                    <div class="flex items-center gap-3"><div class="w-8 h-8 rounded-md bg-slate-100 text-slate-600 flex items-center justify-center shrink-0"><i class="fa-solid fa-lock"></i></div><div class="text-left"><p class="text-xs font-bold text-slate-700">Security / Password</p><p class="text-[9px] text-slate-400">Ubah kata sandi Anda</p></div></div>
                     <i class="fa-solid fa-chevron-right text-slate-300 text-xs"></i>
                 </button>
             </div>
 
-            <!-- Logout Button -->
-            <button onclick="openCustomConfirm('Keluar Akun', 'Apakah Anda yakin ingin keluar dari sistem?', handleLogout)" class="w-full bg-white rounded-2xl shadow-sm border border-slate-100 p-4 flex items-center justify-between hover:bg-red-50 transition-colors group">
-                <div class="flex items-center gap-3">
-                    <div class="w-9 h-9 rounded-xl bg-red-50 group-hover:bg-red-100 text-red-500 flex items-center justify-center transition-colors"><i class="fa-solid fa-arrow-right-from-bracket text-sm"></i></div>
-                    <p class="text-xs font-bold text-red-500">Keluar (Logout)</p>
-                </div>
-                <i class="fa-solid fa-chevron-right text-red-200 text-xs group-hover:text-red-400"></i>
+            <!-- Logout -->
+            <button onclick="openCustomConfirm('Keluar Akun', 'Apakah Anda yakin ingin keluar dari sistem?', handleLogout)" class="w-full bg-white rounded-xl shadow-sm border border-red-100 flex items-center justify-between p-4 hover:bg-red-50 transition-colors relative z-0">
+                <div class="flex items-center gap-3"><div class="w-8 h-8 rounded-md bg-red-50 text-red-500 flex items-center justify-center shrink-0"><i class="fa-solid fa-sign-out-alt"></i></div><p class="text-xs font-bold text-red-600">Logout</p></div>
+                <i class="fa-solid fa-chevron-right text-slate-300 text-xs"></i>
             </button>
-        </div>
-
-        <!-- MODAL: EDIT BIODATA -->
-        <div id="profileBiodataModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[80] hidden p-3">
-            <div class="bg-white rounded-xl shadow-xl w-full max-w-[320px] overflow-hidden flex flex-col max-h-[90vh]">
-                <div class="p-3 border-b border-slate-100 flex justify-between items-center shrink-0">
-                    <h3 class="font-bold text-slate-800 text-xs"><i class="fa-solid fa-address-card mr-1.5 text-emerald-600"></i>Identitas Saya</h3>
-                    <button onclick="document.getElementById('profileBiodataModal').classList.add('hidden')" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-sm"></i></button>
-                </div>
-                <div class="p-4 overflow-y-auto">
-                    <form onsubmit="saveProfile(event)" class="space-y-2.5">
-                        <div class="grid grid-cols-2 gap-2"><div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">NRP</label><input type="text" value="${user.nrp}" class="w-full border bg-slate-50 rounded-md px-2 py-1.5 text-[10px] text-slate-500 cursor-not-allowed" readonly></div><div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Nama Lengkap</label><input type="text" id="profName" value="${user.nama_lengkap}" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-[10px] focus:outline-none focus:border-cyan-500" required></div></div>
-                        <div class="grid grid-cols-2 gap-2"><div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Jabatan</label><input type="text" id="profJabatan" value="${user.jabatan}" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-[10px] focus:outline-none focus:border-cyan-500" required></div><div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">No WhatsApp</label><input type="number" id="profWa" value="${user.no_wa}" class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-[10px] focus:outline-none focus:border-cyan-500" required></div></div>
-                        <div class="grid grid-cols-1 gap-2">
-                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Perusahaan</label><select id="profPerusahaan" class="w-full border border-slate-300 rounded-md px-1.5 py-1.5 text-[10px] focus:outline-none focus:border-cyan-500 bg-white cursor-pointer" required>${optProfPerusahaan}</select></div>
-                            <div class="grid grid-cols-2 gap-2">
-                                <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Departemen</label><select id="profDepartemen" class="w-full border border-slate-300 rounded-md px-1.5 py-1.5 text-[10px] focus:outline-none focus:border-cyan-500 bg-white cursor-pointer" required>${optProfDepartemen}</select></div>
-                                <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Section</label><select id="profSection" class="w-full border border-slate-300 rounded-md px-1.5 py-1.5 text-[10px] focus:outline-none focus:border-cyan-500 bg-white cursor-pointer" required>${optProfSection}</select></div>
-                            </div>
-                        </div>
-                        <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-lg text-[10px] mt-4 shadow-sm transition-colors">Simpan Perubahan</button>
-                    </form>
-                </div>
-            </div>
-        </div>
-
-        <!-- MODAL: GANTI PASSWORD -->
-        <div id="profileSettingsModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[80] hidden p-3">
-            <div class="bg-white rounded-xl shadow-xl w-full max-w-[280px] overflow-hidden flex flex-col">
-                <div class="p-3 border-b border-slate-100 flex justify-between items-center shrink-0">
-                    <h3 class="font-bold text-slate-800 text-xs"><i class="fa-solid fa-lock mr-1.5 text-slate-500"></i>Ubah Kata Sandi</h3>
-                    <button onclick="document.getElementById('profileSettingsModal').classList.add('hidden')" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-sm"></i></button>
-                </div>
-                <div class="p-4">
-                    <form onsubmit="savePassword(event)" class="space-y-3">
-                        <div>
-                            <label class="block text-[9px] font-bold text-slate-500 mb-1">Kata Sandi Baru</label>
-                            <div class="relative">
-                                <input type="password" id="profPwd1" class="w-full border border-slate-300 rounded-md px-2 py-2 pr-6 text-[10px] focus:outline-none focus:border-slate-500" required>
-                                <i id="toggleProfPwd1" class="fa-regular fa-eye absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer pwd-toggle text-[10px]" onclick="togglePassword('profPwd1', 'toggleProfPwd1')"></i>
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block text-[9px] font-bold text-slate-500 mb-1">Konfirmasi Sandi Baru</label>
-                            <div class="relative">
-                                <input type="password" id="profPwd2" class="w-full border border-slate-300 rounded-md px-2 py-2 pr-6 text-[10px] focus:outline-none focus:border-slate-500" required>
-                                <i id="toggleProfPwd2" class="fa-regular fa-eye absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer pwd-toggle text-[10px]" onclick="togglePassword('profPwd2', 'toggleProfPwd2')"></i>
-                            </div>
-                        </div>
-                        <button type="submit" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold px-4 py-2 rounded-lg text-[10px] mt-2 shadow-sm transition-colors">Perbarui Kata Sandi</button>
-                    </form>
-                </div>
-            </div>
         </div>`;
     }
 
-    function saveProfile(e) { e.preventDefault(); let user = JSON.parse(localStorage.getItem('lifting_user')); let users = getUsers(); let idx = users.findIndex(u => u.nrp === user.nrp); user.nama_lengkap = document.getElementById('profName').value; user.jabatan = document.getElementById('profJabatan').value; user.perusahaan = document.getElementById('profPerusahaan').value; user.departemen = document.getElementById('profDepartemen').value; user.section = document.getElementById('profSection').value; user.no_wa = document.getElementById('profWa').value; users[idx] = user; saveUsers(users); localStorage.setItem('lifting_user', JSON.stringify(user)); showToast('Profil diupdate!'); renderApp(true); }
-    function savePassword(e) { e.preventDefault(); let pwd1 = document.getElementById('profPwd1').value; let pwd2 = document.getElementById('profPwd2').value; if (pwd1 !== pwd2) return showToast('Password tidak cocok!', 'error'); let user = JSON.parse(localStorage.getItem('lifting_user')); let users = getUsers(); let idx = users.findIndex(u => u.nrp === user.nrp); users[idx].password_hash = pwd1; saveUsers(users); document.getElementById('profPwd1').value = ''; document.getElementById('profPwd2').value = ''; showToast('Password diubah!'); document.getElementById('profileSettingsModal').classList.add('hidden'); }
+    function saveProfile(e) { 
+        e.preventDefault(); 
+        let user = JSON.parse(localStorage.getItem('lifting_user')); 
+        let users = getUsers(); 
+        let idx = users.findIndex(u => u.nrp === user.nrp); 
+        
+        user.nama_lengkap = document.getElementById('profName').value; 
+        user.jabatan = document.getElementById('profJabatan').value; 
+        user.perusahaan = document.getElementById('profPerusahaan').value; 
+        user.departemen = document.getElementById('profDepartemen').value; 
+        user.section = document.getElementById('profSection').value; 
+        user.no_wa = document.getElementById('profWa').value; 
+        
+        if (idx !== -1) {
+            users[idx] = user; 
+            saveUsers(users); 
+            localStorage.setItem('lifting_user', JSON.stringify(user)); 
+            
+            document.getElementById('profileBiodataModal').classList.add('hidden');
+            showToast('Profil diupdate!'); 
+            renderApp(true); 
+        }
+    }
+    
+    function savePassword(e) { 
+        e.preventDefault(); 
+        let pwd1 = document.getElementById('profPwd1').value; 
+        let pwd2 = document.getElementById('profPwd2').value; 
+        if (pwd1 !== pwd2) return showToast('Password tidak cocok!', 'error'); 
+        
+        let user = JSON.parse(localStorage.getItem('lifting_user')); 
+        let users = getUsers(); 
+        let idx = users.findIndex(u => u.nrp === user.nrp); 
+        
+        if (idx !== -1) {
+            users[idx].password_hash = pwd1; 
+            saveUsers(users); 
+            user.password_hash = pwd1;
+            localStorage.setItem('lifting_user', JSON.stringify(user)); 
+            
+            document.getElementById('profPwd1').value = ''; 
+            document.getElementById('profPwd2').value = ''; 
+            document.getElementById('profileSettingsModal').classList.add('hidden');
+            showToast('Password berhasil diubah!'); 
+        } else {
+            showToast('Gagal mereset, user tidak ditemukan', 'error');
+        }
+    }
 
     window.addEventListener('load', () => { fetchFromSupabase().then(() => { renderApp(false); }); });
-    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { const user = localStorage.getItem('lifting_user'); if (user && isSafeToRender()) { fetchFromSupabase().then(() => { renderApp(true); }); } } });
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { const user = localStorage.getItem('lifting_user'); if (user) { fetchFromSupabase().then(() => { renderApp(true); }); } } });
 </script>
 </body>
 </html>
