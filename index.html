@@ -19,6 +19,7 @@
 </head>
 <body class="antialiased text-[11px] sm:text-xs">
 
+    <!-- Container Utama -->
     <div id="app" class="min-h-screen"></div>
 
 <script>
@@ -83,11 +84,10 @@
         try {
             let shouldRender = false;
 
-            // Tarik Data Order Baru dengan sorting dari timestamp terdahulu
+            // Tarik Data Order Baru dengan sortir waktu
             const resOrders = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=timestamp.desc`, {
                 headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
             });
-            
             if (resOrders.ok) {
                 const data = await resOrders.json();
                 const oldData = localStorage.getItem('lifting_orders');
@@ -102,7 +102,6 @@
             const resSettings = await fetch(`${SUPABASE_URL}/rest/v1/settings?id=eq.1`, {
                 headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
             });
-
             if (resSettings.ok) {
                 const sData = await resSettings.json();
                 if (sData && sData.length > 0) {
@@ -122,7 +121,7 @@
         } catch(e) {}
     }, 3000);
 
-    // Fungsi fetch manual (untuk load pertama / tombol tarik paksa)
+    // Fungsi fetch manual (untuk load pertama / saat HP dibuka kembali)
     async function fetchFromSupabase(isManual = false) {
         if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
         try {
@@ -166,12 +165,8 @@
     function getMasterData() { return JSON.parse(localStorage.getItem('lifting_master_data')); }
 
     function handleSort(col) {
-        if (sortColumn === col) { 
-            sortDirection = sortDirection === 'asc' ? 'desc' : 'asc'; 
-        } else { 
-            sortColumn = col; 
-            sortDirection = 'asc'; 
-        }
+        if (sortColumn === col) { sortDirection = sortDirection === 'asc' ? 'desc' : 'asc'; } 
+        else { sortColumn = col; sortDirection = 'asc'; }
         renderApp();
     }
 
@@ -191,15 +186,8 @@
     function togglePassword(inputId, iconId) {
         let input = document.getElementById(inputId);
         let icon = document.getElementById(iconId);
-        if (input.type === "password") { 
-            input.type = "text"; 
-            icon.classList.remove('fa-eye');
-            icon.classList.add('fa-eye-slash');
-        } else { 
-            input.type = "password"; 
-            icon.classList.remove('fa-eye-slash');
-            icon.classList.add('fa-eye');
-        }
+        if (input.type === "password") { input.type = "text"; icon.classList.replace('fa-eye', 'fa-eye-slash'); } 
+        else { input.type = "password"; icon.classList.replace('fa-eye-slash', 'fa-eye'); }
     }
 
     function copyText(text, label) {
@@ -219,10 +207,7 @@
 
     function generateWO(kategori) {
         const date = new Date();
-        const yyyy = date.getFullYear(); 
-        const mm = String(date.getMonth() + 1).padStart(2, '0'); 
-        const dd = String(date.getDate()).padStart(2, '0');
-        
+        const yyyy = date.getFullYear(); const mm = String(date.getMonth() + 1).padStart(2, '0'); const dd = String(date.getDate()).padStart(2, '0');
         let prefix = kategori === 'Big Crane' ? 'BC-' : (kategori === 'Lowboy' ? 'LB-' : 'CT-');
         const datePrefix = `${prefix}${yyyy}${mm}${dd}-`;
         
@@ -244,27 +229,30 @@
         const user = JSON.parse(localStorage.getItem('lifting_user'));
         const settings = getSettings();
 
-        if (!user) { 
-            app.innerHTML = getAuthView(); 
-            return; 
-        }
-        
+        if (!user) { app.innerHTML = getAuthView(); return; }
         const isMobile = window.innerWidth < 768;
-        const logoHtmlMobile = settings.logo_url ? `<img src="${settings.logo_url}" alt="Logo" class="w-5 h-5 object-contain">` : `<div class="bg-cyan-600 text-white p-1 rounded-sm flex items-center justify-center"><i class="fa-solid fa-truck-moving text-[10px]"></i></div>`;
+
+        const logoHtmlMobile = settings.logo_url ? 
+            `<img src="${settings.logo_url}" alt="Logo" class="w-10 h-10 object-contain">` : 
+            `<div class="bg-cyan-600 text-white p-2 rounded-md flex items-center justify-center"><i class="fa-solid fa-truck-moving text-lg"></i></div>`;
 
         app.innerHTML = `
             <div class="flex h-screen bg-slate-50 overflow-hidden">
                 ${!isMobile ? getDesktopSidebar(user, settings) : ''}
                 <div class="flex-1 flex flex-col h-screen overflow-hidden relative">
                     ${isMobile ? `
-                    <div class="bg-white shadow-sm px-3 py-2 flex items-center justify-between shrink-0 z-10 border-b border-slate-200">
-                        <div class="flex items-center gap-1.5 text-cyan-700 font-bold text-xs uppercase tracking-tight">
-                            ${logoHtmlMobile} ${user.role === 'MANPOWER' ? 'PANEL LAPANGAN' : 'Support Equipment'}
+                    <div class="bg-white shadow-sm px-4 py-3 flex items-center justify-between shrink-0 z-10 border-b border-slate-200">
+                        <div class="flex items-center gap-2.5 text-cyan-700 font-bold text-lg uppercase tracking-tight">
+                            ${logoHtmlMobile}
+                            ${user.role === 'MANPOWER' ? 'PANEL LAPANGAN' : 'Support Equipment'}
                         </div>
-                        ${user.role === 'MANPOWER' ? `<div class="flex items-center gap-2"><span class="text-[9px] font-semibold text-slate-600 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-sm">${user.nama_lengkap}</span></div>` : ''}
+                        ${user.role === 'MANPOWER' ? `
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] font-semibold text-slate-600 bg-slate-100 border border-slate-200 px-2 py-1 rounded-sm">${user.nama_lengkap}</span>
+                        </div>` : ''}
                     </div>` : ''}
                     
-                    <div class="flex-1 overflow-y-auto p-2 sm:p-3 pb-16 sm:pb-3 relative w-full hide-scrollbar">
+                    <div class="flex-1 overflow-y-auto p-2 sm:p-3 pb-24 sm:pb-3 relative w-full hide-scrollbar">
                         ${currentTab === 'dashboard' && (user.role === 'ADMIN' || user.role === 'GL') ? getDashboardView() : ''}
                         ${currentTab === 'monitoring' ? (user.role === 'MANPOWER' ? getManpowerWorkflow() : getMonitoringView()) : ''}
                         ${currentTab === 'order' ? getOrderFormView() : ''}
@@ -287,13 +275,7 @@
                 </div>
             </div>
         `;
-        
-        setTimeout(() => { 
-            document.querySelectorAll('.chart-bar').forEach(bar => { 
-                const w = bar.getAttribute('data-width'); 
-                if(w) bar.style.width = w; 
-            }); 
-        }, 50);
+        setTimeout(() => { document.querySelectorAll('.chart-bar').forEach(bar => { const w = bar.getAttribute('data-width'); if(w) bar.style.width = w; }); }, 50);
     }
 
     function switchTab(tab) {
@@ -304,11 +286,7 @@
     }
 
     function getDesktopSidebar(user, settings) {
-        const isAdmin = user.role === 'ADMIN'; 
-        const isGL = user.role === 'GL'; 
-        const isUSER = user.role === 'USER'; 
-        const isMP = user.role === 'MANPOWER';
-        
+        const isAdmin = user.role === 'ADMIN'; const isGL = user.role === 'GL'; const isUSER = user.role === 'USER'; const isMP = user.role === 'MANPOWER';
         const logoHtmlDesktop = settings.logo_url ? `<img src="${settings.logo_url}" alt="Logo" class="w-6 h-6 object-contain rounded-sm shadow-sm">` : `<div class="bg-cyan-600 text-white p-1.5 rounded shadow-sm flex items-center justify-center"><i class="fa-solid fa-truck-moving text-[10px]"></i></div>`;
 
         return `
@@ -322,36 +300,55 @@
                 ${(isAdmin || isGL) ? `<button onclick="switchTab('dashboard')" class="w-full text-left px-2 py-1.5 rounded-sm text-[11px] font-medium transition-all flex items-center gap-2 ${currentTab === 'dashboard' ? 'bg-cyan-50 text-cyan-700 border-l-2 border-cyan-600 font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-2 border-transparent'}"><i class="fa-solid fa-chart-pie w-3 text-center text-[10px]"></i> Dashboard</button>` : ''}
                 <button onclick="switchTab('monitoring')" class="w-full text-left px-2 py-1.5 rounded-sm text-[11px] font-medium transition-all flex items-center gap-2 mt-0.5 ${currentTab === 'monitoring' ? 'bg-cyan-50 text-cyan-700 border-l-2 border-cyan-600 font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-2 border-transparent'}"><i class="fa-solid ${isMP ? 'fa-hard-hat' : 'fa-list-check'} w-3 text-center text-[10px]"></i> ${isMP ? 'Tugas Aktif' : 'Data Order'}</button>
                 ${(isUSER || isAdmin || isGL) ? `<button onclick="switchTab('order')" class="w-full text-left px-2 py-1.5 rounded-sm text-[11px] font-medium transition-all flex items-center gap-2 mt-0.5 ${currentTab === 'order' ? 'bg-cyan-50 text-cyan-700 border-l-2 border-cyan-600 font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-2 border-transparent'}"><i class="fa-solid fa-plus w-3 text-center text-[10px]"></i> Buat Order</button>` : ''}
-                
                 <div class="text-[9px] font-bold text-slate-400 tracking-wider mt-4 mb-1 ml-1 uppercase">Akun</div>
                 ${isAdmin ? `<button onclick="switchTab('master')" class="w-full text-left px-2 py-1.5 rounded-sm text-[11px] font-medium transition-all flex items-center gap-2 ${currentTab === 'master' ? 'bg-cyan-50 text-cyan-700 border-l-2 border-cyan-600 font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-2 border-transparent'}"><i class="fa-solid fa-database w-3 text-center text-[10px]"></i> Master Data</button>` : ''}
                 <button onclick="switchTab('profile')" class="w-full text-left px-2 py-1.5 rounded-sm text-[11px] font-medium transition-all flex items-center gap-2 mt-0.5 ${currentTab === 'profile' ? 'bg-cyan-50 text-cyan-700 border-l-2 border-cyan-600 font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-2 border-transparent'}"><i class="fa-solid fa-user w-3 text-center text-[10px]"></i> Profil Saya</button>
             </div>
-            
             <div class="p-3 border-t border-slate-200 mt-auto shrink-0 flex items-center justify-between bg-slate-50">
-                <div class="overflow-hidden pr-1">
-                    <div class="text-xs font-bold text-slate-800 leading-tight truncate">${user.nama_lengkap}</div>
-                    <div class="text-[9px] font-bold text-slate-400 tracking-wider mt-0.5">${user.role}</div>
-                </div>
+                <div class="overflow-hidden pr-1"><div class="text-xs font-bold text-slate-800 leading-tight truncate">${user.nama_lengkap}</div><div class="text-[9px] font-bold text-slate-400 tracking-wider mt-0.5">${user.role}</div></div>
             </div>
         </div>`;
     }
 
     function getMobileNav(user) {
         return `
-        <div class="fixed bottom-0 w-full bg-white border-t border-slate-200 px-2 py-0.5 flex justify-around items-center z-40 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-            ${(user.role === 'ADMIN' || user.role === 'GL') ? `<button onclick="switchTab('dashboard')" class="flex flex-col items-center p-1 ${currentTab === 'dashboard' ? 'text-cyan-600' : 'text-slate-400'}"><i class="fa-solid fa-chart-pie text-base mb-0"></i><span class="text-[8px] font-medium">Dashboard</span></button>` : ''}
-            <button onclick="switchTab('monitoring')" class="flex flex-col items-center p-1 ${currentTab === 'monitoring' ? 'text-cyan-600' : 'text-slate-400'}"><i class="fa-solid ${user.role === 'MANPOWER' ? 'fa-hard-hat' : 'fa-list-check'} text-base mb-0"></i><span class="text-[8px] font-medium">${user.role === 'MANPOWER' ? 'Tugas Aktif' : 'Data'}</span></button>
-            ${(user.role === 'USER' || user.role === 'ADMIN' || user.role === 'GL') ? `<button onclick="switchTab('order')" class="relative flex flex-col items-center -mt-4"><div class="w-8 h-8 rounded-full flex items-center justify-center border-2 border-white shadow-sm ${currentTab === 'order' ? 'bg-cyan-600 text-white' : 'bg-cyan-500 text-white'}"><i class="fa-solid fa-plus text-sm"></i></div><span class="text-[8px] font-medium text-slate-500 mt-0.5">Order</span></button>` : ''}
-            ${user.role === 'ADMIN' ? `<button onclick="switchTab('master')" class="flex flex-col items-center p-1 ${currentTab === 'master' ? 'text-cyan-600' : 'text-slate-400'}"><i class="fa-solid fa-database text-base mb-0"></i><span class="text-[8px] font-medium">Master</span></button>` : ''}
-            <button onclick="switchTab('profile')" class="flex flex-col items-center p-1 ${currentTab === 'profile' ? 'text-cyan-600' : 'text-slate-400'}"><i class="fa-solid fa-user text-base mb-0"></i><span class="text-[8px] font-medium">Profil</span></button>
+        <div class="fixed bottom-0 w-full bg-white border-t border-slate-200 px-2 py-2 flex justify-around items-center z-40 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+            ${(user.role === 'ADMIN' || user.role === 'GL') ? `
+            <button onclick="switchTab('dashboard')" class="flex flex-col items-center p-1.5 ${currentTab === 'dashboard' ? 'text-cyan-600' : 'text-slate-400'}">
+                <i class="fa-solid fa-chart-pie text-2xl mb-1"></i>
+                <span class="text-[10px] font-medium">Dashboard</span>
+            </button>` : ''}
+            
+            <button onclick="switchTab('monitoring')" class="flex flex-col items-center p-1.5 ${currentTab === 'monitoring' ? 'text-cyan-600' : 'text-slate-400'}">
+                <i class="fa-solid ${user.role === 'MANPOWER' ? 'fa-hard-hat' : 'fa-list-check'} text-2xl mb-1"></i>
+                <span class="text-[10px] font-medium">${user.role === 'MANPOWER' ? 'Tugas Aktif' : 'Data'}</span>
+            </button>
+            
+            ${(user.role === 'USER' || user.role === 'ADMIN' || user.role === 'GL') ? `
+            <button onclick="switchTab('order')" class="relative flex flex-col items-center -mt-6">
+                <div class="w-14 h-14 rounded-full flex items-center justify-center border-4 border-white shadow-md ${currentTab === 'order' ? 'bg-cyan-600 text-white' : 'bg-cyan-500 text-white'}">
+                    <i class="fa-solid fa-plus text-2xl"></i>
+                </div>
+                <span class="text-[10px] font-medium text-slate-500 mt-1">Order</span>
+            </button>` : ''}
+            
+            ${user.role === 'ADMIN' ? `
+            <button onclick="switchTab('master')" class="flex flex-col items-center p-1.5 ${currentTab === 'master' ? 'text-cyan-600' : 'text-slate-400'}">
+                <i class="fa-solid fa-database text-2xl mb-1"></i>
+                <span class="text-[10px] font-medium">Master</span>
+            </button>` : ''}
+            
+            <button onclick="switchTab('profile')" class="flex flex-col items-center p-1.5 ${currentTab === 'profile' ? 'text-cyan-600' : 'text-slate-400'}">
+                <i class="fa-solid fa-user text-2xl mb-1"></i>
+                <span class="text-[10px] font-medium">Profil</span>
+            </button>
         </div>`;
     }
 
     function getAuthView() {
         const settings = getSettings();
         const bgStyle = settings.bg_url ? `background-image: url('${settings.bg_url}'); background-size: cover; background-position: center;` : 'background-color: #1e293b;';
-        const logoHtml = settings.logo_url ? `<img src="${settings.logo_url}" alt="Logo" class="w-12 h-12 object-contain mx-auto mb-2 relative z-10">` : `<div class="w-10 h-10 bg-cyan-500 flex items-center justify-center mx-auto mb-2 relative z-10 rounded-sm"><i class="fa-solid fa-truck-moving text-xl text-white"></i></div>`;
+        const logoHtml = settings.logo_url ? `<img src="${settings.logo_url}" alt="Logo" class="w-16 h-16 object-contain mx-auto mb-2 relative z-10">` : `<div class="w-12 h-12 bg-cyan-500 flex items-center justify-center mx-auto mb-2 relative z-10 rounded-sm"><i class="fa-solid fa-truck-moving text-2xl text-white"></i></div>`;
         const overlay = settings.bg_url ? `<div class="absolute inset-0 bg-slate-900/80"></div>` : '';
 
         return `
@@ -361,8 +358,8 @@
                     ${overlay}
                     <div class="relative z-10">
                         ${logoHtml}
-                        <h1 class="text-base font-bold text-white tracking-tight uppercase">Order Lifting</h1>
-                        <p class="text-cyan-400 text-[9px] mt-0.5 font-medium tracking-wide">Support Equipment</p>
+                        <h1 class="text-lg font-bold text-white tracking-tight uppercase">Order Lifting</h1>
+                        <p class="text-cyan-400 text-[10px] mt-0.5 font-medium tracking-wide">Support Equipment</p>
                     </div>
                 </div>
                 <div class="p-4">
@@ -394,44 +391,23 @@
                 </div>
                 <div class="p-3">
                     <form onsubmit="handleSignup(event)" class="space-y-2">
-                        <div>
-                            <label class="block text-[9px] font-bold text-slate-500 mb-0.5">NRP</label>
-                            <input type="text" id="regNrp" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required>
-                        </div>
-                        <div>
-                            <label class="block text-[9px] font-bold text-slate-500 mb-0.5">Nama Lengkap</label>
-                            <input type="text" id="regName" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required>
-                        </div>
+                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">NRP</label><input type="text" id="regNrp" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Nama Lengkap</label><input type="text" id="regName" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
                         
                         <datalist id="listPerusahaan">${getMasterData().perusahaan.map(p=>`<option value="${p}">`).join('')}</datalist>
                         <datalist id="listDepartemen">${getMasterData().departemen.map(d=>`<option value="${d}">`).join('')}</datalist>
                         <datalist id="listSection">${getMasterData().section.map(s=>`<option value="${s}">`).join('')}</datalist>
 
                         <div class="grid grid-cols-2 gap-2">
-                            <div>
-                                <label class="block text-[9px] font-bold text-slate-500 mb-0.5">Perusahaan</label>
-                                <input list="listPerusahaan" id="regPerusahaan" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required>
-                            </div>
-                            <div>
-                                <label class="block text-[9px] font-bold text-slate-500 mb-0.5">Departemen</label>
-                                <input list="listDepartemen" id="regDepartemen" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required>
-                            </div>
+                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Perusahaan</label><input list="listPerusahaan" id="regPerusahaan" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Departemen</label><input list="listDepartemen" id="regDepartemen" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
                         </div>
                         <div class="grid grid-cols-2 gap-2">
-                            <div>
-                                <label class="block text-[9px] font-bold text-slate-500 mb-0.5">Section</label>
-                                <input list="listSection" id="regSection" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required>
-                            </div>
-                            <div>
-                                <label class="block text-[9px] font-bold text-slate-500 mb-0.5">Jabatan</label>
-                                <input type="text" id="regJabatan" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required>
-                            </div>
+                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Section</label><input list="listSection" id="regSection" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Jabatan</label><input type="text" id="regJabatan" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
                         </div>
 
-                        <div>
-                            <label class="block text-[9px] font-bold text-slate-500 mb-0.5">No WhatsApp</label>
-                            <input type="number" id="regWa" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required>
-                        </div>
+                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">No WhatsApp</label><input type="number" id="regWa" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
                         <div>
                             <label class="block text-[9px] font-bold text-slate-500 mb-0.5">Password</label>
                             <div class="relative">
@@ -456,86 +432,51 @@
 
     function handleLogin(e) {
         e.preventDefault();
-        const nrp = document.getElementById('loginNrp').value.trim();
-        const pwd = document.getElementById('loginPwd').value;
-        const users = getUsers();
-        const user = users.find(u => u.nrp === nrp && u.password_hash === pwd && u.status_akun === 'ACTIVE');
+        const nrp = document.getElementById('loginNrp').value.trim(); const pwd = document.getElementById('loginPwd').value;
+        const users = getUsers(); const user = users.find(u => u.nrp === nrp && u.password_hash === pwd && u.status_akun === 'ACTIVE');
         const errorMsg = document.getElementById('loginErrorMsg');
         
         if (user) {
             localStorage.setItem('lifting_user', JSON.stringify(user));
             currentTab = (user.role === 'ADMIN' || user.role === 'GL') ? 'dashboard' : 'monitoring';
-            userOrderFleetMode = null;
-            mpFleetMode = null;
-            renderApp();
+            userOrderFleetMode = null; mpFleetMode = null; renderApp();
         } else {
-            errorMsg.innerHTML = '<i class="fa-solid fa-circle-exclamation mr-1"></i>NRP atau Password salah!';
-            errorMsg.classList.remove('hidden');
+            errorMsg.innerHTML = '<i class="fa-solid fa-circle-exclamation mr-1"></i>NRP atau Password salah!'; errorMsg.classList.remove('hidden');
         }
     }
 
-    function handleLogout() {
-        localStorage.removeItem('lifting_user');
-        renderApp();
-    }
+    function handleLogout() { localStorage.removeItem('lifting_user'); renderApp(); }
 
     function handleSignup(e) {
         e.preventDefault();
-        const users = getUsers();
-        const nrp = document.getElementById('regNrp').value.trim();
-        
+        const users = getUsers(); const nrp = document.getElementById('regNrp').value.trim();
         if (users.find(u => u.nrp === nrp)) return showToast('NRP terdaftar!', 'error');
 
         const newUser = {
-            nrp: nrp, 
-            nama_lengkap: document.getElementById('regName').value, 
-            jabatan: document.getElementById('regJabatan').value,
-            perusahaan: document.getElementById('regPerusahaan').value, 
-            departemen: document.getElementById('regDepartemen').value,
-            section: document.getElementById('regSection').value, 
-            no_wa: document.getElementById('regWa').value,
-            password_hash: document.getElementById('regPwd').value, 
-            role: 'USER', 
-            status_akun: 'ACTIVE'
+            nrp: nrp, nama_lengkap: document.getElementById('regName').value, jabatan: document.getElementById('regJabatan').value,
+            perusahaan: document.getElementById('regPerusahaan').value, departemen: document.getElementById('regDepartemen').value,
+            section: document.getElementById('regSection').value, no_wa: document.getElementById('regWa').value,
+            password_hash: document.getElementById('regPwd').value, role: 'USER', status_akun: 'ACTIVE'
         };
-        
-        users.push(newUser);
-        saveUsers(users);
-        showToast('Pendaftaran sukses!');
-        toggleAuthMode();
+        users.push(newUser); saveUsers(users); showToast('Pendaftaran sukses!'); toggleAuthMode();
     }
 
     function openCustomConfirm(title, message, onConfirm) {
-        document.getElementById('confirmTitle').innerText = title;
-        document.getElementById('confirmMessage').innerText = message;
-        
-        const btnContainer = document.getElementById('confirmButtons');
-        btnContainer.innerHTML = `
+        document.getElementById('confirmTitle').innerText = title; document.getElementById('confirmMessage').innerText = message;
+        document.getElementById('confirmButtons').innerHTML = `
             <button class="flex-1 bg-slate-100 text-slate-600 font-bold py-2 text-[10px] hover:bg-slate-200 transition-colors border-t border-slate-200" id="btnConfirmCancel">Batal</button>
             <button class="flex-1 bg-red-500 text-white font-bold py-2 text-[10px] hover:bg-red-600 transition-colors border-t border-red-500" id="btnConfirmOk">Ya, Lanjutkan</button>
         `;
-        
         document.getElementById('globalConfirmModal').classList.remove('hidden');
-        
-        document.getElementById('btnConfirmCancel').onclick = () => {
-            document.getElementById('globalConfirmModal').classList.add('hidden');
-        };
-        
-        document.getElementById('btnConfirmOk').onclick = () => {
-            document.getElementById('globalConfirmModal').classList.add('hidden');
-            onConfirm();
-        };
+        document.getElementById('btnConfirmCancel').onclick = () => { document.getElementById('globalConfirmModal').classList.add('hidden'); };
+        document.getElementById('btnConfirmOk').onclick = () => { document.getElementById('globalConfirmModal').classList.add('hidden'); onConfirm(); };
     }
 
     function getDashboardView() {
         let jobs = getOrders();
-        
         let tglMulai = document.getElementById('dash_tgl_mulai') ? document.getElementById('dash_tgl_mulai').value : '';
         let tglSelesai = document.getElementById('dash_tgl_selesai') ? document.getElementById('dash_tgl_selesai').value : '';
-        
-        if (tglMulai && tglSelesai) {
-            jobs = jobs.filter(j => j.tgl_pelaksanaan >= tglMulai && j.tgl_pelaksanaan <= tglSelesai);
-        }
+        if (tglMulai && tglSelesai) jobs = jobs.filter(j => j.tgl_pelaksanaan >= tglMulai && j.tgl_pelaksanaan <= tglSelesai);
 
         let cntOrder = jobs.length;
         let cntProg = jobs.filter(j => j.status === 'ON PROGRESS').length;
@@ -543,40 +484,23 @@
         let cntDone = jobs.filter(j => j.status === 'COMPLETED').length;
         let cntCancel = jobs.filter(j => j.status === 'CANCELED').length;
 
-        let cntCT = jobs.filter(j => j.kategori === 'Crane Truck').length;
-        let cntBC = jobs.filter(j => j.kategori === 'Big Crane').length;
-        let cntLB = jobs.filter(j => j.kategori === 'Lowboy').length;
+        let cntCT = jobs.filter(j => j.kategori === 'Crane Truck').length; let cntBC = jobs.filter(j => j.kategori === 'Big Crane').length; let cntLB = jobs.filter(j => j.kategori === 'Lowboy').length;
         let totalUnits = cntCT + cntBC + cntLB || 1; 
 
-        let pctCT = Math.round((cntCT / totalUnits) * 100) || 0;
-        let pctBC = Math.round((cntBC / totalUnits) * 100) || 0;
-        let pctLB = Math.round((cntLB / totalUnits) * 100) || 0;
-        let degCT = (pctCT / 100) * 360;
-        let degBC = degCT + ((pctBC / 100) * 360);
+        let pctCT = Math.round((cntCT / totalUnits) * 100) || 0; let pctBC = Math.round((cntBC / totalUnits) * 100) || 0; let pctLB = Math.round((cntLB / totalUnits) * 100) || 0;
+        let degCT = (pctCT / 100) * 360; let degBC = degCT + ((pctBC / 100) * 360);
         let pieStyle = `background: conic-gradient(#0891b2 0deg ${degCT}deg, #6366f1 ${degCT}deg ${degBC}deg, #94a3b8 ${degBC}deg 360deg);`;
 
-        function getTopData(field) {
-            let counts = {};
-            jobs.forEach(j => { if(j[field]) counts[j[field]] = (counts[j[field]] || 0) + 1; });
-            return Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0, 5);
-        }
-        
-        let topPerusahaan = getTopData('perusahaan');
-        let topDept = getTopData('departemen');
-        let topSection = getTopData('section');
+        function getTopData(field) { let counts = {}; jobs.forEach(j => { if(j[field]) counts[j[field]] = (counts[j[field]] || 0) + 1; }); return Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0, 5); }
+        let topPerusahaan = getTopData('perusahaan'); let topDept = getTopData('departemen'); let topSection = getTopData('section');
 
         function renderBarList(data, colorClass) {
             if(data.length === 0) return `<div class="text-[9px] text-slate-400 italic mt-2">Data kosong</div>`;
             let maxVal = Math.max(...data.map(d=>d[1])) || 1;
             return data.map(d => `
                 <div class="mb-1.5 mt-2">
-                    <div class="flex justify-between text-[9px] mb-0.5">
-                        <span class="font-semibold text-slate-700 truncate mr-2">${d[0]}</span>
-                        <span class="font-bold text-slate-500">${d[1]}</span>
-                    </div>
-                    <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                        <div class="${colorClass} h-1.5 rounded-full chart-bar w-0" data-width="${(d[1]/maxVal)*100}%"></div>
-                    </div>
+                    <div class="flex justify-between text-[9px] mb-0.5"><span class="font-semibold text-slate-700 truncate mr-2">${d[0]}</span><span class="font-bold text-slate-500">${d[1]}</span></div>
+                    <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden"><div class="${colorClass} h-1.5 rounded-full chart-bar w-0" data-width="${(d[1]/maxVal)*100}%"></div></div>
                 </div>
             `).join('');
         }
@@ -601,41 +525,17 @@
             </div>
 
             <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                <div class="bg-white border border-slate-200 rounded-md p-3 text-center shadow-sm flex flex-col justify-center">
-                    <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Order</div>
-                    <div class="text-xl font-bold text-slate-800">${cntOrder}</div>
-                </div>
-                <div class="bg-blue-50 border border-blue-200 rounded-md p-3 text-center shadow-sm flex flex-col justify-center">
-                    <div class="text-[9px] font-bold text-blue-500 uppercase tracking-wider mb-1">Progres</div>
-                    <div class="text-xl font-bold text-blue-700">${cntProg}</div>
-                </div>
-                <div class="bg-orange-50 border border-orange-200 rounded-md p-3 text-center shadow-sm flex flex-col justify-center">
-                    <div class="text-[9px] font-bold text-orange-500 uppercase tracking-wider mb-1">Pending</div>
-                    <div class="text-xl font-bold text-orange-600">${cntPend}</div>
-                </div>
-                <div class="bg-emerald-50 border border-emerald-200 rounded-md p-3 text-center shadow-sm flex flex-col justify-center">
-                    <div class="text-[9px] font-bold text-emerald-500 uppercase tracking-wider mb-1">Selesai</div>
-                    <div class="text-xl font-bold text-emerald-600">${cntDone}</div>
-                </div>
-                <div class="bg-red-50 border border-red-200 rounded-md p-3 text-center shadow-sm flex flex-col justify-center col-span-2 sm:col-span-1">
-                    <div class="text-[9px] font-bold text-red-500 uppercase tracking-wider mb-1">Batal</div>
-                    <div class="text-xl font-bold text-red-600">${cntCancel}</div>
-                </div>
+                <div class="bg-white border border-slate-200 rounded-md p-3 text-center shadow-sm flex flex-col justify-center"><div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Order</div><div class="text-xl font-bold text-slate-800">${cntOrder}</div></div>
+                <div class="bg-blue-50 border border-blue-200 rounded-md p-3 text-center shadow-sm flex flex-col justify-center"><div class="text-[9px] font-bold text-blue-500 uppercase tracking-wider mb-1">Progres</div><div class="text-xl font-bold text-blue-700">${cntProg}</div></div>
+                <div class="bg-orange-50 border border-orange-200 rounded-md p-3 text-center shadow-sm flex flex-col justify-center"><div class="text-[9px] font-bold text-orange-500 uppercase tracking-wider mb-1">Pending</div><div class="text-xl font-bold text-orange-600">${cntPend}</div></div>
+                <div class="bg-emerald-50 border border-emerald-200 rounded-md p-3 text-center shadow-sm flex flex-col justify-center"><div class="text-[9px] font-bold text-emerald-500 uppercase tracking-wider mb-1">Selesai</div><div class="text-xl font-bold text-emerald-600">${cntDone}</div></div>
+                <div class="bg-red-50 border border-red-200 rounded-md p-3 text-center shadow-sm flex flex-col justify-center col-span-2 sm:col-span-1"><div class="text-[9px] font-bold text-red-500 uppercase tracking-wider mb-1">Batal</div><div class="text-xl font-bold text-red-600">${cntCancel}</div></div>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm flex items-center justify-between">
-                    <div class="flex items-center gap-2 text-slate-500"><i class="fa-solid fa-truck-moving text-base"></i><span class="text-[11px] font-bold">Crane Truck</span></div>
-                    <div class="text-lg font-bold text-slate-800">${cntCT}</div>
-                </div>
-                <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm flex items-center justify-between">
-                    <div class="flex items-center gap-2 text-slate-500"><i class="fa-solid fa-truck-ramp-box text-base"></i><span class="text-[11px] font-bold">Big Crane</span></div>
-                    <div class="text-lg font-bold text-slate-800">${cntBC}</div>
-                </div>
-                <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm flex items-center justify-between">
-                    <div class="flex items-center gap-2 text-slate-500"><i class="fa-solid fa-trailer text-base"></i><span class="text-[11px] font-bold">Lowboy</span></div>
-                    <div class="text-lg font-bold text-slate-800">${cntLB}</div>
-                </div>
+                <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm flex items-center justify-between"><div class="flex items-center gap-2 text-slate-500"><i class="fa-solid fa-truck-moving text-base"></i><span class="text-[11px] font-bold">Crane Truck</span></div><div class="text-lg font-bold text-slate-800">${cntCT}</div></div>
+                <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm flex items-center justify-between"><div class="flex items-center gap-2 text-slate-500"><i class="fa-solid fa-truck-ramp-box text-base"></i><span class="text-[11px] font-bold">Big Crane</span></div><div class="text-lg font-bold text-slate-800">${cntBC}</div></div>
+                <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm flex items-center justify-between"><div class="flex items-center gap-2 text-slate-500"><i class="fa-solid fa-trailer text-base"></i><span class="text-[11px] font-bold">Lowboy</span></div><div class="text-lg font-bold text-slate-800">${cntLB}</div></div>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -651,18 +551,9 @@
                     ` : `<div class="text-[9px] text-slate-400 italic my-auto">Data kosong</div>`}
                 </div>
                 
-                <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm flex flex-col">
-                    <h3 class="text-[10px] font-bold text-slate-600 border-b border-slate-100 pb-1.5">Top Perusahaan</h3>
-                    ${renderBarList(topPerusahaan, 'bg-cyan-500')}
-                </div>
-                <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm flex flex-col">
-                    <h3 class="text-[10px] font-bold text-slate-600 border-b border-slate-100 pb-1.5">Top Departemen</h3>
-                    ${renderBarList(topDept, 'bg-indigo-400')}
-                </div>
-                <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm flex flex-col">
-                    <h3 class="text-[10px] font-bold text-slate-600 border-b border-slate-100 pb-1.5">Top Section</h3>
-                    ${renderBarList(topSection, 'bg-teal-400')}
-                </div>
+                <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm flex flex-col"><h3 class="text-[10px] font-bold text-slate-600 border-b border-slate-100 pb-1.5">Top Perusahaan</h3>${renderBarList(topPerusahaan, 'bg-cyan-500')}</div>
+                <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm flex flex-col"><h3 class="text-[10px] font-bold text-slate-600 border-b border-slate-100 pb-1.5">Top Departemen</h3>${renderBarList(topDept, 'bg-indigo-400')}</div>
+                <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm flex flex-col"><h3 class="text-[10px] font-bold text-slate-600 border-b border-slate-100 pb-1.5">Top Section</h3>${renderBarList(topSection, 'bg-teal-400')}</div>
             </div>
 
             <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm">
@@ -671,16 +562,7 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2">
                     ${topRiggers.map(r => {
                         let maxHr = topRiggers[0][1] || 1;
-                        return `
-                        <div>
-                            <div class="flex justify-between text-[9px] mb-0.5">
-                                <span class="font-semibold text-slate-700 truncate">${r[0]}</span>
-                                <span class="font-bold text-emerald-600">${r[1].toFixed(1)} Jam</span>
-                            </div>
-                            <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                                <div class="bg-emerald-500 h-1.5 rounded-full chart-bar w-0" data-width="${(r[1]/maxHr)*100}%"></div>
-                            </div>
-                        </div>`;
+                        return `<div><div class="flex justify-between text-[9px] mb-0.5"><span class="font-semibold text-slate-700 truncate">${r[0]}</span><span class="font-bold text-emerald-600">${r[1].toFixed(1)} Jam</span></div><div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden"><div class="bg-emerald-500 h-1.5 rounded-full chart-bar w-0" data-width="${(r[1]/maxHr)*100}%"></div></div></div>`;
                     }).join('')}
                 </div>`}
             </div>
@@ -701,22 +583,10 @@
             if (filterShift !== 'ALL') jobs = jobs.filter(j => j.shift === filterShift);
             if (filterKategori !== 'ALL') jobs = jobs.filter(j => j.kategori === filterKategori);
 
-            // Logika Sorting Super Cerdas
             jobs.sort((a, b) => {
-                let valA = a[sortColumn];
-                let valB = b[sortColumn];
-                
-                if (valA === null || valA === undefined) valA = '';
-                if (valB === null || valB === undefined) valB = '';
-
-                valA = valA.toString();
-                valB = valB.toString();
-
-                if (sortDirection === 'asc') {
-                    return valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' });
-                } else {
-                    return valB.localeCompare(valA, undefined, { numeric: true, sensitivity: 'base' });
-                }
+                let valA = (a[sortColumn] || '').toString().toLowerCase(); let valB = (b[sortColumn] || '').toString().toLowerCase();
+                // Pengurutan cerdas agar angka di string tetap terbaca hierarkinya dengan benar
+                return valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' }) * (sortDirection === 'asc' ? 1 : -1);
             });
 
             let pendingCount = jobs.filter(j => j.status === 'SCHEDULED' || j.status === 'UNSCHEDULED' || (j.status === 'PENDING' && (!j.operator || !j.rigger))).length;
@@ -755,16 +625,14 @@
                             <tr>
                                 <th class="px-1 md:px-2 py-1.5 text-center font-semibold w-8 md:w-16">Aksi</th>
                                 <th class="px-2 py-1.5 font-semibold w-24 md:w-28 cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('no_wo')">No LIFT & Waktu ${getSortIcon('no_wo')}</th>
-                                <th class="px-2 py-1.5 font-semibold w-20 md:w-auto cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('nama_pemohon')">Pemohon ${getSortIcon('nama_pemohon')}</th>
+                                <th class="px-2 py-1.5 font-semibold w-20 md:w-28 cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('nama_pemohon')">Pemohon ${getSortIcon('nama_pemohon')}</th>
                                 <th class="px-2 py-1.5 font-semibold w-24 hidden md:table-cell cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('tgl_pelaksanaan')">Jadwal ${getSortIcon('tgl_pelaksanaan')}</th>
-                                <!-- Kolom Lokasi Diperbesar (w-1/4) -->
-                                <th class="px-2 py-1.5 font-semibold min-w-[180px] md:w-1/4 cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('lokasi_angkat')">Lokasi / Tugas ${getSortIcon('lokasi_angkat')}</th>
+                                <th class="px-2 py-1.5 font-semibold w-28 md:w-48 cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('lokasi_angkat')">Lokasi / Tugas ${getSortIcon('lokasi_angkat')}</th>
                                 <th class="px-2 py-1.5 text-center font-semibold w-24 hidden md:table-cell cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('status')">Status ${getSortIcon('status')}</th>
                                 <th class="px-2 py-1.5 font-semibold min-w-[140px] w-40 hidden md:table-cell cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('unit')">Penugasan ${getSortIcon('unit')}</th>
                                 <th class="px-2 py-1.5 font-semibold w-24 hidden md:table-cell cursor-pointer hover:bg-slate-200 select-none transition-colors whitespace-nowrap" onclick="handleSort('jam_start_aktual')">Waktu Aktual ${getSortIcon('jam_start_aktual')}</th>
-                                <!-- Kolom Durasi dan Kendala Diperkecil -->
-                                <th class="px-2 py-1.5 text-center font-semibold w-12 hidden md:table-cell cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('durasi_aktual')">Durasi ${getSortIcon('durasi_aktual')}</th>
-                                <th class="px-2 py-1.5 font-semibold w-20 md:w-28 hidden md:table-cell">Kendala</th>
+                                <th class="px-2 py-1.5 text-center font-semibold w-16 hidden md:table-cell cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('durasi_aktual')">Durasi ${getSortIcon('durasi_aktual')}</th>
+                                <th class="px-2 py-1.5 font-semibold w-auto min-w-[200px] hidden md:table-cell">Kendala</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100 text-[11px]">
@@ -792,13 +660,13 @@
                                         </div>
                                     </td>
                                     <td class="px-2 py-1.5 align-top">
-                                        <div class="font-bold text-cyan-600 text-[9px] md:text-[10px] cursor-pointer hover:underline leading-tight" onclick="viewJobDetail('${job.no_wo}')">${job.no_wo}</div>
+                                        <div class="font-bold text-cyan-600 text-[9px] md:text-[10px] cursor-pointer hover:underline leading-tight" onclick="viewJobDetail('${job.no_wo}')" title="Klik untuk lihat detail">${job.no_wo}</div>
                                         <div class="text-[8px] md:text-[9px] text-slate-500 mb-1 leading-tight">${job.timestamp.split('T')[0]} ${job.timestamp.split('T')[1].substring(0,5)}</div>
                                         <div class="md:hidden"><span class="${statusColor} border text-[7px] px-1 py-0.5 rounded-sm font-bold leading-none whitespace-nowrap inline-block">${job.status}</span></div>
                                     </td>
                                     <td class="px-2 py-1.5 align-top">
-                                        <div class="font-semibold text-slate-800 text-[9px] md:text-[10px] uppercase truncate max-w-[70px] md:max-w-none leading-tight" title="${job.nama_pemohon}">${job.nama_pemohon}</div>
-                                        <div class="text-[8px] md:text-[9px] text-slate-500 truncate max-w-[70px] md:max-w-none leading-tight" title="${job.perusahaan} - ${job.departemen}">${job.departemen}</div>
+                                        <div class="font-semibold text-slate-800 text-[9px] md:text-[10px] uppercase truncate max-w-[70px] md:max-w-[100px] leading-tight" title="${job.nama_pemohon}">${job.nama_pemohon}</div>
+                                        <div class="text-[8px] md:text-[9px] text-slate-500 truncate max-w-[70px] md:max-w-[100px] leading-tight" title="${job.perusahaan} - ${job.departemen}">${job.departemen}</div>
                                     </td>
                                     <td class="px-2 py-1.5 align-top hidden md:table-cell">
                                         <div class="font-bold text-slate-700 text-[10px]">${job.tgl_pelaksanaan}</div>
@@ -806,7 +674,7 @@
                                     </td>
                                     <td class="px-2 py-1.5 align-top">
                                         ${job.kategori !== 'Big Crane' ? `<div class="text-[9px] md:text-[10px] text-orange-600 font-semibold flex items-start gap-1 mb-0.5 leading-tight"><i class="fa-solid fa-location-dot mt-0.5"></i> <span>${job.lokasi_angkat || '-'} <i class="fa-solid fa-arrow-right text-[7px] mx-0.5 text-slate-400"></i> ${job.lokasi_tujuan || '-'}</span></div>` : ''}
-                                        <div class="text-[9px] text-emerald-700 flex items-start gap-1"><i class="fa-solid fa-flag-checkered mt-0.5"></i> <span class="leading-tight truncate max-w-[100px] md:max-w-full" title="${job.deskripsi}">${job.deskripsi}</span></div>
+                                        <div class="text-[9px] text-emerald-700 flex items-start gap-1"><i class="fa-solid fa-flag-checkered mt-0.5"></i> <span class="leading-tight truncate max-w-[100px]" title="${job.deskripsi}">${job.deskripsi}</span></div>
                                     </td>
                                     <td class="px-2 py-1.5 text-center align-top hidden md:table-cell">
                                         <span class="${statusColor} border text-[9px] px-1.5 py-0.5 rounded-sm font-semibold whitespace-nowrap inline-block">${job.status}</span>
@@ -839,13 +707,15 @@
 
         // Monitoring View Khusus USER (Mobile view)
         jobs = jobs.filter(j => j.nrp_pemohon === currentUser.nrp);
+        
+        // Memaksa pengurutan berdasarkan timestamp terbaru khusus untuk User
+        jobs.sort((a, b) => {
+            return (b.timestamp || '').localeCompare(a.timestamp || '');
+        });
 
         let filterCat = document.getElementById('filter_kategori') ? document.getElementById('filter_kategori').value : 'ALL';
         if (filterCat !== 'ALL') jobs = jobs.filter(j => j.kategori === filterCat);
         
-        // Memaksa pengurutan waktu untuk USER mobile
-        jobs.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
-
         let html = `<h2 class="text-sm font-bold text-slate-800 mb-2"><i class="fa-solid fa-list-check mr-1.5 text-cyan-600"></i>Data Order Pekerjaan</h2>`;
 
         if (jobs.length === 0) {
@@ -1087,6 +957,45 @@
         renderApp();
     }
 
+    function confirmHapusOrder(wo) {
+        openCustomConfirm('Hapus Data', `Apakah Anda yakin ingin menghapus order ${wo}?`, async () => {
+            let jobs = getOrders().filter(j => j.no_wo !== wo);
+            localStorage.setItem('lifting_orders', JSON.stringify(jobs));
+            
+            if (SUPABASE_KEY && !SUPABASE_KEY.includes('PASTE_KUNCI')) {
+                try { await fetch(`${SUPABASE_URL}/rest/v1/orders?no_wo=eq.${wo}`, { method: 'DELETE', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }); } 
+                catch(e) { console.warn(e); }
+            }
+            showToast('Data dihapus!'); 
+            document.getElementById('editJobModal').classList.add('hidden'); 
+            renderApp();
+        });
+    }
+
+    function downloadCSV() {
+        const jobs = getOrders();
+        if(jobs.length === 0) return showToast("Tidak ada data", "error");
+        
+        let csvContent = "data:text/csv;charset=utf-8,No WO,Status,Pemohon,Dept,Kategori,Tgl Pelaksanaan,Jam Req,Shift,Durasi Req,Lokasi Angkat,Lokasi Tujuan,Deskripsi,GL,Unit,Operator,Rigger,Jam Start,Jam End,Durasi Aktual,Final Inspeksi,Alasan Telat,Alasan Overtime\n";
+        
+        jobs.forEach(j => {
+            let riggerCombined = j.rigger || '';
+            if (j.rigger2) riggerCombined += ' & ' + j.rigger2;
+            let row = [
+                j.no_wo, j.status, j.nama_pemohon, j.departemen, j.kategori,
+                j.tgl_pelaksanaan, j.jam_pelaksanaan||'', j.shift, j.durasi_request,
+                `"${(j.lokasi_angkat||'').replace(/"/g, '""')}"`, `"${(j.lokasi_tujuan||'').replace(/"/g, '""')}"`, `"${(j.deskripsi||'').replace(/"/g, '""')}"`,
+                j.gl||'', j.unit||'', j.operator||'', `"${riggerCombined}"`,
+                j.jam_start_aktual||'', j.jam_end_aktual||'', j.durasi_aktual||'',
+                j.final_inspeksi||'', `"${(j.alasan_telat||'').replace(/"/g, '""')}"`, `"${(j.alasan_overtime||'').replace(/"/g, '""')}"`
+            ].join(",");
+            csvContent += row + "\n";
+        });
+        const encodedUri = encodeURI(csvContent); const link = document.createElement("a");
+        link.setAttribute("href", encodedUri); link.setAttribute("download", `Data_Lifting_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    }
+
     function getOrderFormView() {
         const user = JSON.parse(localStorage.getItem('lifting_user'));
         const m = getMasterData();
@@ -1170,40 +1079,26 @@
             <div class="bg-slate-50 border border-slate-200 rounded-sm p-2 mb-3">
                 <p class="text-[9px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Info Pemohon</p>
                 <div class="grid grid-cols-2 gap-y-1 gap-x-2 text-[10px]">
-                    <div><p class="text-slate-500 text-[9px]">Nama:</p><p class="font-semibold text-slate-800">${user.nama_lengkap}</p></div>
-                    <div><p class="text-slate-500 text-[9px]">Dept:</p><p class="font-semibold text-slate-800">${user.departemen}</p></div>
-                    <div><p class="text-slate-500 text-[9px]">No. WA:</p><p class="font-semibold text-slate-800">${user.no_wa}</p></div>
-                    <div><p class="text-slate-500 text-[9px]">Vendor:</p><p class="font-semibold text-slate-800">${user.perusahaan}</p></div>
+                    <div><p class="text-slate-500 text-[9px]">Nama:</p><p class="font-semibold text-slate-800">${user.nama_lengkap}</p></div><div><p class="text-slate-500 text-[9px]">Dept:</p><p class="font-semibold text-slate-800">${user.departemen}</p></div>
+                    <div><p class="text-slate-500 text-[9px]">No. WA:</p><p class="font-semibold text-slate-800">${user.no_wa}</p></div><div><p class="text-slate-500 text-[9px]">Vendor:</p><p class="font-semibold text-slate-800">${user.perusahaan}</p></div>
                 </div>
             </div>`;
 
         return `
         <div class="max-w-md mx-auto bg-white rounded-md shadow-sm border border-slate-200 overflow-hidden mt-2">
-            <div class="p-2 border-b border-slate-100 flex items-center gap-2">
-                <button onclick="userOrderFleetMode=null; renderApp();" class="w-6 h-6 rounded-sm border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50"><i class="fa-solid fa-arrow-left text-[10px]"></i></button>
-                <h2 class="text-sm font-bold text-slate-800">Order: <span class="text-cyan-600">${cat}</span></h2>
-            </div>
+            <div class="p-2 border-b border-slate-100 flex items-center gap-2"><button onclick="userOrderFleetMode=null; renderApp();" class="w-6 h-6 rounded-sm border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50"><i class="fa-solid fa-arrow-left text-[10px]"></i></button><h2 class="text-sm font-bold text-slate-800">Order: <span class="text-cyan-600">${cat}</span></h2></div>
             <div class="p-3">
-                <datalist id="profListPerusahaan">${m.perusahaan.map(p=>`<option value="${p}">`).join('')}</datalist>
-                <datalist id="profListDepartemen">${m.departemen.map(d=>`<option value="${d}">`).join('')}</datalist>
+                <datalist id="profListPerusahaan">${m.perusahaan.map(p=>`<option value="${p}">`).join('')}</datalist><datalist id="profListDepartemen">${m.departemen.map(d=>`<option value="${d}">`).join('')}</datalist>
                 ${requesterHtml}
-                <form onsubmit="submitOrder(event)" class="space-y-2">
-                    ${formFields}
-                    <div class="pt-2 mt-3 border-t border-slate-100">
-                        <button id="btnSubmitOrder" type="submit" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-1.5 rounded-sm transition-colors text-xs shadow-sm">Submit Order</button>
-                    </div>
-                </form>
+                <form onsubmit="submitOrder(event)" class="space-y-2">${formFields}<div class="pt-2 mt-3 border-t border-slate-100"><button id="btnSubmitOrder" type="submit" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-1.5 rounded-sm transition-colors text-xs shadow-sm">Submit Order</button></div></form>
             </div>
         </div>`;
     }
 
     function calculateShift() {
-        const jamInput = document.getElementById('jam_pelaksanaan'); 
-        if (!jamInput || !jamInput.value) return;
-        const shiftField = document.getElementById('shift'); 
-        if(!shiftField) return;
-        const h = parseInt(jamInput.value.split(':')[0]); 
-        shiftField.value = (h >= 5 && h < 17) ? "Shift 1" : "Shift 2";
+        const jamInput = document.getElementById('jam_pelaksanaan'); if (!jamInput || !jamInput.value) return;
+        const shiftField = document.getElementById('shift'); if(!shiftField) return;
+        const h = parseInt(jamInput.value.split(':')[0]); shiftField.value = (h >= 5 && h < 17) ? "Shift 1" : "Shift 2";
     }
 
     async function submitOrder(e) {
