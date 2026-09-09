@@ -74,22 +74,22 @@
 
     // ================= DEFAULT DATA (FALLBACK) =================
     const defaultUsers = [
-        { nrp: 'admin', nama_lengkap: 'Budi Admin', jabatan: 'Dispatcher', perusahaan: 'PPA', departemen: 'Operation', section: 'Control', no_wa: '081111111', password_hash: 'admin', role: 'ADMIN', status_akun: 'ACTIVE' },
-        { nrp: 'gl', nama_lengkap: 'Achmad Hariyanto', jabatan: 'Group Leader', perusahaan: 'PPA', departemen: 'Operation', section: 'Lifting', no_wa: '082222222', password_hash: 'gl', role: 'GL', status_akun: 'ACTIVE' },
-        { nrp: 'user', nama_lengkap: 'Andi Requester', jabatan: 'Foreman', perusahaan: 'Subkon A', departemen: 'Plant', section: 'Maintenance', no_wa: '08987654321', password_hash: 'user', role: 'USER', status_akun: 'ACTIVE' },
-        { nrp: 'mp', nama_lengkap: 'Joko Operator', jabatan: 'Operator', perusahaan: 'PPA', departemen: 'Operation', section: 'Lifting', no_wa: '084444444', password_hash: 'mp', role: 'MANPOWER', status_akun: 'ACTIVE' }
+        { nrp: 'ADMIN', nama_lengkap: 'BUDI ADMIN', jabatan: 'DISPATCHER', perusahaan: 'PPA', departemen: 'OPERATION', section: 'CONTROL', no_wa: '081111111', password_hash: 'admin', role: 'ADMIN', status_akun: 'ACTIVE' },
+        { nrp: 'GL', nama_lengkap: 'ACHMAD HARIYANTO', jabatan: 'GROUP LEADER', perusahaan: 'PPA', departemen: 'OPERATION', section: 'LIFTING', no_wa: '082222222', password_hash: 'gl', role: 'GL', status_akun: 'ACTIVE' },
+        { nrp: 'USER', nama_lengkap: 'ANDI REQUESTER', jabatan: 'FOREMAN', perusahaan: 'SUBKON A', departemen: 'PLANT', section: 'MAINTENANCE', no_wa: '08987654321', password_hash: 'user', role: 'USER', status_akun: 'ACTIVE' },
+        { nrp: 'MP', nama_lengkap: 'JOKO OPERATOR', jabatan: 'OPERATOR', perusahaan: 'PPA', departemen: 'OPERATION', section: 'LIFTING', no_wa: '084444444', password_hash: 'mp', role: 'MANPOWER', status_akun: 'ACTIVE' }
     ];
 
     const defaultMasterData = {
-        perusahaan: ['PPA', 'Subkon A', 'Subkon B', 'PT. BIB'],
-        departemen: ['Mining', 'Plant', 'Safety', 'HR'],
-        section: ['Operation', 'Maintenance', 'HSE', 'Recruitment'],
+        perusahaan: ['PPA', 'SUBKON A', 'SUBKON B', 'PT. BIB'],
+        departemen: ['MINING', 'PLANT', 'SAFETY', 'HR'],
+        section: ['OPERATION', 'MAINTENANCE', 'HSE', 'RECRUITMENT'],
         unit_ct: ['CT-01', 'CT-02', 'CT-03'],
         unit_big_crane: ['BC-01', 'BC-02'],
         unit_lowboy: ['LB-01', 'LB-02'],
-        gl: ['Achmad Hariyanto', 'Lukmanul Hakim'],
-        operator: ['Joko Operator', 'Supriadi'],
-        rigger: ['Agus Rigger', 'Bambang', 'Candra']
+        gl: ['ACHMAD HARIYANTO', 'LUKMANUL HAKIM'],
+        operator: ['JOKO OPERATOR', 'SUPRIADI'],
+        rigger: ['AGUS RIGGER', 'BAMBANG', 'CANDRA']
     };
 
     if (!localStorage.getItem('lifting_users')) localStorage.setItem('lifting_users', JSON.stringify(defaultUsers));
@@ -115,7 +115,6 @@
     let sortDirection = 'desc';
 
     // ================= SUPABASE AUTO-SYNC ENGINE =================
-    
     setInterval(async () => {
         if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
         const user = localStorage.getItem('lifting_user');
@@ -130,46 +129,49 @@
         try {
             let shouldRender = false;
 
-            const [resOrders, resSettings, resMaster, resUsers] = await Promise.all([
-                fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=timestamp.desc`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }),
-                fetch(`${SUPABASE_URL}/rest/v1/settings?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }),
-                fetch(`${SUPABASE_URL}/rest/v1/master_data?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }),
-                fetch(`${SUPABASE_URL}/rest/v1/users?select=*`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } })
-            ]);
-
+            // 1. Sync Orders
+            const resOrders = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=timestamp.desc`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
             if (resOrders.ok) {
                 const data = await resOrders.json();
-                const oldData = localStorage.getItem('lifting_orders');
                 const newData = JSON.stringify(data);
-                if (oldData !== newData) { localStorage.setItem('lifting_orders', newData); shouldRender = true; }
+                if (localStorage.getItem('lifting_orders') !== newData) {
+                    localStorage.setItem('lifting_orders', newData); shouldRender = true; 
+                }
             }
 
+            // 2. Sync Settings
+            const resSettings = await fetch(`${SUPABASE_URL}/rest/v1/settings?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
             if (resSettings.ok) {
                 const sData = await resSettings.json();
                 if (sData && sData.length > 0) {
                     const newSettings = JSON.stringify(sData[0]);
-                    const oldSettings = localStorage.getItem('lifting_settings');
-                    if (oldSettings !== newSettings) { localStorage.setItem('lifting_settings', newSettings); shouldRender = true; }
+                    if (localStorage.getItem('lifting_settings') !== newSettings) {
+                        localStorage.setItem('lifting_settings', newSettings); shouldRender = true;
+                    }
                 }
             }
 
-            if (resMaster.ok) {
-                const mData = await resMaster.json();
-                if (mData && mData.length > 0 && Object.keys(mData[0]).length > 1) {
-                    let cleanMaster = {...mData[0]};
-                    delete cleanMaster.id;
-                    const newMaster = JSON.stringify(cleanMaster);
-                    const oldMaster = localStorage.getItem('lifting_master_data');
-                    if (oldMaster !== newMaster) { localStorage.setItem('lifting_master_data', newMaster); shouldRender = true; }
-                }
-            }
-
+            // 3. Sync Users
+            const resUsers = await fetch(`${SUPABASE_URL}/rest/v1/users?select=*`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
             if (resUsers.ok) {
-                const uData = await resUsers.json();
-                if (uData && uData.length > 0) {
-                    const newUsers = JSON.stringify(uData);
-                    const oldUsers = localStorage.getItem('lifting_users');
-                    if (oldUsers !== newUsers) { localStorage.setItem('lifting_users', newUsers); shouldRender = true; }
+                const data = await resUsers.json();
+                if (data && data.length > 0) {
+                    const newData = JSON.stringify(data);
+                    if (localStorage.getItem('lifting_users') !== newData) {
+                        localStorage.setItem('lifting_users', newData); shouldRender = true;
+                    }
+                }
+            }
+
+            // 4. Sync Master Data
+            const resMaster = await fetch(`${SUPABASE_URL}/rest/v1/master_data?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
+            if (resMaster.ok) {
+                const data = await resMaster.json();
+                if (data && data.length > 0) {
+                    const newData = JSON.stringify(data[0]);
+                    if (localStorage.getItem('lifting_master_data') !== newData) {
+                        localStorage.setItem('lifting_master_data', newData); shouldRender = true;
+                    }
                 }
             }
 
@@ -182,32 +184,18 @@
     async function fetchFromSupabase(isManual = false) {
         if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
         try {
-            const [resOrders, resSettings, resMaster, resUsers] = await Promise.all([
+            const [resOrders, resSettings, resUsers, resMaster] = await Promise.all([
                 fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=timestamp.desc`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }),
                 fetch(`${SUPABASE_URL}/rest/v1/settings?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }),
-                fetch(`${SUPABASE_URL}/rest/v1/master_data?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }),
-                fetch(`${SUPABASE_URL}/rest/v1/users?select=*`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } })
+                fetch(`${SUPABASE_URL}/rest/v1/users?select=*`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }),
+                fetch(`${SUPABASE_URL}/rest/v1/master_data?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } })
             ]);
 
-            if (resOrders.ok) {
-                const data = await resOrders.json();
-                if(Array.isArray(data)) localStorage.setItem('lifting_orders', JSON.stringify(data));
-            }
-            if (resSettings.ok) {
-                const sData = await resSettings.json();
-                if(sData && sData.length > 0) localStorage.setItem('lifting_settings', JSON.stringify(sData[0]));
-            }
-            if (resMaster.ok) {
-                const mData = await resMaster.json();
-                if (mData && mData.length > 0 && Object.keys(mData[0]).length > 1) {
-                    let cleanMaster = {...mData[0]}; delete cleanMaster.id;
-                    localStorage.setItem('lifting_master_data', JSON.stringify(cleanMaster));
-                }
-            }
-            if (resUsers.ok) {
-                const uData = await resUsers.json();
-                if(uData && uData.length > 0) localStorage.setItem('lifting_users', JSON.stringify(uData));
-            }
+            if (resOrders.ok) { const data = await resOrders.json(); if(Array.isArray(data)) localStorage.setItem('lifting_orders', JSON.stringify(data)); }
+            if (resSettings.ok) { const data = await resSettings.json(); if(data && data.length > 0) localStorage.setItem('lifting_settings', JSON.stringify(data[0])); }
+            if (resUsers.ok) { const data = await resUsers.json(); if(Array.isArray(data) && data.length > 0) localStorage.setItem('lifting_users', JSON.stringify(data)); }
+            if (resMaster.ok) { const data = await resMaster.json(); if(data && data.length > 0) localStorage.setItem('lifting_master_data', JSON.stringify(data[0])); }
+            
             if(isManual) { showToast("Data berhasil ditarik!", "success"); renderApp(false); }
         } catch(e) { console.warn("Gagal mengambil data:", e); }
     }
@@ -221,42 +209,41 @@
                 headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'resolution=merge-duplicates' },
                 body: JSON.stringify(orders)
             });
-            if (!res.ok) {
-                const errDetail = await res.text();
-                showToast("Gagal sync ke cloud: " + errDetail, "error");
-            }
+            if (!res.ok) { const errDetail = await res.text(); showToast("Gagal sync ke cloud: " + errDetail, "error"); }
         } catch (e) { console.error("Koneksi gagal:", e); }
-    }
-
-    async function syncMasterDataToSupabase(m) {
-        if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
-        try {
-            let payload = { id: 1, ...m };
-            await fetch(`${SUPABASE_URL}/rest/v1/master_data?on_conflict=id`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'resolution=merge-duplicates' },
-                body: JSON.stringify(payload)
-            });
-        } catch(e) { console.error(e); }
     }
 
     async function syncUsersToSupabase(users) {
         if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
         try {
+            if (!users || users.length === 0) return;
             await fetch(`${SUPABASE_URL}/rest/v1/users?on_conflict=nrp`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'resolution=merge-duplicates' },
                 body: JSON.stringify(users)
             });
-        } catch(e) { console.error(e); }
+        } catch (e) { console.error("Koneksi gagal:", e); }
     }
 
+    async function syncMasterToSupabase(data) {
+        if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
+        try {
+            data.id = 1;
+            await fetch(`${SUPABASE_URL}/rest/v1/master_data?on_conflict=id`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'resolution=merge-duplicates' },
+                body: JSON.stringify(data)
+            });
+        } catch (e) { console.error("Koneksi gagal:", e); }
+    }
+
+    // Accessors
     function getOrders() { return JSON.parse(localStorage.getItem('lifting_orders')) || []; }
     function saveOrders(orders) { localStorage.setItem('lifting_orders', JSON.stringify(orders)); syncToSupabase(orders); }
     function getUsers() { return JSON.parse(localStorage.getItem('lifting_users')) || []; }
     function saveUsers(users) { localStorage.setItem('lifting_users', JSON.stringify(users)); syncUsersToSupabase(users); }
     function getMasterData() { return JSON.parse(localStorage.getItem('lifting_master_data')); }
-    function saveMasterData(m) { localStorage.setItem('lifting_master_data', JSON.stringify(m)); syncMasterDataToSupabase(m); }
+    function saveMasterData(data) { localStorage.setItem('lifting_master_data', JSON.stringify(data)); syncMasterToSupabase(data); }
 
     function handleSort(col) {
         if (sortColumn === col) { sortDirection = sortDirection === 'asc' ? 'desc' : 'asc'; } 
@@ -299,8 +286,10 @@
         let waText = '';
         
         if (job.status === 'SCHEDULED' || job.status === 'UNSCHEDULED') {
+            // Format Pesanan Baru
             waText = `*DETAIL PEKERJAAN LIFTING*\n*NO WO:* ${job.no_wo}\n*Status:* ${job.status}\n\n*Pemohon:* ${job.nama_pemohon} (${job.departemen})\n*Kontak WA:* ${job.no_wa}\n\n*Armada:* ${job.kategori} ${job.unit ? '('+job.unit+')' : ''}\n*Tanggal:* ${job.tgl_pelaksanaan} ${job.jam_pelaksanaan ? '| Jam: '+job.jam_pelaksanaan : ''}\n*Lokasi:* ${job.lokasi_angkat || '-'} ➔ ${job.lokasi_tujuan || '-'}\n*Deskripsi:* ${job.deskripsi}`;
         } else {
+            // Format Pelaporan Eksekusi
             waText = `*PELAPORAN PROGRES JOB LIFTING*\n*Status:* ${job.status}\n\n*Nama Job:* ${job.deskripsi}\n*Jam Start:* ${job.jam_start_aktual || '-'}\n*Jam Finish:* ${job.jam_end_aktual || '-'}\n*No. Unit:* ${job.unit || '-'}\n*Nama Operator:* ${job.operator || '-'}\n*Nama Rigger:* ${job.rigger || '-'}${job.rigger2 ? ', ' + job.rigger2 : ''}\n\n*Final Inspeksi:* ${job.final_inspeksi || '-'}\n*Kendala:* ${job.alasan_telat ? 'Telat: ' + job.alasan_telat + ' ' : ''}${job.alasan_overtime ? 'Over: ' + job.alasan_overtime : ''}${(!job.alasan_telat && !job.alasan_overtime) ? '-' : ''}`;
         }
         
@@ -341,7 +330,8 @@
         }
         
         m.classList.remove('hidden');
-        setTimeout(() => { m.classList.add('hidden'); }, 3000);
+        // Auto Close
+        setTimeout(() => { m.classList.add('hidden'); }, 1500);
     }
 
     // MAIN RENDER APP
@@ -362,7 +352,7 @@
                 ${!isMobile ? getDesktopSidebar(user, settings) : ''}
                 <div class="flex-1 flex flex-col h-screen overflow-hidden relative">
                     ${isMobile ? `
-                    <div class="bg-white shadow-sm px-4 py-3 flex items-center justify-between shrink-0 z-20 border-b border-slate-200 relative">
+                    <div class="bg-white shadow-sm px-4 py-3 flex items-center justify-between shrink-0 z-10 border-b border-slate-200">
                         <div class="flex items-center gap-2 text-cyan-700 font-bold text-base sm:text-lg uppercase tracking-tight">
                             ${logoHtmlMobile}
                             ${user.role === 'MANPOWER' ? 'PANEL LAPANGAN' : 'Support Equipment'}
@@ -370,7 +360,7 @@
                         ${user.role === 'MANPOWER' ? `<div class="flex items-center gap-2"><span class="text-[10px] sm:text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200 px-2 py-1 rounded-md">${user.nama_lengkap}</span></div>` : ''}
                     </div>` : ''}
                     
-                    <div class="flex-1 overflow-y-auto p-2 sm:p-3 pb-24 sm:pb-3 relative w-full hide-scrollbar z-10 ${animClass}">
+                    <div class="flex-1 overflow-y-auto p-2 sm:p-3 pb-24 sm:pb-3 relative w-full hide-scrollbar ${animClass}">
                         ${currentTab === 'dashboard' && (user.role === 'ADMIN' || user.role === 'GL') ? getDashboardView() : ''}
                         ${currentTab === 'monitoring' ? (user.role === 'MANPOWER' ? getManpowerWorkflow() : getMonitoringView()) : ''}
                         ${currentTab === 'order' ? getOrderFormView() : ''}
@@ -490,14 +480,15 @@
                     <div id="successIcon" class="w-16 h-16 rounded-full flex items-center justify-center text-3xl mb-3 text-white"></div>
                     <h2 id="successTitle" class="text-sm font-bold text-slate-800 mb-1">Berhasil</h2>
                     <p id="successMessage" class="text-[10px] text-slate-500">Tersimpan.</p>
-                    <button onclick="document.getElementById('successModal').classList.add('hidden')" class="mt-4 w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 rounded-lg text-[10px] transition-colors">Tutup</button>
                 </div>
             </div>
 
         `;
 
+        // Bar Animation
         setTimeout(() => { document.querySelectorAll('.chart-bar').forEach(bar => { const w = bar.getAttribute('data-width'); if(w) bar.style.width = w; }); }, 50);
 
+        // ChartJS Initialization untuk Dashboard
         if (currentTab === 'dashboard' && (user.role === 'ADMIN' || user.role === 'GL')) {
             setTimeout(initDashboardCharts, 100);
         }
@@ -515,7 +506,7 @@
         const logoHtmlDesktop = settings.logo_url ? `<img src="${settings.logo_url}" alt="Logo" class="w-6 h-6 object-contain rounded-sm shadow-sm">` : `<div class="bg-cyan-600 text-white p-1.5 rounded shadow-sm flex items-center justify-center"><i class="fa-solid fa-truck-moving text-[10px]"></i></div>`;
 
         return `
-        <div class="w-44 bg-white border-r border-slate-200 flex flex-col h-full shrink-0 z-30 relative">
+        <div class="w-44 bg-white border-r border-slate-200 flex flex-col h-full shrink-0 z-20">
             <div class="p-3 border-b border-slate-100 flex items-center gap-2 shrink-0">
                 ${logoHtmlDesktop} <h1 class="font-bold text-slate-800 tracking-tight text-[11px] leading-tight uppercase">Support Equipment</h1>
             </div>
@@ -527,7 +518,7 @@
                 
                 <button onclick="switchTab('monitoring')" class="w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold transition-all duration-300 flex items-center gap-2 ${currentTab === 'monitoring' ? 'nav-active shadow-sm' : 'text-slate-600 hover:bg-slate-50'}"><i class="fa-solid ${isMP ? 'fa-hard-hat' : 'fa-list-check'} w-5 text-center text-sm"></i> ${isMP ? 'Tugas Aktif' : 'Data Order'}</button>
                 
-                ${(isUSER || isAdmin || isGL) ? `<button onclick="switchTab('order')" class="w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold transition-all duration-300 flex items-center gap-2 ${currentTab === 'order' ? 'nav-active shadow-sm' : 'text-slate-600 hover:bg-slate-50'}"><i class="fa-solid fa-plus w-5 text-center text-sm"></i> Buat Order</button>` : ''}
+                ${(isUSER || isAdmin || isGL) ? `<button onclick="switchTab('order')" class="w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold transition-all duration-300 flex items-center gap-2 ${currentTab === 'order' ? 'nav-active shadow-sm' : 'text-slate-600 hover:bg-slate-50'} relative z-30"><i class="fa-solid fa-plus w-5 text-center text-sm"></i> Buat Order</button>` : ''}
                 
                 <div class="text-[9px] font-bold text-slate-400 tracking-wider mt-4 mb-1 ml-1 uppercase">Akun</div>
                 
@@ -582,6 +573,7 @@
         const bgStyle = settings.bg_url ? `background-image: url('${settings.bg_url}'); background-size: cover; background-position: center;` : 'background-color: #1e293b;';
         const logoHtml = settings.logo_url ? `<img src="${settings.logo_url}" alt="Logo" class="w-12 h-12 object-contain mx-auto mb-2 relative z-10">` : `<div class="w-10 h-10 bg-cyan-500 flex items-center justify-center mx-auto mb-2 relative z-10 rounded-sm"><i class="fa-solid fa-truck-moving text-xl text-white"></i></div>`;
         const overlay = settings.bg_url ? `<div class="absolute inset-0 bg-slate-900/80"></div>` : '';
+        const m = getMasterData();
 
         return `
         <div class="min-h-screen flex items-center justify-center p-3 bg-slate-50 relative page-flip-anim">
@@ -598,7 +590,7 @@
                     <form onsubmit="handleLogin(event)" class="space-y-3">
                         <div>
                             <label class="block text-[10px] font-bold text-slate-500 mb-1">NRP / ID Pengguna</label>
-                            <input type="text" id="loginNrp" class="w-full border border-slate-300 rounded-none px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" required>
+                            <input type="text" id="loginNrp" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-none px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" required>
                         </div>
                         <div>
                             <label class="block text-[10px] font-bold text-slate-500 mb-1">Password</label>
@@ -622,21 +614,22 @@
                     <h2 class="text-sm font-bold text-white relative z-10">Buat Akun User</h2>
                 </div>
                 <div class="p-3">
-                    <form onsubmit="handleSignup(event)" class="space-y-2">
-                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">NRP</label><input type="text" id="regNrp" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
-                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Nama Lengkap</label><input type="text" id="regName" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
-                        
-                        <datalist id="listPerusahaan">${getMasterData().perusahaan.map(p=>`<option value="${p}">`).join('')}</datalist>
-                        <datalist id="listDepartemen">${getMasterData().departemen.map(d=>`<option value="${d}">`).join('')}</datalist>
-                        <datalist id="listSection">${getMasterData().section.map(s=>`<option value="${s}">`).join('')}</datalist>
+                    <!-- DATALIST UNTUK DROPDOWN SEARCHABLE -->
+                    <datalist id="listPerusahaan">${m.perusahaan.map(p=>`<option value="${p}">`).join('')}</datalist>
+                    <datalist id="listDepartemen">${m.departemen.map(d=>`<option value="${d}">`).join('')}</datalist>
+                    <datalist id="listSection">${m.section.map(s=>`<option value="${s}">`).join('')}</datalist>
 
+                    <form onsubmit="handleSignup(event)" class="space-y-2">
+                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">NRP</label><input type="text" id="regNrp" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Nama Lengkap</label><input type="text" id="regName" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                        
                         <div class="grid grid-cols-2 gap-2">
-                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Perusahaan</label><input list="listPerusahaan" id="regPerusahaan" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
-                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Departemen</label><input list="listDepartemen" id="regDepartemen" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Perusahaan</label><input list="listPerusahaan" id="regPerusahaan" oninput="this.value = this.value.toUpperCase()" autocomplete="off" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Departemen</label><input list="listDepartemen" id="regDepartemen" oninput="this.value = this.value.toUpperCase()" autocomplete="off" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
                         </div>
                         <div class="grid grid-cols-2 gap-2">
-                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Section</label><input list="listSection" id="regSection" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
-                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Jabatan</label><input type="text" id="regJabatan" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Section</label><input list="listSection" id="regSection" oninput="this.value = this.value.toUpperCase()" autocomplete="off" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Jabatan</label><input type="text" id="regJabatan" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
                         </div>
 
                         <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">No WhatsApp</label><input type="number" id="regWa" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
@@ -654,6 +647,17 @@
                     </div>
                 </div>
             </div>
+
+            <!-- MODAL ANIMASI SUKSES UNTUK DAFTAR -->
+            <div id="successRegModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex justify-center items-center z-[110] hidden">
+                <div class="bg-white rounded-xl shadow-2xl w-full max-w-[250px] p-6 text-center animate-pop-in flex flex-col items-center">
+                    <div class="w-16 h-16 rounded-full flex items-center justify-center text-3xl mb-3 text-white bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]">
+                        <i class="fa-solid fa-check"></i>
+                    </div>
+                    <h2 class="text-sm font-bold text-slate-800 mb-1">Berhasil Daftar!</h2>
+                    <p class="text-[10px] text-slate-500">Silakan masuk dengan akun Anda.</p>
+                </div>
+            </div>
         </div>`;
     }
 
@@ -661,7 +665,8 @@
 
     function handleLogin(e) {
         e.preventDefault();
-        const nrp = document.getElementById('loginNrp').value.trim(); const pwd = document.getElementById('loginPwd').value;
+        const nrp = document.getElementById('loginNrp').value.trim().toUpperCase(); 
+        const pwd = document.getElementById('loginPwd').value;
         const users = getUsers(); const user = users.find(u => u.nrp === nrp && u.password_hash === pwd && u.status_akun === 'ACTIVE');
         const errorMsg = document.getElementById('loginErrorMsg');
         
@@ -678,16 +683,35 @@
 
     function handleSignup(e) {
         e.preventDefault();
-        const users = getUsers(); const nrp = document.getElementById('regNrp').value.trim();
+        const users = getUsers(); 
+        const nrp = document.getElementById('regNrp').value.trim().toUpperCase();
         if (users.find(u => u.nrp === nrp)) return showToast('NRP terdaftar!', 'error');
 
         const newUser = {
-            nrp: nrp, nama_lengkap: document.getElementById('regName').value, jabatan: document.getElementById('regJabatan').value,
-            perusahaan: document.getElementById('regPerusahaan').value, departemen: document.getElementById('regDepartemen').value,
-            section: document.getElementById('regSection').value, no_wa: document.getElementById('regWa').value,
-            password_hash: document.getElementById('regPwd').value, role: 'USER', status_akun: 'ACTIVE'
+            nrp: nrp, 
+            nama_lengkap: document.getElementById('regName').value.trim().toUpperCase(), 
+            jabatan: document.getElementById('regJabatan').value.trim().toUpperCase(),
+            perusahaan: document.getElementById('regPerusahaan').value.trim().toUpperCase(), 
+            departemen: document.getElementById('regDepartemen').value.trim().toUpperCase(),
+            section: document.getElementById('regSection').value.trim().toUpperCase(), 
+            no_wa: document.getElementById('regWa').value,
+            password_hash: document.getElementById('regPwd').value, 
+            role: 'USER', 
+            status_akun: 'ACTIVE'
         };
-        users.push(newUser); saveUsers(users); showToast('Pendaftaran sukses!'); toggleAuthMode();
+        users.push(newUser); 
+        saveUsers(users); 
+        
+        // Show success animation
+        const m = document.getElementById('successRegModal');
+        m.classList.remove('hidden');
+        
+        setTimeout(() => {
+            m.classList.add('hidden');
+            toggleAuthMode();
+            document.getElementById('loginNrp').value = nrp; // pre-fill
+            document.getElementById('loginPwd').value = '';
+        }, 1500);
     }
 
     function openCustomConfirm(title, message, onConfirm) {
@@ -701,8 +725,6 @@
         document.getElementById('btnConfirmOk').onclick = () => { document.getElementById('globalConfirmModal').classList.add('hidden'); onConfirm(); };
     }
 
-    // ================= DASHBOARD & CHARTS LOGIC =================
-    
     function getDashboardView() {
         let jobs = getOrders();
         
@@ -730,7 +752,15 @@
         let degCT = (pctCT / 100) * 360; let degBC = degCT + ((pctBC / 100) * 360);
         let pieStyle = `background: conic-gradient(#0891b2 0deg ${degCT}deg, #6366f1 ${degCT}deg ${degBC}deg, #94a3b8 ${degBC}deg 360deg);`;
 
-        function getTopData(field) { let counts = {}; filteredJobs.forEach(j => { if(j[field]) counts[j[field]] = (counts[j[field]] || 0) + 1; }); return Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0, 5); }
+        function getTopData(field) { 
+            let counts = {}; 
+            filteredJobs.forEach(j => { 
+                let val = j[field];
+                if(val && val !== '-' && val !== 'N/A') counts[val] = (counts[val] || 0) + 1; 
+            }); 
+            return Object.entries(counts).sort((a,b) => b[1] - a[1]).slice(0, 5); 
+        }
+        
         let topPerusahaan = getTopData('perusahaan'); let topDept = getTopData('departemen'); let topSection = getTopData('section');
 
         function renderBarList(data, colorClass) {
@@ -749,14 +779,18 @@
             riggerHours[j.rigger] = (riggerHours[j.rigger] || 0) + parseFloat(j.durasi_aktual);
             if(j.rigger2) riggerHours[j.rigger2] = (riggerHours[j.rigger2] || 0) + parseFloat(j.durasi_aktual);
         });
-        let topRiggers = Object.entries(riggerHours).sort((a,b)=>b[1]-a[1]).slice(0, 5);
+        let topRiggers = Object.entries(riggerHours).sort((a,b) => b[1] - a[1]).slice(0, 5);
+
+        let m = getMasterData();
+        let allUnits = [...m.unit_ct, ...m.unit_big_crane, ...m.unit_lowboy];
+        let unitOptionsHtml = allUnits.map(u => `<option value="${u}" ${dashUnit===u?'selected':''}>${u}</option>`).join('');
 
         return `
-        <div class="max-w-6xl mx-auto space-y-3">
+        <div class="max-w-6xl mx-auto space-y-3 relative z-10">
             <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-2">
                 <h2 class="text-sm font-bold text-slate-800 shrink-0"><i class="fa-solid fa-chart-pie mr-1.5 text-cyan-600"></i>Dashboard Analytics</h2>
                 
-                <div class="flex items-center text-[10px] w-full lg:w-auto bg-white border border-slate-200 rounded-md p-1 shadow-sm flex-wrap gap-y-1">
+                <div class="flex items-center text-[10px] w-full lg:w-auto bg-white border border-slate-200 rounded-md p-1 shadow-sm flex-wrap gap-y-1 relative z-20">
                     <div class="flex items-center shrink-0 pr-1">
                         <i class="fa-regular fa-calendar mx-1 text-slate-400"></i>
                         <input type="date" id="dash_tgl_mulai" class="bg-transparent px-1 py-0.5 text-slate-700 focus:outline-none" value="${tglMulai}" onchange="renderApp(true)">
@@ -783,7 +817,7 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+            <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 relative z-0">
                 <div class="bg-white border border-slate-200 rounded-md p-3 text-center shadow-sm flex flex-col justify-center"><div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Order</div><div class="text-xl font-bold text-slate-800">${cntOrder}</div></div>
                 <div class="bg-blue-50 border border-blue-200 rounded-md p-3 text-center shadow-sm flex flex-col justify-center"><div class="text-[9px] font-bold text-blue-500 uppercase tracking-wider mb-1">Progres</div><div class="text-xl font-bold text-blue-700">${cntProg}</div></div>
                 <div class="bg-orange-50 border border-orange-200 rounded-md p-3 text-center shadow-sm flex flex-col justify-center"><div class="text-[9px] font-bold text-orange-500 uppercase tracking-wider mb-1">Pending</div><div class="text-xl font-bold text-orange-600">${cntPend}</div></div>
@@ -850,9 +884,11 @@
         let dashShift = document.getElementById('dash_shift').value;
         let dashUnit = document.getElementById('dash_unit').value;
 
+        // Apply Shift & Unit for charts globally
         if (dashShift !== 'ALL') allJobs = allJobs.filter(j => j.shift === dashShift);
         if (dashUnit !== 'ALL') allJobs = allJobs.filter(j => j.kategori === dashUnit);
 
+        // --- BAR CHART LOGIC ---
         let filteredJobsRange = allJobs.filter(j => j.tgl_pelaksanaan >= dashTglMulai && j.tgl_pelaksanaan <= dashTglSelesai);
         let countS1 = filteredJobsRange.filter(j => j.shift === 'Shift 1').length;
         let countS2 = filteredJobsRange.filter(j => j.shift === 'Shift 2').length;
@@ -877,9 +913,10 @@
             }
         });
 
+        // --- LINE CHART LOGIC ---
         let refDate = new Date(dashTglMulai);
         let day = refDate.getDay();
-        let diff = refDate.getDate() - day + (day === 0 ? -6 : 1); 
+        let diff = refDate.getDate() - day + (day === 0 ? -6 : 1); // get Monday
         let mondayThisWeek = new Date(refDate.setDate(diff));
         
         let dataThisWeek = [];
@@ -955,18 +992,6 @@
             if (filterKategori !== 'ALL') jobs = jobs.filter(j => j.kategori === filterKategori);
 
             jobs.sort((a, b) => {
-                if (sortColumn === 'aksi') {
-                    let isNeedValA = (a.status === 'SCHEDULED' || a.status === 'UNSCHEDULED' || (a.status === 'PENDING' && (!a.operator || !a.rigger))) ? 1 : 0;
-                    let isNeedValB = (b.status === 'SCHEDULED' || b.status === 'UNSCHEDULED' || (b.status === 'PENDING' && (!b.operator || !b.rigger))) ? 1 : 0;
-                    let comparison = isNeedValB - isNeedValA; 
-                    if (sortDirection === 'asc') comparison = isNeedValA - isNeedValB;
-                    if (comparison === 0) {
-                        let valA = (a.timestamp || '').toString().toLowerCase(); let valB = (b.timestamp || '').toString().toLowerCase();
-                        return valA.localeCompare(valB, undefined, {numeric: true}) * (sortDirection === 'asc' ? 1 : -1);
-                    }
-                    return comparison;
-                }
-
                 let valA = (a[sortColumn] || '').toString().toLowerCase(); 
                 let valB = (b[sortColumn] || '').toString().toLowerCase();
                 let comparison = valA.localeCompare(valB, undefined, {numeric: true});
@@ -975,11 +1000,20 @@
                 return 0;
             });
 
+            // PRIORITASKAN YANG BUTUH VALIDASI DI ATAS JIKA SORT ASCENDING
+            if (sortColumn === 'status' || sortColumn === 'timestamp') {
+               jobs.sort((a,b) => {
+                   let aNeed = (a.status === 'SCHEDULED' || a.status === 'UNSCHEDULED' || (a.status === 'PENDING' && !a.operator)) ? 1 : 0;
+                   let bNeed = (b.status === 'SCHEDULED' || b.status === 'UNSCHEDULED' || (b.status === 'PENDING' && !b.operator)) ? 1 : 0;
+                   return bNeed - aNeed;
+               });
+            }
+
             let pendingCount = jobs.filter(j => j.status === 'SCHEDULED' || j.status === 'UNSCHEDULED' || (j.status === 'PENDING' && (!j.operator || !j.rigger))).length;
 
             let html = `
-            <div class="bg-white rounded-md shadow-sm border border-slate-200 relative z-10">
-                <div class="p-2 border-b border-slate-200 flex flex-col sm:flex-row gap-2 justify-between bg-slate-50/50 rounded-t-md">
+            <div class="bg-white rounded-md shadow-sm border border-slate-200">
+                <div class="p-2 border-b border-slate-200 flex flex-col sm:flex-row gap-2 justify-between bg-slate-50/50 rounded-t-md relative z-20">
                     <div class="flex items-center justify-between sm:justify-start gap-2 w-full sm:w-auto">
                         <h2 class="text-sm font-bold text-slate-800 shrink-0"><i class="fa-solid fa-database mr-1.5 text-cyan-600"></i>Data Order</h2>
                         <div class="flex items-center gap-1.5 shrink-0">
@@ -1009,7 +1043,7 @@
                     <table class="w-full text-left border-collapse">
                         <thead class="bg-slate-100 text-slate-600 text-[10px] border-b border-slate-200">
                             <tr>
-                                <th class="px-1 md:px-2 py-1.5 text-center font-semibold w-8 md:w-16 cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('aksi')">Aksi ${getSortIcon('aksi')}</th>
+                                <th class="px-1 md:px-2 py-1.5 text-center font-semibold w-8 md:w-20 cursor-pointer hover:bg-slate-200" onclick="handleSort('status')">Aksi ${getSortIcon('status')}</th>
                                 <th class="px-2 py-1.5 font-semibold w-24 md:w-28 cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('no_wo')">No LIFT & Waktu ${getSortIcon('no_wo')}</th>
                                 <th class="px-2 py-1.5 font-semibold w-20 md:w-24 cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('nama_pemohon')">Pemohon ${getSortIcon('nama_pemohon')}</th>
                                 <th class="px-2 py-1.5 font-semibold w-24 hidden md:table-cell cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('tgl_pelaksanaan')">Jadwal ${getSortIcon('tgl_pelaksanaan')}</th>
@@ -1030,19 +1064,9 @@
                                 
                                 let isNeedValidation = (job.status === 'SCHEDULED' || job.status === 'UNSCHEDULED' || (job.status === 'PENDING' && (!job.operator || !job.rigger)));
                                 
-                                let actionBtnClass = '';
-                                let actionBtnText = '';
-                                let actionBtnIcon = '';
-
-                                if (isNeedValidation) {
-                                    actionBtnClass = 'bg-red-50 hover:bg-red-100 text-red-600 border-red-200';
-                                    actionBtnText = 'Validasi';
-                                    actionBtnIcon = '<i class="fa-solid fa-clipboard-check"></i>';
-                                } else {
-                                    actionBtnClass = 'bg-blue-50 hover:bg-blue-100 text-blue-600 border-blue-200';
-                                    actionBtnText = 'Edit';
-                                    actionBtnIcon = '<i class="fa-solid fa-pen"></i>';
-                                }
+                                let btnAksiHtml = isNeedValidation 
+                                    ? `<button onclick="openAdminEditJob('${job.no_wo}')" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-[10px] px-2 py-1 rounded-sm shadow-sm w-full md:w-auto flex justify-center items-center gap-1 font-bold" title="Validasi Job"><i class="fa-solid fa-clipboard-check"></i> <span class="hidden md:inline">Validasi</span></button>`
+                                    : `<button onclick="openAdminEditJob('${job.no_wo}')" class="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 text-[10px] px-2 py-1 rounded-sm shadow-sm w-full md:w-auto flex justify-center items-center gap-1 font-bold" title="Edit Job"><i class="fa-solid fa-pen"></i> <span class="hidden md:inline">Edit</span></button>`;
 
                                 let kendalaHtml = '';
                                 if(job.final_inspeksi) kendalaHtml += `<div class="text-[9px] bg-green-50 text-green-700 border border-green-200 rounded-sm px-1 py-0.5 mb-0.5 w-full"><i class="fa-solid fa-check-circle mr-0.5"></i>Insp: ${job.final_inspeksi}</div>`;
@@ -1052,13 +1076,13 @@
 
                                 return `
                                 <tr class="hover:bg-slate-50 transition-colors">
-                                    <td class="px-1 md:px-2 py-1.5 text-center align-top relative z-10">
-                                        <div class="flex items-center justify-center">
-                                            <button onclick="openAdminEditJob('${job.no_wo}')" class="${actionBtnClass} text-[10px] px-2 py-1 rounded-sm border shadow-sm w-full md:w-auto flex justify-center items-center gap-1" title="${actionBtnText} Job">${actionBtnIcon} <span class="hidden md:inline font-bold">${actionBtnText}</span></button>
+                                    <td class="px-1 md:px-2 py-1.5 text-center align-top">
+                                        <div class="flex items-center justify-center relative z-10">
+                                            ${btnAksiHtml}
                                         </div>
                                     </td>
-                                    <td class="px-2 py-1.5 align-top">
-                                        <div class="font-bold text-cyan-600 text-[9px] md:text-[10px] cursor-pointer hover:underline leading-tight relative z-20" onclick="viewJobDetail('${job.no_wo}')">${job.no_wo}</div>
+                                    <td class="px-2 py-1.5 align-top relative z-10">
+                                        <div class="font-bold text-cyan-600 text-[9px] md:text-[10px] cursor-pointer hover:underline leading-tight inline-block" onclick="viewJobDetail('${job.no_wo}')">${job.no_wo}</div>
                                         <div class="text-[8px] md:text-[9px] text-slate-500 mb-1 leading-tight">${job.timestamp.split('T')[0]} ${job.timestamp.split('T')[1].substring(0,5)}</div>
                                         <div class="md:hidden"><span class="${statusColor} border text-[7px] px-1 py-0.5 rounded-sm font-bold leading-none whitespace-nowrap inline-block">${job.status}</span></div>
                                     </td>
@@ -1121,10 +1145,10 @@
                               (job.status === 'CANCELED' ? 'bg-red-50 text-red-600 border-red-200' : 'bg-slate-50 text-slate-600 border-slate-200')));
 
             html += `
-            <div class="bg-white rounded-md p-2.5 mb-2 border border-slate-200 shadow-sm relative text-[11px] cursor-pointer hover:shadow-md transition-shadow">
+            <div class="bg-white rounded-md p-2.5 mb-2 border border-slate-200 shadow-sm relative text-[11px] cursor-pointer hover:shadow-md transition-shadow relative z-10" onclick="viewJobDetail('${job.no_wo}')">
                 <div class="absolute top-2 right-2 ${statusColor} border px-1.5 py-0.5 rounded-sm text-[8px] font-bold tracking-wider">${job.status}</div>
                 
-                <div class="text-[9px] text-cyan-600 font-mono font-bold mb-1 hover:underline relative z-20" onclick="viewJobDetail('${job.no_wo}')">${job.no_wo}</div>
+                <div class="text-[9px] text-cyan-600 font-mono font-bold mb-1 hover:underline">${job.no_wo}</div>
                 <div class="flex items-center gap-1.5 mb-1.5">
                     <span class="font-bold text-slate-800 text-xs">${job.kategori}</span>
                     <span class="text-slate-300">|</span>
@@ -1139,7 +1163,7 @@
                 
                 <div class="text-[10px] text-slate-500 mb-2 pl-1 border-l-2 border-slate-300 truncate">${job.deskripsi}</div>
 
-                <div class="pt-1.5 border-t border-slate-100 flex items-center justify-between" onclick="viewJobDetail('${job.no_wo}')">
+                <div class="pt-1.5 border-t border-slate-100 flex items-center justify-between">
                     <div class="text-[9px] text-slate-400"><i class="fa-solid fa-user-circle mr-1"></i>${job.nama_pemohon}</div>
                     <div class="text-cyan-600 text-[9px] font-semibold">Klik untuk Detail</div>
                 </div>
@@ -1210,6 +1234,7 @@
     }
 
     function openAdminEditJob(wo) {
+        // Bebaskan akses edit untuk COMPLETED
         const job = getOrders().find(j => j.no_wo === wo && j.status !== 'CANCELED');
         if(!job) return;
         const currentUser = JSON.parse(localStorage.getItem('lifting_user'));
@@ -1364,48 +1389,8 @@
         renderApp(true); 
     }
 
-    function confirmHapusOrder(wo) {
-        openCustomConfirm('Hapus Data', `Apakah Anda yakin ingin menghapus order ${wo}?`, async () => {
-            let jobs = getOrders().filter(j => j.no_wo !== wo);
-            localStorage.setItem('lifting_orders', JSON.stringify(jobs));
-            
-            if (SUPABASE_KEY && !SUPABASE_KEY.includes('PASTE_KUNCI')) {
-                try { await fetch(`${SUPABASE_URL}/rest/v1/orders?no_wo=eq.${wo}`, { method: 'DELETE', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }); } 
-                catch(e) { console.warn(e); }
-            }
-            showToast('Data dihapus!'); 
-            document.getElementById('editJobModal').classList.add('hidden'); 
-            renderApp(true);
-        });
-    }
-
-    function downloadCSV() {
-        const jobs = getOrders();
-        if(jobs.length === 0) return showToast("Tidak ada data", "error");
-        
-        let csvContent = "data:text/csv;charset=utf-8,No WO,Status,Pemohon,Dept,Kategori,Tgl Pelaksanaan,Jam Req,Shift,Durasi Req,Lokasi Angkat,Lokasi Tujuan,Deskripsi,GL,Unit,Operator,Rigger,Jam Start,Jam End,Durasi Aktual,Final Inspeksi,Alasan Telat,Alasan Overtime\n";
-        
-        jobs.forEach(j => {
-            let riggerCombined = j.rigger || '';
-            if (j.rigger2) riggerCombined += ' & ' + j.rigger2;
-            let row = [
-                j.no_wo, j.status, j.nama_pemohon, j.departemen, j.kategori,
-                j.tgl_pelaksanaan, j.jam_pelaksanaan||'', j.shift, j.durasi_request,
-                `"${(j.lokasi_angkat||'').replace(/"/g, '""')}"`, `"${(j.lokasi_tujuan||'').replace(/"/g, '""')}"`, `"${(j.deskripsi||'').replace(/"/g, '""')}"`,
-                j.gl||'', j.unit||'', j.operator||'', `"${riggerCombined}"`,
-                j.jam_start_aktual||'', j.jam_end_aktual||'', j.durasi_aktual||'',
-                j.final_inspeksi||'', `"${(j.alasan_telat||'').replace(/"/g, '""')}"`, `"${(j.alasan_overtime||'').replace(/"/g, '""')}"`
-            ].join(",");
-            csvContent += row + "\n";
-        });
-        const encodedUri = encodeURI(csvContent); const link = document.createElement("a");
-        link.setAttribute("href", encodedUri); link.setAttribute("download", `Data_Lifting_${new Date().toISOString().split('T')[0]}.csv`);
-        document.body.appendChild(link); link.click(); document.body.removeChild(link);
-    }
-
     function getOrderFormView() {
         const user = JSON.parse(localStorage.getItem('lifting_user'));
-        const m = getMasterData();
         const isAdminGL = user.role === 'ADMIN' || user.role === 'GL';
         const settings = getSettings();
         
@@ -1473,13 +1458,14 @@
             `;
         }
 
+        const m = getMasterData();
         let requesterHtml = isAdminGL ? `
             <div class="bg-cyan-50 border border-cyan-200 rounded-sm p-2 mb-3">
                 <p class="text-[9px] font-bold text-cyan-700 mb-1 uppercase tracking-wider"><i class="fa-solid fa-user-pen mr-1"></i>Delegasi: Info Pemohon</p>
                 <div class="grid grid-cols-2 gap-2 text-[10px]">
-                    <input type="text" id="del_nama" placeholder="Nama Pemohon..." value="${user.nama_lengkap}" class="w-full border border-slate-300 rounded-sm px-1.5 py-1" required>
-                    <input list="profListDepartemen" id="del_dept" placeholder="Departemen..." value="${user.departemen}" class="w-full border border-slate-300 rounded-sm px-1.5 py-1" required>
-                    <input list="profListPerusahaan" id="del_vendor" placeholder="Perusahaan/Vendor..." value="${user.perusahaan}" class="w-full border border-slate-300 rounded-sm px-1.5 py-1" required>
+                    <input type="text" id="del_nama" placeholder="Nama Pemohon..." value="${user.nama_lengkap}" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-sm px-1.5 py-1" required>
+                    <input list="profListDepartemen" id="del_dept" placeholder="Departemen..." value="${user.departemen}" oninput="this.value = this.value.toUpperCase()" autocomplete="off" class="w-full border border-slate-300 rounded-sm px-1.5 py-1" required>
+                    <input list="profListPerusahaan" id="del_vendor" placeholder="Perusahaan/Vendor..." value="${user.perusahaan}" oninput="this.value = this.value.toUpperCase()" autocomplete="off" class="w-full border border-slate-300 rounded-sm px-1.5 py-1" required>
                     <input type="number" id="del_wa" placeholder="No WA..." value="${user.no_wa}" class="w-full border border-slate-300 rounded-sm px-1.5 py-1" required>
                 </div>
                 <div class="text-[9px] text-cyan-700 mt-1 font-semibold border-t border-cyan-200 pt-1">Section: <span id="del_section">${user.section || '-'}</span> (Tarik Otomatis)</div>
@@ -1504,12 +1490,6 @@
         </div>`;
     }
 
-    function calculateShift() {
-        const jamInput = document.getElementById('jam_pelaksanaan'); if (!jamInput || !jamInput.value) return;
-        const shiftField = document.getElementById('shift'); if(!shiftField) return;
-        const h = parseInt(jamInput.value.split(':')[0]); shiftField.value = (h >= 5 && h < 17) ? "Shift 1" : "Shift 2";
-    }
-
     async function submitOrder(e) {
         e.preventDefault();
         const btnSubmit = document.getElementById('btnSubmitOrder'); btnSubmit.disabled = true; btnSubmit.innerText = "Orderan sedang diproses...";
@@ -1525,8 +1505,11 @@
         let durasiVal = document.getElementById('durasi_req')?.value || ''; let satuan = document.getElementById('satuan_durasi')?.value || 'JAM';
         const baseOrder = {
             no_wo: generateWO(cat), timestamp: new Date().toISOString(), kategori: cat, nrp_pemohon: user.nrp, 
-            nama_pemohon: isAdminGL ? document.getElementById('del_nama').value : user.nama_lengkap, perusahaan: isAdminGL ? document.getElementById('del_vendor').value : user.perusahaan, 
-            departemen: isAdminGL ? document.getElementById('del_dept').value : user.departemen, section: user.section || '-', no_wa: isAdminGL ? document.getElementById('del_wa').value : user.no_wa,
+            nama_pemohon: isAdminGL ? document.getElementById('del_nama').value.toUpperCase() : user.nama_lengkap, 
+            perusahaan: isAdminGL ? document.getElementById('del_vendor').value.toUpperCase() : user.perusahaan, 
+            departemen: isAdminGL ? document.getElementById('del_dept').value.toUpperCase() : user.departemen, 
+            section: user.section || '-', 
+            no_wa: isAdminGL ? document.getElementById('del_wa').value : user.no_wa,
             tgl_pelaksanaan: tgl, jam_pelaksanaan: jam, shift: document.getElementById('shift')?.value || '-', durasi_request: `${durasiVal} ${satuan}`,
             lokasi_angkat: document.getElementById('lok_angkat')?.value || '', lokasi_tujuan: document.getElementById('lok_tujuan')?.value || '', deskripsi: document.getElementById('deskripsi')?.value || '',
             status: statusTag, foto_evidence: '', gl: '', unit: '', operator: '', rigger: '', rigger2: '', jam_start_aktual: '', jam_end_aktual: '', durasi_aktual: '', final_inspeksi: '', alasan_telat: '', alasan_overtime: '', alasan_pending: ''
@@ -1569,87 +1552,115 @@
         showSuccessAnim('check', 'Order Terkirim!', 'Pemesanan alat berat Anda berhasil disubmit.');
     }
 
-    let currentMasterTab = 'branding';
-
-    function getMasterDataView() {
-        const m = getMasterData(); const users = getUsers();
-        const tabs = [ { id: 'branding', label: 'Branding UI' }, { id: 'perusahaan', label: 'Perusahaan' }, { id: 'departemen', label: 'Departemen' }, { id: 'section', label: 'Section' }, { id: 'unit_ct', label: 'Unit CT' }, { id: 'unit_big_crane', label: 'Unit Big Crane' }, { id: 'unit_lowboy', label: 'Unit Lowboy' }, { id: 'gl', label: 'GL' }, { id: 'operator', label: 'OP' }, { id: 'rigger', label: 'Rig' }, { id: 'users', label: 'Pengguna' } ];
-
-        let contentHtml = '';
-        if (currentMasterTab === 'branding') {
-            const settings = getSettings();
-            contentHtml = `
-            <form onsubmit="saveBranding(event)" class="space-y-3 mt-2">
-                <div class="bg-blue-50 border border-blue-200 p-2 rounded-sm mb-3">
-                    <p class="text-[9px] text-blue-700"><i class="fa-solid fa-cloud-arrow-up mr-1"></i>Setelan Branding (Logo & Background Unit) akan tersimpan di Cloud Supabase dan otomatis berubah di HP seluruh pengguna.</p>
-                </div>
-                <div><label class="block text-[10px] font-bold text-slate-600 mb-1">URL Foto Background Login</label><input type="url" id="setting_bg" value="${settings.bg_url || ''}" placeholder="https://..." class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500"></div>
-                <div><label class="block text-[10px] font-bold text-slate-600 mb-1">URL Logo Utama</label><input type="url" id="setting_logo" value="${settings.logo_url || ''}" placeholder="https://..." class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500"></div>
-                <hr class="border-slate-100 my-2"><h4 class="text-[10px] font-bold text-slate-800 mb-1">Foto Background Kartu Armada</h4>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Foto Crane Truck</label><input type="url" id="setting_icon_ct" value="${settings.icon_ct_url || ''}" placeholder="https://..." class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] focus:outline-none focus:border-cyan-500"></div>
-                    <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Foto Big Crane</label><input type="url" id="setting_icon_bc" value="${settings.icon_bc_url || ''}" placeholder="https://..." class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] focus:outline-none focus:border-cyan-500"></div>
-                    <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Foto Lowboy</label><input type="url" id="setting_icon_lb" value="${settings.icon_lb_url || ''}" placeholder="https://..." class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] focus:outline-none focus:border-cyan-500"></div>
-                </div>
-                <button type="submit" class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold px-4 py-1.5 rounded-sm text-[10px] shadow-sm mt-3 w-full sm:w-auto"><i class="fa-solid fa-cloud-arrow-up mr-1"></i> Simpan ke Cloud</button>
-            </form>`;
-        } else if (currentMasterTab === 'users') {
-            contentHtml = `<div class="overflow-x-auto border border-slate-200 rounded-sm mt-2"><table class="w-full text-left"><thead class="bg-slate-50 text-slate-500 text-[9px] border-b"><tr><th class="p-2 uppercase">NRP</th><th class="p-2 uppercase">Nama Lengkap</th><th class="p-2 uppercase">Role</th><th class="p-2 uppercase text-center">Aksi</th></tr></thead><tbody class="divide-y divide-slate-100 text-[10px]">${users.map(u => `<tr class="hover:bg-slate-50"><td class="p-2 font-mono text-slate-600">${u.nrp}</td><td class="p-2 font-semibold text-slate-800">${u.nama_lengkap}</td><td class="p-2"><span class="text-[8px] font-bold px-1.5 py-0.5 rounded-sm ${u.role === 'ADMIN' ? 'bg-purple-100 text-purple-700' : (u.role === 'GL' ? 'bg-teal-100 text-teal-700' : (u.role === 'MANPOWER' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-700'))}">${u.role}</span></td><td class="p-2 text-center"><button onclick="openResetPwd('${u.nrp}')" class="bg-cyan-50 hover:bg-cyan-100 text-cyan-600 text-[9px] font-bold px-1.5 py-1 rounded-sm"><i class="fa-solid fa-key"></i></button></td></tr>`).join('')}</tbody></table></div>`;
-        } else {
-            let addFormHtml = '';
-            if (['gl', 'operator', 'rigger'].includes(currentMasterTab)) {
-                addFormHtml = `<form onsubmit="addAccountMasterData(event, '${currentMasterTab}')" class="flex flex-col sm:flex-row gap-1.5 mb-2 bg-slate-50 p-2 rounded-sm border border-slate-100"><input type="text" id="new_master_name" placeholder="Nama..." class="flex-1 border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required><input type="text" id="new_master_nrp" placeholder="NRP..." class="flex-1 border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required><div class="relative flex-1"><input type="password" id="new_master_pwd" placeholder="Pwd..." class="w-full border border-slate-300 rounded-sm px-2 py-1 pr-6 text-[10px] focus:outline-none focus:border-cyan-500" required><i id="toggleMasterPwd" class="fa-regular fa-eye absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer pwd-toggle text-[9px]" onclick="togglePassword('new_master_pwd', 'toggleMasterPwd')"></i></div><button type="submit" class="bg-cyan-600 hover:bg-cyan-700 text-white font-semibold px-2.5 py-1 rounded-sm text-[10px] whitespace-nowrap"><i class="fa-solid fa-plus"></i></button></form>`;
-            } else {
-                addFormHtml = `<form onsubmit="addMasterData(event, '${currentMasterTab}')" class="flex gap-1.5 mb-2 bg-slate-50 p-2 rounded-sm border border-slate-100"><input type="text" id="new_master_val" placeholder="Data baru..." class="flex-1 border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required><button type="submit" class="bg-cyan-600 hover:bg-cyan-700 text-white font-semibold px-2.5 py-1 rounded-sm text-[10px] whitespace-nowrap"><i class="fa-solid fa-plus"></i> Tambah</button></form>`;
-            }
-            contentHtml = `${addFormHtml}<div class="overflow-x-auto border border-slate-200 rounded-sm"><table class="w-full text-left"><thead class="bg-slate-50 text-slate-500 text-[9px] border-b"><tr><th class="p-2 uppercase">Nama Data</th><th class="p-2 uppercase text-right">Aksi</th></tr></thead><tbody class="divide-y divide-slate-100 text-[10px]">${m[currentMasterTab].map((val, idx) => `<tr class="hover:bg-slate-50"><td class="p-2 font-semibold text-slate-700">${val}</td><td class="p-2 text-right"><button onclick="confirmDeleteMasterData('${currentMasterTab}', ${idx})" class="text-red-400 hover:text-red-600 bg-red-50 hover:bg-red-100 p-1 rounded-sm"><i class="fa-solid fa-trash-can text-[9px]"></i></button></td></tr>`).join('')}</tbody></table></div>`;
-        }
-
-        return `
-        <div class="bg-white rounded-md shadow-sm border border-slate-200 p-1 mb-2 flex flex-wrap gap-1">${tabs.map(t => `<button onclick="currentMasterTab='${t.id}'; renderApp(false);" class="px-2 py-1 text-[9px] font-semibold rounded-sm transition-colors ${currentMasterTab === t.id ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}">${t.label}</button>`).join('')}</div>
-        <div class="bg-white rounded-md shadow-sm border border-slate-200 p-3 min-h-[50vh]"><h3 class="text-xs font-bold text-slate-800 capitalize mb-2">Data: ${currentMasterTab.replace('_', ' ')}</h3>${contentHtml}</div>`;
-    }
-
-    async function saveBranding(e) {
-        e.preventDefault();
-        if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return showToast('Error: API Supabase belum dipasang!', 'error');
-
-        const btn = e.target.querySelector('button[type="submit"]');
-        const originalText = btn.innerHTML; btn.innerHTML = "Menyimpan ke Cloud..."; btn.disabled = true;
+    function getManpowerWorkflow() {
+        const settings = getSettings() || {};
         
-        let newSettings = {
-            id: 1, bg_url: document.getElementById('setting_bg').value.trim(), logo_url: document.getElementById('setting_logo').value.trim(),
-            icon_ct_url: document.getElementById('setting_icon_ct').value.trim(), icon_bc_url: document.getElementById('setting_icon_bc').value.trim(), icon_lb_url: document.getElementById('setting_icon_lb').value.trim()
+        const getUnitCard = (type, modeVar, iconUrl, iconClass, label) => {
+            const bgStyle = iconUrl ? `style="background-image: url('${iconUrl}'); background-size: cover; background-position: center;"` : '';
+            const content = iconUrl 
+                ? `<div class="absolute inset-0 bg-slate-900/40 group-hover:bg-slate-900/20 transition-colors"></div><span class="font-bold text-white text-sm sm:text-base uppercase relative z-10 tracking-widest drop-shadow-lg text-center leading-tight px-2">${label}</span>`
+                : `<div class="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-slate-50 group-hover:bg-cyan-50 flex items-center justify-center transition-colors"><i class="fa-solid ${iconClass} text-2xl sm:text-3xl text-slate-400 group-hover:text-cyan-600"></i></div><span class="font-bold text-slate-700 text-[11px] sm:text-xs uppercase tracking-wide text-center leading-tight mt-2 px-2">${label}</span>`;
+            return `<button onclick="${modeVar}='${type}'; renderApp(false);" class="relative bg-white border border-slate-200 hover:border-cyan-500 hover:shadow-md rounded-xl flex flex-col items-center justify-center shadow-sm transition-all group aspect-square sm:aspect-[4/3] w-full sm:w-44 overflow-hidden" ${bgStyle}>${content}</button>`;
         };
-        
-        try {
-            const res = await fetch(`${SUPABASE_URL}/rest/v1/settings?on_conflict=id`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'resolution=merge-duplicates' },
-                body: JSON.stringify(newSettings)
-            });
-            if (!res.ok) throw new Error("Gagal simpan database");
 
-            localStorage.setItem('lifting_settings', JSON.stringify(newSettings)); showToast('Branding berhasil disimpan ke Cloud!'); renderApp(true);
-        } catch(err) { showToast('Gagal simpan branding ke cloud!', 'error'); } finally { btn.innerHTML = originalText; btn.disabled = false; }
+        const btnCT = getUnitCard('Crane Truck', 'mpFleetMode', settings.icon_ct_url, 'fa-truck-moving', 'Crane Truck');
+        const btnBC = getUnitCard('Big Crane', 'mpFleetMode', settings.icon_bc_url, 'fa-truck-ramp-box', 'Big Crane');
+        const btnLB = getUnitCard('Lowboy', 'mpFleetMode', settings.icon_lb_url, 'fa-trailer', 'Lowboy');
+
+        if (!mpFleetMode) return `<div class="min-h-[70vh] flex flex-col items-center justify-center max-w-[900px] mx-auto w-full px-4 py-8"><h2 class="text-sm sm:text-base font-bold text-slate-800 mb-6 text-center"><i class="fa-solid fa-list-check mr-1.5 text-cyan-600"></i>Pilih Unit Armada</h2><div class="grid grid-cols-2 sm:flex sm:flex-row sm:justify-center gap-4 sm:gap-6 w-full max-w-2xl mx-auto">${btnCT}${btnBC}${btnLB}</div></div>`;
+
+        const m = getMasterData(); let unitOptions = [];
+        if (mpFleetMode === 'Crane Truck') unitOptions = m.unit_ct; else if (mpFleetMode === 'Big Crane') unitOptions = m.unit_big_crane; else if (mpFleetMode === 'Lowboy') unitOptions = m.unit_lowboy;
+        let filterUnit = document.getElementById('mp_filter_unit') ? document.getElementById('mp_filter_unit').value : 'ALL';
+        
+        let jobs = getOrders().filter(j => j.kategori === mpFleetMode);
+        if (currentMpPanel === 'PENDING') jobs = jobs.filter(j => j.status === 'PENDING' && j.operator); else jobs = jobs.filter(j => j.status === currentMpPanel);
+        if (filterUnit !== 'ALL') jobs = jobs.filter(j => j.unit === filterUnit);
+
+        let html = `
+        <div class="flex items-center gap-2 mb-2 mt-2"><button onclick="mpFleetMode=null; renderApp(false);" class="w-6 h-6 rounded-sm border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 bg-white shadow-sm"><i class="fa-solid fa-arrow-left text-[10px]"></i></button><h2 class="text-xs font-bold text-slate-800">Tugas: <span class="text-cyan-600">${mpFleetMode}</span></h2></div>
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <div class="flex gap-1 overflow-x-auto hide-scrollbar bg-white p-0.5 rounded-full shadow-sm border border-slate-200">${['ON PROGRESS', 'PENDING', 'COMPLETED', 'CANCELED'].map(panel => `<button onclick="currentMpPanel='${panel}'; renderApp(true)" class="px-2.5 py-1 rounded-full text-[9px] font-bold whitespace-nowrap transition-colors ${currentMpPanel === panel ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}">${panel}</button>`).join('')}</div>
+            <select id="mp_filter_unit" onchange="renderApp(true)" class="text-[9px] font-bold bg-white border border-slate-300 text-slate-700 rounded-full px-2 py-1 outline-none shadow-sm focus:border-cyan-500"><option value="ALL">Semua Unit</option>${unitOptions.map(u => `<option value="${u}" ${filterUnit === u ? 'selected' : ''}>${u}</option>`).join('')}</select>
+        </div>
+        <div class="space-y-2 pb-4">`;
+
+        if (jobs.length === 0) html += `<div class="bg-white rounded-md p-4 text-center border shadow-sm"><p class="text-slate-400 text-[11px]">Kosong.</p></div>`;
+
+        jobs.forEach(job => {
+            html += `
+            <div class="bg-white rounded-md p-2.5 border border-slate-200 shadow-sm relative text-[11px]">
+                <div class="flex justify-between items-start mb-1.5"><div class="text-[9px] font-mono font-bold text-cyan-600 cursor-pointer hover:underline" onclick="viewJobDetail('${job.no_wo}')" title="Buka Detail">${job.no_wo}</div><div class="text-[9px] bg-cyan-50 text-cyan-700 border border-cyan-100 px-1.5 py-0.5 rounded-sm font-semibold">Unit: ${job.unit || '-'}</div></div>
+                <div class="font-bold text-slate-800 text-xs mb-0.5">Req: ${job.tgl_pelaksanaan} ${job.jam_pelaksanaan || ''}</div>
+                ${job.kategori !== 'Big Crane' ? `<div class="text-[10px] text-slate-500 mb-2 truncate">Lokasi: ${job.lokasi_angkat||'-'} ➔ ${job.lokasi_tujuan||'-'}</div>` : `<div class="text-[10px] text-slate-500 mb-2 truncate border-l-2 border-slate-300 pl-1">${job.deskripsi}</div>`}
+                <div class="flex gap-1.5">
+                    ${job.status === 'ON PROGRESS' ? `<button onclick="openManpowerAction('${job.no_wo}')" class="flex-1 bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-1 rounded-sm text-[10px] transition-colors shadow-sm">Eksekusi</button>` : ''}
+                    ${job.status === 'PENDING' ? `<button onclick="promptLanjutPending('${job.no_wo}')" class="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-bold py-1 rounded-sm text-[10px] transition-colors shadow-sm"><i class="fa-solid fa-forward mr-1"></i> Lanjut Job</button>` : ''}
+                </div>
+            </div>`;
+        });
+
+        html += `</div>`;
+        return html;
     }
 
-    function addMasterData(e, key) { e.preventDefault(); const val = document.getElementById('new_master_val').value.trim(); const m = getMasterData(); if(m[key].includes(val)) return showToast('Data sudah ada!', 'error'); m[key].push(val); saveMasterData(m); showToast('Ditambahkan!'); renderApp(true); }
-    function addAccountMasterData(e, key) { e.preventDefault(); const name = document.getElementById('new_master_name').value.trim(); const nrp = document.getElementById('new_master_nrp').value.trim(); const pwd = document.getElementById('new_master_pwd').value; const users = getUsers(); if (users.find(u => u.nrp === nrp)) return showToast('NRP terdaftar!', 'error'); const m = getMasterData(); if(m[key].includes(name)) return showToast('Nama sudah ada!', 'error'); m[key].push(name); saveMasterData(m); let role = key === 'gl' ? 'GL' : 'MANPOWER'; let jabatan = key === 'gl' ? 'Group Leader' : (key === 'operator' ? 'Operator' : 'Rigger'); users.push({ nrp: nrp, nama_lengkap: name, jabatan: jabatan, perusahaan: 'PPA', departemen: 'Operation', section: 'Lifting', no_wa: '-', password_hash: pwd, role: role, status_akun: 'ACTIVE' }); saveUsers(users); showToast(`Akun dibuat!`); renderApp(true); }
-    function confirmDeleteMasterData(key, index) { openCustomConfirm('Hapus Master Data', 'Yakin ingin menghapus item ini dari data master?', () => { const m = getMasterData(); m[key].splice(index, 1); saveMasterData(m); showToast('Dihapus!'); renderApp(true); }); }
-    function openResetPwd(nrp) { document.getElementById('resetNrpLabel').innerText = nrp; document.getElementById('resetNrpVal').value = nrp; document.getElementById('resetPwdInput').value = ''; document.getElementById('resetPwdModal').classList.remove('hidden'); }
-    function processResetPassword(e) { e.preventDefault(); const nrp = document.getElementById('resetNrpVal').value; const newPwd = document.getElementById('resetPwdInput').value; const users = getUsers(); const idx = users.findIndex(u => u.nrp === nrp); if(idx !== -1) { users[idx].password_hash = newPwd; saveUsers(users); showToast(`Password direset!`); document.getElementById('resetPwdModal').classList.add('hidden'); renderApp(true); } }
+    function processMpAction(e, wo, targetStatus) {
+        e.preventDefault(); const job = getOrders().find(j => j.no_wo === wo); if(!job) return;
+        const elStart = document.getElementById('mp_start'); const elEnd = document.getElementById('mp_end'); const elOp = document.getElementById('mp_op'); const elRig = document.getElementById('mp_rig'); const elRig2 = document.getElementById('mp_rig2'); const errorBox = document.getElementById('mpFormError');
+        let isMissing = false; const markError = (el) => { if(!el) return false; if(!el.value) { el.classList.add('border-red-500', 'bg-red-50', 'text-red-600'); el.classList.remove('border-slate-300'); return true; } else { el.classList.remove('border-red-500', 'bg-red-50', 'text-red-600'); el.classList.add('border-slate-300'); return false; } };
+        if (markError(elStart)) isMissing = true; if (markError(elEnd)) isMissing = true; if (markError(elOp)) isMissing = true; if (markError(elRig)) isMissing = true; if (job.kategori === 'Big Crane' && markError(elRig2)) isMissing = true;
+        if (isMissing) { errorBox.innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-1"></i> Lengkapi seluruh form waktu dan personal!'; errorBox.classList.remove('hidden'); return; } else { errorBox.classList.add('hidden'); }
+        const start = elStart.value; const end = elEnd.value; const op = elOp.value; const rig = elRig.value; const rig2 = elRig2 ? elRig2.value : ''; const inspeksi = document.getElementById('mp_inspeksi').value;
+        let dStart = new Date(`2000-01-01T${start}:00`); let dEnd = new Date(`2000-01-01T${end}:00`); if(dEnd < dStart) dEnd = new Date(`2000-01-02T${end}:00`); let actualMins = (dEnd - dStart) / (1000 * 60);
+        let reqMins = 0; if(job.durasi_request.includes('JAM')) reqMins = parseFloat(job.durasi_request) * 60; else if(job.durasi_request.includes('HARI')) reqMins = parseFloat(job.durasi_request) * 24 * 60;
+        let diffStartMins = 0; if(job.jam_pelaksanaan) { let reqStart = new Date(`2000-01-01T${job.jam_pelaksanaan}:00`); diffStartMins = (dStart - reqStart) / (1000 * 60); }
+        let isLate = diffStartMins > 15; let isOvertime = actualMins > (reqMins + 15);
+        tempMpData = { wo, start, end, op, rig, rig2, inspeksi, actualMins, isLate, isOvertime, diffStartMins, diffOvertime: actualMins - reqMins, status: targetStatus };
+        if(isLate || isOvertime) showKendalaModal(); else saveMpFinal(null, null); 
+    }
+
+    function saveMpFinal(alasanTelat, alasanOvertime) {
+        let jobs = getOrders(); let idx = jobs.findIndex(j => j.no_wo === tempMpData.wo);
+        jobs[idx].operator = tempMpData.op; jobs[idx].rigger = tempMpData.rig; if (tempMpData.rig2) jobs[idx].rigger2 = tempMpData.rig2;
+        jobs[idx].jam_start_aktual = tempMpData.start; jobs[idx].jam_end_aktual = tempMpData.end; jobs[idx].final_inspeksi = tempMpData.inspeksi; jobs[idx].durasi_aktual = (tempMpData.actualMins / 60).toFixed(2); jobs[idx].status = tempMpData.status;
+        if(alasanTelat) jobs[idx].alasan_telat = alasanTelat; if(alasanOvertime) jobs[idx].alasan_overtime = alasanOvertime;
+        
+        saveOrders(jobs); 
+        document.getElementById('mpActionModal').classList.add('hidden'); 
+        renderApp(true);
+        
+        if (tempMpData.status === 'COMPLETED') {
+            showSuccessAnim('thumb', 'Kerja Bagus!', 'Pekerjaan telah diselesaikan dan laporan siap.');
+        } else {
+            showToast('Tersimpan!');
+        }
+    }
 
     function getProfileView() {
         const user = JSON.parse(localStorage.getItem('lifting_user'));
+        const m = getMasterData();
         return `
         <div class="max-w-[400px] mx-auto bg-white rounded-md shadow-sm border border-slate-200 overflow-hidden mt-2">
             <div class="p-3 border-b border-slate-100 flex items-center justify-between bg-slate-50"><h2 class="text-sm font-bold text-slate-800">Profil Saya</h2><div class="bg-cyan-50 text-cyan-700 text-[9px] font-bold px-2 py-0.5 rounded-sm border border-cyan-100">${user.role}</div></div>
             <div class="p-4">
+                <datalist id="profListPerusahaan">${m.perusahaan.map(p=>`<option value="${p}">`).join('')}</datalist>
+                <datalist id="profListDepartemen">${m.departemen.map(d=>`<option value="${d}">`).join('')}</datalist>
+                <datalist id="profListSection">${m.section.map(s=>`<option value="${s}">`).join('')}</datalist>
+
                 <form onsubmit="saveProfile(event)" class="space-y-2 mb-4">
-                    <div class="grid grid-cols-2 gap-2"><div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">NRP</label><input type="text" value="${user.nrp}" class="w-full border bg-slate-50 rounded-sm px-2 py-1 text-[10px] text-slate-500 cursor-not-allowed" readonly></div><div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Nama Lengkap</label><input type="text" id="profName" value="${user.nama_lengkap}" class="w-full border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required></div></div>
-                    <datalist id="profListPerusahaan">${getMasterData().perusahaan.map(p=>`<option value="${p}">`).join('')}</datalist><datalist id="profListDepartemen">${getMasterData().departemen.map(d=>`<option value="${d}">`).join('')}</datalist><datalist id="profListSection">${getMasterData().section.map(s=>`<option value="${s}">`).join('')}</datalist>
-                    <div class="grid grid-cols-2 gap-2"><div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Jabatan</label><input type="text" id="profJabatan" value="${user.jabatan}" class="w-full border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required></div><div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">No WhatsApp</label><input type="number" id="profWa" value="${user.no_wa}" class="w-full border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required></div></div>
-                    <div class="grid grid-cols-3 gap-2"><div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Perusahaan</label><input list="profListPerusahaan" id="profPerusahaan" value="${user.perusahaan}" class="w-full border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required></div><div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Departemen</label><input list="profListDepartemen" id="profDepartemen" value="${user.departemen}" class="w-full border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required></div><div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Section</label><input list="profListSection" id="profSection" value="${user.section}" class="w-full border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required></div></div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">NRP</label><input type="text" value="${user.nrp}" class="w-full border bg-slate-50 rounded-sm px-2 py-1 text-[10px] text-slate-500 cursor-not-allowed" readonly></div>
+                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Nama Lengkap</label><input type="text" id="profName" value="${user.nama_lengkap}" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required></div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Jabatan</label><input type="text" id="profJabatan" value="${user.jabatan}" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required></div>
+                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">No WhatsApp</label><input type="number" id="profWa" value="${user.no_wa}" class="w-full border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required></div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Perusahaan</label><input list="profListPerusahaan" id="profPerusahaan" value="${user.perusahaan}" oninput="this.value = this.value.toUpperCase()" autocomplete="off" class="w-full border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required></div>
+                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Departemen</label><input list="profListDepartemen" id="profDepartemen" value="${user.departemen}" oninput="this.value = this.value.toUpperCase()" autocomplete="off" class="w-full border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required></div>
+                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Section</label><input list="profListSection" id="profSection" value="${user.section}" oninput="this.value = this.value.toUpperCase()" autocomplete="off" class="w-full border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required></div>
+                    </div>
                     <button type="submit" class="bg-slate-800 hover:bg-slate-900 text-white font-bold px-4 py-1.5 rounded-sm text-[10px] mt-2">Simpan Profil</button>
                 </form>
                 <hr class="border-slate-100 my-4"><h3 class="text-xs font-bold text-slate-800 mb-2">Ganti Password</h3>
@@ -1666,8 +1677,25 @@
         </div>`;
     }
 
-    function saveProfile(e) { e.preventDefault(); let user = JSON.parse(localStorage.getItem('lifting_user')); let users = getUsers(); let idx = users.findIndex(u => u.nrp === user.nrp); user.nama_lengkap = document.getElementById('profName').value; user.jabatan = document.getElementById('profJabatan').value; user.perusahaan = document.getElementById('profPerusahaan').value; user.departemen = document.getElementById('profDepartemen').value; user.section = document.getElementById('profSection').value; user.no_wa = document.getElementById('profWa').value; users[idx] = user; saveUsers(users); localStorage.setItem('lifting_user', JSON.stringify(user)); showToast('Profil diupdate!'); renderApp(true); }
-    function savePassword(e) { e.preventDefault(); let pwd1 = document.getElementById('profPwd1').value; let pwd2 = document.getElementById('profPwd2').value; if (pwd1 !== pwd2) return showToast('Password tidak cocok!', 'error'); let user = JSON.parse(localStorage.getItem('lifting_user')); let users = getUsers(); let idx = users.findIndex(u => u.nrp === user.nrp); users[idx].password_hash = pwd1; saveUsers(users); document.getElementById('profPwd1').value = ''; document.getElementById('profPwd2').value = ''; showToast('Password diubah!'); }
+    function saveProfile(e) { 
+        e.preventDefault(); 
+        let user = JSON.parse(localStorage.getItem('lifting_user')); 
+        let users = getUsers(); 
+        let idx = users.findIndex(u => u.nrp === user.nrp); 
+        
+        user.nama_lengkap = document.getElementById('profName').value.trim().toUpperCase(); 
+        user.jabatan = document.getElementById('profJabatan').value.trim().toUpperCase(); 
+        user.perusahaan = document.getElementById('profPerusahaan').value.trim().toUpperCase(); 
+        user.departemen = document.getElementById('profDepartemen').value.trim().toUpperCase(); 
+        user.section = document.getElementById('profSection').value.trim().toUpperCase(); 
+        user.no_wa = document.getElementById('profWa').value; 
+        
+        users[idx] = user; 
+        saveUsers(users); 
+        localStorage.setItem('lifting_user', JSON.stringify(user)); 
+        showToast('Profil diupdate!'); 
+        renderApp(true); 
+    }
 
     // Memuat saat pertama kali dibuka
     window.addEventListener('load', () => {
