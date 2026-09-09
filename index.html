@@ -15,6 +15,29 @@
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         .pwd-toggle:hover { color: #0891b2; }
         .chart-bar { transition: width 0.8s ease-out; }
+        
+        /* Animasi Transisi Halaman Utama (Flip In) */
+        @keyframes flipPage {
+            0% { opacity: 0; transform: perspective(1000px) rotateX(-10deg) scale(0.98); }
+            100% { opacity: 1; transform: perspective(1000px) rotateX(0deg) scale(1); }
+        }
+        .page-flip-anim {
+            animation: flipPage 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+            transform-origin: top;
+        }
+
+        /* Animasi Ikon Menu Aktif (Flip Bar Navigasi) */
+        @keyframes navIconFlip {
+            0% { transform: perspective(400px) rotateY(90deg); opacity: 0.5; }
+            100% { transform: perspective(400px) rotateY(0deg); opacity: 1; }
+        }
+        .nav-active {
+            background-color: #ecfeff; /* bg-cyan-50 (Latar belakang aktif) */
+            color: #0891b2 !important; /* text-cyan-600 */
+        }
+        .nav-active i {
+            animation: navIconFlip 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
     </style>
 </head>
 <body class="antialiased text-[11px] sm:text-xs">
@@ -72,9 +95,8 @@
     setInterval(async () => {
         if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
         const user = localStorage.getItem('lifting_user');
-        if (!user) return; // Stop jika tidak login
+        if (!user) return;
 
-        // Keamanan UI: Cegah render layar saat user sedang mengetik atau modal pop-up terbuka
         const isTyping = document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
         const isModalOpen = ['editJobModal', 'detailJobModal', 'mpActionModal', 'kendalaModal', 'cancelPromptModal', 'pendingPromptModal', 'globalConfirmModal', 'resetPwdModal'].some(id => {
             const el = document.getElementById(id);
@@ -84,8 +106,7 @@
         try {
             let shouldRender = false;
 
-            // Tarik Data Order Baru dengan sortir waktu
-            const resOrders = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=timestamp.desc`, {
+            const resOrders = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*`, {
                 headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
             });
             if (resOrders.ok) {
@@ -98,7 +119,6 @@
                 }
             }
 
-            // Tarik Data Settings (Branding Global)
             const resSettings = await fetch(`${SUPABASE_URL}/rest/v1/settings?id=eq.1`, {
                 headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
             });
@@ -114,19 +134,19 @@
                 }
             }
 
-            // Eksekusi update UI jika aman
+            // Mencegah layar berkedip animasi saat auto-sync, kita render secara "Silent" (isSilentSync = true)
             if (shouldRender && !isTyping && !isModalOpen && currentTab !== 'order') {
-                renderApp();
+                renderApp(true);
             }
         } catch(e) {}
     }, 3000);
 
-    // Fungsi fetch manual (untuk load pertama / saat HP dibuka kembali)
+    // Fungsi fetch manual
     async function fetchFromSupabase(isManual = false) {
         if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
         try {
             const [resOrders, resSettings] = await Promise.all([
-                fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=timestamp.desc`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }),
+                fetch(`${SUPABASE_URL}/rest/v1/orders?select=*`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }),
                 fetch(`${SUPABASE_URL}/rest/v1/settings?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } })
             ]);
 
@@ -138,7 +158,7 @@
                 const sData = await resSettings.json();
                 if(sData && sData.length > 0) localStorage.setItem('lifting_settings', JSON.stringify(sData[0]));
             }
-            if(isManual) { showToast("Data berhasil ditarik!", "success"); renderApp(); }
+            if(isManual) { showToast("Data berhasil ditarik!", "success"); renderApp(false); }
         } catch(e) { console.warn("Gagal mengambil data:", e); }
     }
 
@@ -167,7 +187,7 @@
     function handleSort(col) {
         if (sortColumn === col) { sortDirection = sortDirection === 'asc' ? 'desc' : 'asc'; } 
         else { sortColumn = col; sortDirection = 'asc'; }
-        renderApp();
+        renderApp(true); // Silent sync so it doesn't animate table
     }
 
     function getSortIcon(col) {
@@ -224,17 +244,20 @@
         return `${datePrefix}${maxNumber + 1}`;
     }
 
-    function renderApp() {
+    // Main App Renderer dengan animasi flag
+    function renderApp(isSilentSync = false) {
         const app = document.getElementById('app');
         const user = JSON.parse(localStorage.getItem('lifting_user'));
         const settings = getSettings();
 
         if (!user) { app.innerHTML = getAuthView(); return; }
         const isMobile = window.innerWidth < 768;
+        
+        // Memilih kelas animasi (Jika switch menu, beri animasi. Jika auto-sync latar, sembunyikan animasi)
+        const animClass = isSilentSync ? '' : 'page-flip-anim';
 
-        const logoHtmlMobile = settings.logo_url ? 
-            `<img src="${settings.logo_url}" alt="Logo" class="w-10 h-10 object-contain">` : 
-            `<div class="bg-cyan-600 text-white p-2 rounded-md flex items-center justify-center"><i class="fa-solid fa-truck-moving text-lg"></i></div>`;
+        // Logo HP dibuat besar (w-8 h-8 / text-base)
+        const logoHtmlMobile = settings.logo_url ? `<img src="${settings.logo_url}" alt="Logo" class="w-8 h-8 sm:w-10 sm:h-10 object-contain">` : `<div class="bg-cyan-600 text-white p-2 rounded-sm flex items-center justify-center shadow-sm"><i class="fa-solid fa-truck-moving text-base"></i></div>`;
 
         app.innerHTML = `
             <div class="flex h-screen bg-slate-50 overflow-hidden">
@@ -242,17 +265,14 @@
                 <div class="flex-1 flex flex-col h-screen overflow-hidden relative">
                     ${isMobile ? `
                     <div class="bg-white shadow-sm px-4 py-3 flex items-center justify-between shrink-0 z-10 border-b border-slate-200">
-                        <div class="flex items-center gap-2.5 text-cyan-700 font-bold text-lg uppercase tracking-tight">
+                        <div class="flex items-center gap-2 text-cyan-700 font-bold text-base sm:text-lg uppercase tracking-tight">
                             ${logoHtmlMobile}
                             ${user.role === 'MANPOWER' ? 'PANEL LAPANGAN' : 'Support Equipment'}
                         </div>
-                        ${user.role === 'MANPOWER' ? `
-                        <div class="flex items-center gap-2">
-                            <span class="text-[10px] font-semibold text-slate-600 bg-slate-100 border border-slate-200 px-2 py-1 rounded-sm">${user.nama_lengkap}</span>
-                        </div>` : ''}
+                        ${user.role === 'MANPOWER' ? `<div class="flex items-center gap-2"><span class="text-[10px] sm:text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200 px-2 py-1 rounded-md">${user.nama_lengkap}</span></div>` : ''}
                     </div>` : ''}
                     
-                    <div class="flex-1 overflow-y-auto p-2 sm:p-3 pb-24 sm:pb-3 relative w-full hide-scrollbar">
+                    <div class="flex-1 overflow-y-auto p-2 sm:p-3 pb-24 sm:pb-3 relative w-full hide-scrollbar ${animClass}">
                         ${currentTab === 'dashboard' && (user.role === 'ADMIN' || user.role === 'GL') ? getDashboardView() : ''}
                         ${currentTab === 'monitoring' ? (user.role === 'MANPOWER' ? getManpowerWorkflow() : getMonitoringView()) : ''}
                         ${currentTab === 'order' ? getOrderFormView() : ''}
@@ -282,7 +302,7 @@
         if(tab === 'order') userOrderFleetMode = null; 
         if(tab === 'monitoring') mpFleetMode = null;
         currentTab = tab;
-        renderApp();
+        renderApp(false); // Terjunkan animasi saat pindah menu
     }
 
     function getDesktopSidebar(user, settings) {
@@ -295,15 +315,22 @@
                 ${logoHtmlDesktop} <h1 class="font-bold text-slate-800 tracking-tight text-[11px] leading-tight uppercase">Support Equipment</h1>
             </div>
             
-            <div class="flex-1 overflow-y-auto py-3 px-2 flex flex-col gap-0.5 hide-scrollbar">
+            <div class="flex-1 overflow-y-auto py-3 px-2 flex flex-col gap-1 hide-scrollbar">
                 <div class="text-[9px] font-bold text-slate-400 tracking-wider mb-1 ml-1 uppercase">${isMP ? 'Panel Lapangan' : 'Menu Utama'}</div>
-                ${(isAdmin || isGL) ? `<button onclick="switchTab('dashboard')" class="w-full text-left px-2 py-1.5 rounded-sm text-[11px] font-medium transition-all flex items-center gap-2 ${currentTab === 'dashboard' ? 'bg-cyan-50 text-cyan-700 border-l-2 border-cyan-600 font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-2 border-transparent'}"><i class="fa-solid fa-chart-pie w-3 text-center text-[10px]"></i> Dashboard</button>` : ''}
-                <button onclick="switchTab('monitoring')" class="w-full text-left px-2 py-1.5 rounded-sm text-[11px] font-medium transition-all flex items-center gap-2 mt-0.5 ${currentTab === 'monitoring' ? 'bg-cyan-50 text-cyan-700 border-l-2 border-cyan-600 font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-2 border-transparent'}"><i class="fa-solid ${isMP ? 'fa-hard-hat' : 'fa-list-check'} w-3 text-center text-[10px]"></i> ${isMP ? 'Tugas Aktif' : 'Data Order'}</button>
-                ${(isUSER || isAdmin || isGL) ? `<button onclick="switchTab('order')" class="w-full text-left px-2 py-1.5 rounded-sm text-[11px] font-medium transition-all flex items-center gap-2 mt-0.5 ${currentTab === 'order' ? 'bg-cyan-50 text-cyan-700 border-l-2 border-cyan-600 font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-2 border-transparent'}"><i class="fa-solid fa-plus w-3 text-center text-[10px]"></i> Buat Order</button>` : ''}
+                
+                ${(isAdmin || isGL) ? `<button onclick="switchTab('dashboard')" class="w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold transition-all duration-300 flex items-center gap-2 ${currentTab === 'dashboard' ? 'nav-active shadow-sm' : 'text-slate-600 hover:bg-slate-50'}"><i class="fa-solid fa-chart-pie w-5 text-center text-sm"></i> Dashboard</button>` : ''}
+                
+                <button onclick="switchTab('monitoring')" class="w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold transition-all duration-300 flex items-center gap-2 ${currentTab === 'monitoring' ? 'nav-active shadow-sm' : 'text-slate-600 hover:bg-slate-50'}"><i class="fa-solid ${isMP ? 'fa-hard-hat' : 'fa-list-check'} w-5 text-center text-sm"></i> ${isMP ? 'Tugas Aktif' : 'Data Order'}</button>
+                
+                ${(isUSER || isAdmin || isGL) ? `<button onclick="switchTab('order')" class="w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold transition-all duration-300 flex items-center gap-2 ${currentTab === 'order' ? 'nav-active shadow-sm' : 'text-slate-600 hover:bg-slate-50'}"><i class="fa-solid fa-plus w-5 text-center text-sm"></i> Buat Order</button>` : ''}
+                
                 <div class="text-[9px] font-bold text-slate-400 tracking-wider mt-4 mb-1 ml-1 uppercase">Akun</div>
-                ${isAdmin ? `<button onclick="switchTab('master')" class="w-full text-left px-2 py-1.5 rounded-sm text-[11px] font-medium transition-all flex items-center gap-2 ${currentTab === 'master' ? 'bg-cyan-50 text-cyan-700 border-l-2 border-cyan-600 font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-2 border-transparent'}"><i class="fa-solid fa-database w-3 text-center text-[10px]"></i> Master Data</button>` : ''}
-                <button onclick="switchTab('profile')" class="w-full text-left px-2 py-1.5 rounded-sm text-[11px] font-medium transition-all flex items-center gap-2 mt-0.5 ${currentTab === 'profile' ? 'bg-cyan-50 text-cyan-700 border-l-2 border-cyan-600 font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-2 border-transparent'}"><i class="fa-solid fa-user w-3 text-center text-[10px]"></i> Profil Saya</button>
+                
+                ${isAdmin ? `<button onclick="switchTab('master')" class="w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold transition-all duration-300 flex items-center gap-2 ${currentTab === 'master' ? 'nav-active shadow-sm' : 'text-slate-600 hover:bg-slate-50'}"><i class="fa-solid fa-database w-5 text-center text-sm"></i> Master Data</button>` : ''}
+                
+                <button onclick="switchTab('profile')" class="w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold transition-all duration-300 flex items-center gap-2 ${currentTab === 'profile' ? 'nav-active shadow-sm' : 'text-slate-600 hover:bg-slate-50'}"><i class="fa-solid fa-user w-5 text-center text-sm"></i> Profil Saya</button>
             </div>
+            
             <div class="p-3 border-t border-slate-200 mt-auto shrink-0 flex items-center justify-between bg-slate-50">
                 <div class="overflow-hidden pr-1"><div class="text-xs font-bold text-slate-800 leading-tight truncate">${user.nama_lengkap}</div><div class="text-[9px] font-bold text-slate-400 tracking-wider mt-0.5">${user.role}</div></div>
             </div>
@@ -311,36 +338,37 @@
     }
 
     function getMobileNav(user) {
+        // Teks dan ikon HP dibuat 2x lipat (text-xl/2xl, padding diperlebar, bulatan disesuaikan)
         return `
-        <div class="fixed bottom-0 w-full bg-white border-t border-slate-200 px-2 py-2 flex justify-around items-center z-40 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+        <div class="fixed bottom-0 w-full bg-white border-t border-slate-200 px-1 sm:px-2 py-1.5 flex justify-around items-center z-40 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
             ${(user.role === 'ADMIN' || user.role === 'GL') ? `
-            <button onclick="switchTab('dashboard')" class="flex flex-col items-center p-1.5 ${currentTab === 'dashboard' ? 'text-cyan-600' : 'text-slate-400'}">
-                <i class="fa-solid fa-chart-pie text-2xl mb-1"></i>
-                <span class="text-[10px] font-medium">Dashboard</span>
+            <button onclick="switchTab('dashboard')" class="flex flex-col items-center justify-center p-2 w-16 h-14 rounded-2xl transition-colors duration-300 ${currentTab === 'dashboard' ? 'nav-active' : 'text-slate-400'}">
+                <i class="fa-solid fa-chart-pie text-xl sm:text-2xl mb-1"></i>
+                <span class="text-[9px] sm:text-[10px] font-medium leading-none">Dashboard</span>
             </button>` : ''}
             
-            <button onclick="switchTab('monitoring')" class="flex flex-col items-center p-1.5 ${currentTab === 'monitoring' ? 'text-cyan-600' : 'text-slate-400'}">
-                <i class="fa-solid ${user.role === 'MANPOWER' ? 'fa-hard-hat' : 'fa-list-check'} text-2xl mb-1"></i>
-                <span class="text-[10px] font-medium">${user.role === 'MANPOWER' ? 'Tugas Aktif' : 'Data'}</span>
+            <button onclick="switchTab('monitoring')" class="flex flex-col items-center justify-center p-2 w-16 h-14 rounded-2xl transition-colors duration-300 ${currentTab === 'monitoring' ? 'nav-active' : 'text-slate-400'}">
+                <i class="fa-solid ${user.role === 'MANPOWER' ? 'fa-hard-hat' : 'fa-list-check'} text-xl sm:text-2xl mb-1"></i>
+                <span class="text-[9px] sm:text-[10px] font-medium leading-none">${user.role === 'MANPOWER' ? 'Tugas Aktif' : 'Data'}</span>
             </button>
             
             ${(user.role === 'USER' || user.role === 'ADMIN' || user.role === 'GL') ? `
-            <button onclick="switchTab('order')" class="relative flex flex-col items-center -mt-6">
-                <div class="w-14 h-14 rounded-full flex items-center justify-center border-4 border-white shadow-md ${currentTab === 'order' ? 'bg-cyan-600 text-white' : 'bg-cyan-500 text-white'}">
-                    <i class="fa-solid fa-plus text-2xl"></i>
+            <button onclick="switchTab('order')" class="relative flex flex-col items-center justify-center -mt-8">
+                <div class="w-14 h-14 rounded-full flex items-center justify-center border-[4px] border-white shadow-md transition-transform duration-300 ${currentTab === 'order' ? 'bg-cyan-600 text-white scale-110' : 'bg-cyan-500 text-white hover:scale-105'}">
+                    <i class="fa-solid fa-plus text-3xl ${currentTab === 'order' ? 'animate-[spin_0.3s_ease-out]' : ''}"></i>
                 </div>
-                <span class="text-[10px] font-medium text-slate-500 mt-1">Order</span>
+                <span class="text-[10px] font-medium text-slate-500 mt-1 leading-none">Order</span>
             </button>` : ''}
             
             ${user.role === 'ADMIN' ? `
-            <button onclick="switchTab('master')" class="flex flex-col items-center p-1.5 ${currentTab === 'master' ? 'text-cyan-600' : 'text-slate-400'}">
-                <i class="fa-solid fa-database text-2xl mb-1"></i>
-                <span class="text-[10px] font-medium">Master</span>
+            <button onclick="switchTab('master')" class="flex flex-col items-center justify-center p-2 w-16 h-14 rounded-2xl transition-colors duration-300 ${currentTab === 'master' ? 'nav-active' : 'text-slate-400'}">
+                <i class="fa-solid fa-database text-xl sm:text-2xl mb-1"></i>
+                <span class="text-[9px] sm:text-[10px] font-medium leading-none">Master</span>
             </button>` : ''}
             
-            <button onclick="switchTab('profile')" class="flex flex-col items-center p-1.5 ${currentTab === 'profile' ? 'text-cyan-600' : 'text-slate-400'}">
-                <i class="fa-solid fa-user text-2xl mb-1"></i>
-                <span class="text-[10px] font-medium">Profil</span>
+            <button onclick="switchTab('profile')" class="flex flex-col items-center justify-center p-2 w-16 h-14 rounded-2xl transition-colors duration-300 ${currentTab === 'profile' ? 'nav-active' : 'text-slate-400'}">
+                <i class="fa-solid fa-user text-xl sm:text-2xl mb-1"></i>
+                <span class="text-[9px] sm:text-[10px] font-medium leading-none">Profil</span>
             </button>
         </div>`;
     }
@@ -348,18 +376,18 @@
     function getAuthView() {
         const settings = getSettings();
         const bgStyle = settings.bg_url ? `background-image: url('${settings.bg_url}'); background-size: cover; background-position: center;` : 'background-color: #1e293b;';
-        const logoHtml = settings.logo_url ? `<img src="${settings.logo_url}" alt="Logo" class="w-16 h-16 object-contain mx-auto mb-2 relative z-10">` : `<div class="w-12 h-12 bg-cyan-500 flex items-center justify-center mx-auto mb-2 relative z-10 rounded-sm"><i class="fa-solid fa-truck-moving text-2xl text-white"></i></div>`;
+        const logoHtml = settings.logo_url ? `<img src="${settings.logo_url}" alt="Logo" class="w-12 h-12 object-contain mx-auto mb-2 relative z-10">` : `<div class="w-10 h-10 bg-cyan-500 flex items-center justify-center mx-auto mb-2 relative z-10 rounded-sm"><i class="fa-solid fa-truck-moving text-xl text-white"></i></div>`;
         const overlay = settings.bg_url ? `<div class="absolute inset-0 bg-slate-900/80"></div>` : '';
 
         return `
-        <div class="min-h-screen flex items-center justify-center p-3 bg-slate-50 relative">
+        <div class="min-h-screen flex items-center justify-center p-3 bg-slate-50 relative page-flip-anim">
             <div id="authForm" class="bg-white border border-slate-300 w-full max-w-[280px] overflow-hidden rounded-none shadow-xl z-10">
                 <div class="relative p-5 text-center border-b border-slate-300" style="${bgStyle}">
                     ${overlay}
                     <div class="relative z-10">
                         ${logoHtml}
-                        <h1 class="text-lg font-bold text-white tracking-tight uppercase">Order Lifting</h1>
-                        <p class="text-cyan-400 text-[10px] mt-0.5 font-medium tracking-wide">Support Equipment</p>
+                        <h1 class="text-base font-bold text-white tracking-tight uppercase">Order Lifting</h1>
+                        <p class="text-cyan-400 text-[9px] mt-0.5 font-medium tracking-wide">Support Equipment</p>
                     </div>
                 </div>
                 <div class="p-4">
@@ -425,10 +453,7 @@
         </div>`;
     }
 
-    function toggleAuthMode() {
-        document.getElementById('authForm').classList.toggle('hidden');
-        document.getElementById('signupForm').classList.toggle('hidden');
-    }
+    function toggleAuthMode() { document.getElementById('authForm').classList.toggle('hidden'); document.getElementById('signupForm').classList.toggle('hidden'); }
 
     function handleLogin(e) {
         e.preventDefault();
@@ -439,13 +464,13 @@
         if (user) {
             localStorage.setItem('lifting_user', JSON.stringify(user));
             currentTab = (user.role === 'ADMIN' || user.role === 'GL') ? 'dashboard' : 'monitoring';
-            userOrderFleetMode = null; mpFleetMode = null; renderApp();
+            userOrderFleetMode = null; mpFleetMode = null; renderApp(false);
         } else {
             errorMsg.innerHTML = '<i class="fa-solid fa-circle-exclamation mr-1"></i>NRP atau Password salah!'; errorMsg.classList.remove('hidden');
         }
     }
 
-    function handleLogout() { localStorage.removeItem('lifting_user'); renderApp(); }
+    function handleLogout() { localStorage.removeItem('lifting_user'); renderApp(false); }
 
     function handleSignup(e) {
         e.preventDefault();
@@ -518,9 +543,9 @@
                 <h2 class="text-sm font-bold text-slate-800"><i class="fa-solid fa-chart-pie mr-1.5 text-cyan-600"></i>Dashboard Analytics</h2>
                 <div class="flex items-center gap-1 text-[10px] w-full sm:w-auto bg-white border border-slate-200 rounded-md p-1 shadow-sm">
                     <i class="fa-regular fa-calendar ml-1 text-slate-400"></i>
-                    <input type="date" id="dash_tgl_mulai" class="bg-transparent px-1 py-0.5 text-slate-700 focus:outline-none" value="${tglMulai}" onchange="renderApp()">
+                    <input type="date" id="dash_tgl_mulai" class="bg-transparent px-1 py-0.5 text-slate-700 focus:outline-none" value="${tglMulai}" onchange="renderApp(true)">
                     <span class="text-slate-400">-</span>
-                    <input type="date" id="dash_tgl_selesai" class="bg-transparent px-1 py-0.5 text-slate-700 focus:outline-none" value="${tglSelesai}" onchange="renderApp()">
+                    <input type="date" id="dash_tgl_selesai" class="bg-transparent px-1 py-0.5 text-slate-700 focus:outline-none" value="${tglSelesai}" onchange="renderApp(true)">
                 </div>
             </div>
 
@@ -585,8 +610,7 @@
 
             jobs.sort((a, b) => {
                 let valA = (a[sortColumn] || '').toString().toLowerCase(); let valB = (b[sortColumn] || '').toString().toLowerCase();
-                // Pengurutan cerdas agar angka di string tetap terbaca hierarkinya dengan benar
-                return valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' }) * (sortDirection === 'asc' ? 1 : -1);
+                if (valA < valB) return sortDirection === 'asc' ? -1 : 1; if (valA > valB) return sortDirection === 'asc' ? 1 : -1; return 0;
             });
 
             let pendingCount = jobs.filter(j => j.status === 'SCHEDULED' || j.status === 'UNSCHEDULED' || (j.status === 'PENDING' && (!j.operator || !j.rigger))).length;
@@ -602,15 +626,15 @@
                         </div>
                     </div>
                     <div class="flex items-center gap-1 text-[10px] w-full sm:w-auto overflow-x-auto hide-scrollbar pb-0.5 sm:pb-0">
-                        <input type="date" id="filter_tgl_mulai" class="border border-slate-300 rounded-sm px-1 py-0.5 text-slate-700 focus:outline-none focus:border-cyan-500 shrink-0" value="${tglMulai}" onchange="renderApp()">
+                        <input type="date" id="filter_tgl_mulai" class="border border-slate-300 rounded-sm px-1 py-0.5 text-slate-700 focus:outline-none focus:border-cyan-500 shrink-0" value="${tglMulai}" onchange="renderApp(true)">
                         <span class="text-slate-400 shrink-0">-</span>
-                        <input type="date" id="filter_tgl_selesai" class="border border-slate-300 rounded-sm px-1 py-0.5 text-slate-700 focus:outline-none focus:border-cyan-500 shrink-0" value="${tglSelesai}" onchange="renderApp()">
-                        <select id="filter_shift" class="border border-slate-300 rounded-sm px-1 py-0.5 text-slate-700 focus:outline-none focus:border-cyan-500 shrink-0 ml-1" onchange="renderApp()">
+                        <input type="date" id="filter_tgl_selesai" class="border border-slate-300 rounded-sm px-1 py-0.5 text-slate-700 focus:outline-none focus:border-cyan-500 shrink-0" value="${tglSelesai}" onchange="renderApp(true)">
+                        <select id="filter_shift" class="border border-slate-300 rounded-sm px-1 py-0.5 text-slate-700 focus:outline-none focus:border-cyan-500 shrink-0 ml-1" onchange="renderApp(true)">
                             <option value="ALL" ${filterShift === 'ALL' ? 'selected' : ''}>All Shift</option>
                             <option value="Shift 1" ${filterShift === 'Shift 1' ? 'selected' : ''}>S 1</option>
                             <option value="Shift 2" ${filterShift === 'Shift 2' ? 'selected' : ''}>S 2</option>
                         </select>
-                        <select id="filter_admin_kategori" class="border border-slate-300 rounded-sm px-1 py-0.5 text-slate-700 focus:outline-none focus:border-cyan-500 shrink-0 ml-1" onchange="renderApp()">
+                        <select id="filter_admin_kategori" class="border border-slate-300 rounded-sm px-1 py-0.5 text-slate-700 focus:outline-none focus:border-cyan-500 shrink-0 ml-1" onchange="renderApp(true)">
                             <option value="ALL" ${filterKategori === 'ALL' ? 'selected' : ''}>Semua Armada</option>
                             <option value="Crane Truck" ${filterKategori === 'Crane Truck' ? 'selected' : ''}>Crane Truck</option>
                             <option value="Big Crane" ${filterKategori === 'Big Crane' ? 'selected' : ''}>Big Crane</option>
@@ -625,14 +649,14 @@
                             <tr>
                                 <th class="px-1 md:px-2 py-1.5 text-center font-semibold w-8 md:w-16">Aksi</th>
                                 <th class="px-2 py-1.5 font-semibold w-24 md:w-28 cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('no_wo')">No LIFT & Waktu ${getSortIcon('no_wo')}</th>
-                                <th class="px-2 py-1.5 font-semibold w-20 md:w-28 cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('nama_pemohon')">Pemohon ${getSortIcon('nama_pemohon')}</th>
+                                <th class="px-2 py-1.5 font-semibold w-16 md:w-24 cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('nama_pemohon')">Pemohon ${getSortIcon('nama_pemohon')}</th>
                                 <th class="px-2 py-1.5 font-semibold w-24 hidden md:table-cell cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('tgl_pelaksanaan')">Jadwal ${getSortIcon('tgl_pelaksanaan')}</th>
-                                <th class="px-2 py-1.5 font-semibold w-28 md:w-48 cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('lokasi_angkat')">Lokasi / Tugas ${getSortIcon('lokasi_angkat')}</th>
-                                <th class="px-2 py-1.5 text-center font-semibold w-24 hidden md:table-cell cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('status')">Status ${getSortIcon('status')}</th>
-                                <th class="px-2 py-1.5 font-semibold min-w-[140px] w-40 hidden md:table-cell cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('unit')">Penugasan ${getSortIcon('unit')}</th>
-                                <th class="px-2 py-1.5 font-semibold w-24 hidden md:table-cell cursor-pointer hover:bg-slate-200 select-none transition-colors whitespace-nowrap" onclick="handleSort('jam_start_aktual')">Waktu Aktual ${getSortIcon('jam_start_aktual')}</th>
-                                <th class="px-2 py-1.5 text-center font-semibold w-16 hidden md:table-cell cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('durasi_aktual')">Durasi ${getSortIcon('durasi_aktual')}</th>
-                                <th class="px-2 py-1.5 font-semibold w-auto min-w-[200px] hidden md:table-cell">Kendala</th>
+                                <th class="px-2 py-1.5 font-semibold w-1/3 md:w-1/4 cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('lokasi_angkat')">Lokasi / Tugas ${getSortIcon('lokasi_angkat')}</th>
+                                <th class="px-2 py-1.5 text-center font-semibold w-20 hidden md:table-cell cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('status')">Status ${getSortIcon('status')}</th>
+                                <th class="px-2 py-1.5 font-semibold w-28 hidden md:table-cell cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('unit')">Penugasan ${getSortIcon('unit')}</th>
+                                <th class="px-2 py-1.5 font-semibold w-20 hidden md:table-cell cursor-pointer hover:bg-slate-200 select-none transition-colors whitespace-nowrap" onclick="handleSort('jam_start_aktual')">Waktu Aktual ${getSortIcon('jam_start_aktual')}</th>
+                                <th class="px-2 py-1.5 text-center font-semibold w-12 hidden md:table-cell cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('durasi_aktual')">Durasi ${getSortIcon('durasi_aktual')}</th>
+                                <th class="px-2 py-1.5 font-semibold w-20 md:w-28 hidden md:table-cell">Kendala</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100 text-[11px]">
@@ -655,18 +679,17 @@
                                 <tr class="hover:bg-slate-50 transition-colors">
                                     <td class="px-1 md:px-2 py-1.5 text-center align-top">
                                         <div class="flex items-center justify-center">
-                                            <!-- HANYA TOMBOL EDIT -->
                                             <button onclick="openAdminEditJob('${job.no_wo}')" class="${editColorClass} text-[10px] px-2 py-1 rounded-sm border shadow-sm w-full md:w-auto flex justify-center items-center gap-1" title="Edit/Validasi Job"><i class="fa-solid fa-pen"></i> <span class="hidden md:inline font-bold">Edit</span></button>
                                         </div>
                                     </td>
                                     <td class="px-2 py-1.5 align-top">
-                                        <div class="font-bold text-cyan-600 text-[9px] md:text-[10px] cursor-pointer hover:underline leading-tight" onclick="viewJobDetail('${job.no_wo}')" title="Klik untuk lihat detail">${job.no_wo}</div>
+                                        <div class="font-bold text-cyan-600 text-[9px] md:text-[10px] cursor-pointer hover:underline leading-tight" onclick="viewJobDetail('${job.no_wo}')">${job.no_wo}</div>
                                         <div class="text-[8px] md:text-[9px] text-slate-500 mb-1 leading-tight">${job.timestamp.split('T')[0]} ${job.timestamp.split('T')[1].substring(0,5)}</div>
                                         <div class="md:hidden"><span class="${statusColor} border text-[7px] px-1 py-0.5 rounded-sm font-bold leading-none whitespace-nowrap inline-block">${job.status}</span></div>
                                     </td>
                                     <td class="px-2 py-1.5 align-top">
-                                        <div class="font-semibold text-slate-800 text-[9px] md:text-[10px] uppercase truncate max-w-[70px] md:max-w-[100px] leading-tight" title="${job.nama_pemohon}">${job.nama_pemohon}</div>
-                                        <div class="text-[8px] md:text-[9px] text-slate-500 truncate max-w-[70px] md:max-w-[100px] leading-tight" title="${job.perusahaan} - ${job.departemen}">${job.departemen}</div>
+                                        <div class="font-semibold text-slate-800 text-[9px] md:text-[10px] uppercase truncate max-w-[60px] md:max-w-[90px] leading-tight" title="${job.nama_pemohon}">${job.nama_pemohon}</div>
+                                        <div class="text-[8px] md:text-[9px] text-slate-500 truncate max-w-[60px] md:max-w-[90px] leading-tight" title="${job.perusahaan} - ${job.departemen}">${job.departemen}</div>
                                     </td>
                                     <td class="px-2 py-1.5 align-top hidden md:table-cell">
                                         <div class="font-bold text-slate-700 text-[10px]">${job.tgl_pelaksanaan}</div>
@@ -674,7 +697,7 @@
                                     </td>
                                     <td class="px-2 py-1.5 align-top">
                                         ${job.kategori !== 'Big Crane' ? `<div class="text-[9px] md:text-[10px] text-orange-600 font-semibold flex items-start gap-1 mb-0.5 leading-tight"><i class="fa-solid fa-location-dot mt-0.5"></i> <span>${job.lokasi_angkat || '-'} <i class="fa-solid fa-arrow-right text-[7px] mx-0.5 text-slate-400"></i> ${job.lokasi_tujuan || '-'}</span></div>` : ''}
-                                        <div class="text-[9px] text-emerald-700 flex items-start gap-1"><i class="fa-solid fa-flag-checkered mt-0.5"></i> <span class="leading-tight truncate max-w-[100px]" title="${job.deskripsi}">${job.deskripsi}</span></div>
+                                        <div class="text-[9px] text-emerald-700 flex items-start gap-1"><i class="fa-solid fa-flag-checkered mt-0.5"></i> <span class="leading-tight truncate max-w-[150px] lg:max-w-none" title="${job.deskripsi}">${job.deskripsi}</span></div>
                                     </td>
                                     <td class="px-2 py-1.5 text-center align-top hidden md:table-cell">
                                         <span class="${statusColor} border text-[9px] px-1.5 py-0.5 rounded-sm font-semibold whitespace-nowrap inline-block">${job.status}</span>
@@ -705,14 +728,7 @@
             return html;
         }
 
-        // Monitoring View Khusus USER (Mobile view)
         jobs = jobs.filter(j => j.nrp_pemohon === currentUser.nrp);
-        
-        // Memaksa pengurutan berdasarkan timestamp terbaru khusus untuk User
-        jobs.sort((a, b) => {
-            return (b.timestamp || '').localeCompare(a.timestamp || '');
-        });
-
         let filterCat = document.getElementById('filter_kategori') ? document.getElementById('filter_kategori').value : 'ALL';
         if (filterCat !== 'ALL') jobs = jobs.filter(j => j.kategori === filterCat);
         
@@ -822,7 +838,6 @@
             </div>
             ${fotoHtml}
             <div class="flex gap-2 mt-2">
-                <!-- Tombol salin job resmi dipindah ke sini -->
                 <button onclick="copyJobToWA('${job.no_wo}')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1.5 rounded-sm text-[10px] flex items-center justify-center gap-1 shadow-sm"><i class="fa-regular fa-copy"></i> Salin Job</button>
                 <button onclick="document.getElementById('detailJobModal').classList.add('hidden')" class="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-bold py-1.5 rounded-sm text-[10px] shadow-sm">Tutup Detail</button>
             </div>
@@ -896,7 +911,6 @@
                 </div>
                 
                 <div class="flex gap-1.5 mt-3 pt-2 border-t border-slate-200">
-                    <!-- Tombol delete job resmi disembunyikan di dalam form edit -->
                     ${currentUser.role === 'ADMIN' ? `<button type="button" onclick="confirmHapusOrder('${job.no_wo}')" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold px-3 py-1.5 rounded-sm text-[11px] transition-colors shadow-sm" title="Hapus Order"><i class="fa-solid fa-trash"></i> Hapus</button>` : ''}
                     <button type="submit" class="flex-1 bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-1.5 rounded-sm text-[11px] transition-colors shadow-sm">Simpan & Validasi</button>
                 </div>
@@ -954,7 +968,7 @@
 
         saveOrders(jobs);
         document.getElementById('editJobModal').classList.add('hidden');
-        renderApp();
+        renderApp(true); // silent sync
     }
 
     function confirmHapusOrder(wo) {
@@ -968,7 +982,7 @@
             }
             showToast('Data dihapus!'); 
             document.getElementById('editJobModal').classList.add('hidden'); 
-            renderApp();
+            renderApp(true);
         });
     }
 
@@ -1008,7 +1022,7 @@
                 ? `<div class="absolute inset-0 bg-slate-900/40 group-hover:bg-slate-900/20 transition-colors"></div><span class="font-bold text-white text-sm sm:text-base uppercase relative z-10 tracking-widest drop-shadow-lg text-center leading-tight px-2">${label}</span>`
                 : `<div class="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-slate-50 group-hover:bg-cyan-50 flex items-center justify-center transition-colors"><i class="fa-solid ${iconClass} text-2xl sm:text-3xl text-slate-400 group-hover:text-cyan-600"></i></div><span class="font-bold text-slate-700 text-[11px] sm:text-xs uppercase tracking-wide text-center leading-tight mt-2 px-2">${label}</span>`;
             
-            return `<button onclick="${modeVar}='${type}'; renderApp();" class="relative bg-white border border-slate-200 hover:border-cyan-500 hover:shadow-md rounded-xl flex flex-col items-center justify-center shadow-sm transition-all group aspect-square sm:aspect-[4/3] w-full sm:w-44 overflow-hidden" ${bgStyle}>${content}</button>`;
+            return `<button onclick="${modeVar}='${type}'; renderApp(false);" class="relative bg-white border border-slate-200 hover:border-cyan-500 hover:shadow-md rounded-xl flex flex-col items-center justify-center shadow-sm transition-all group aspect-square sm:aspect-[4/3] w-full sm:w-44 overflow-hidden" ${bgStyle}>${content}</button>`;
         };
 
         const btnCT = getUnitCard('Crane Truck', 'userOrderFleetMode', settings.icon_ct_url, 'fa-truck-moving', 'Crane Truck');
@@ -1086,7 +1100,7 @@
 
         return `
         <div class="max-w-md mx-auto bg-white rounded-md shadow-sm border border-slate-200 overflow-hidden mt-2">
-            <div class="p-2 border-b border-slate-100 flex items-center gap-2"><button onclick="userOrderFleetMode=null; renderApp();" class="w-6 h-6 rounded-sm border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50"><i class="fa-solid fa-arrow-left text-[10px]"></i></button><h2 class="text-sm font-bold text-slate-800">Order: <span class="text-cyan-600">${cat}</span></h2></div>
+            <div class="p-2 border-b border-slate-100 flex items-center gap-2"><button onclick="userOrderFleetMode=null; renderApp(false);" class="w-6 h-6 rounded-sm border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50"><i class="fa-solid fa-arrow-left text-[10px]"></i></button><h2 class="text-sm font-bold text-slate-800">Order: <span class="text-cyan-600">${cat}</span></h2></div>
             <div class="p-3">
                 <datalist id="profListPerusahaan">${m.perusahaan.map(p=>`<option value="${p}">`).join('')}</datalist><datalist id="profListDepartemen">${m.departemen.map(d=>`<option value="${d}">`).join('')}</datalist>
                 ${requesterHtml}
@@ -1157,7 +1171,7 @@
         showToast('Pemesanan disubmit!');
         currentTab = (user.role === 'ADMIN' || user.role === 'GL') ? 'dashboard' : 'monitoring';
         userOrderFleetMode = null;
-        renderApp();
+        renderApp(false);
     }
 
     function getManpowerWorkflow() {
@@ -1168,7 +1182,7 @@
             const content = iconUrl 
                 ? `<div class="absolute inset-0 bg-slate-900/40 group-hover:bg-slate-900/20 transition-colors"></div><span class="font-bold text-white text-sm sm:text-base uppercase relative z-10 tracking-widest drop-shadow-lg text-center leading-tight px-2">${label}</span>`
                 : `<div class="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-slate-50 group-hover:bg-cyan-50 flex items-center justify-center transition-colors"><i class="fa-solid ${iconClass} text-2xl sm:text-3xl text-slate-400 group-hover:text-cyan-600"></i></div><span class="font-bold text-slate-700 text-[11px] sm:text-xs uppercase tracking-wide text-center leading-tight mt-2 px-2">${label}</span>`;
-            return `<button onclick="${modeVar}='${type}'; renderApp();" class="relative bg-white border border-slate-200 hover:border-cyan-500 hover:shadow-md rounded-xl flex flex-col items-center justify-center shadow-sm transition-all group aspect-square sm:aspect-[4/3] w-full sm:w-44 overflow-hidden" ${bgStyle}>${content}</button>`;
+            return `<button onclick="${modeVar}='${type}'; renderApp(false);" class="relative bg-white border border-slate-200 hover:border-cyan-500 hover:shadow-md rounded-xl flex flex-col items-center justify-center shadow-sm transition-all group aspect-square sm:aspect-[4/3] w-full sm:w-44 overflow-hidden" ${bgStyle}>${content}</button>`;
         };
 
         const btnCT = getUnitCard('Crane Truck', 'mpFleetMode', settings.icon_ct_url, 'fa-truck-moving', 'Crane Truck');
@@ -1186,10 +1200,10 @@
         if (filterUnit !== 'ALL') jobs = jobs.filter(j => j.unit === filterUnit);
 
         let html = `
-        <div class="flex items-center gap-2 mb-2 mt-2"><button onclick="mpFleetMode=null; renderApp();" class="w-6 h-6 rounded-sm border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 bg-white shadow-sm"><i class="fa-solid fa-arrow-left text-[10px]"></i></button><h2 class="text-xs font-bold text-slate-800">Tugas: <span class="text-cyan-600">${mpFleetMode}</span></h2></div>
+        <div class="flex items-center gap-2 mb-2 mt-2"><button onclick="mpFleetMode=null; renderApp(false);" class="w-6 h-6 rounded-sm border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 bg-white shadow-sm"><i class="fa-solid fa-arrow-left text-[10px]"></i></button><h2 class="text-xs font-bold text-slate-800">Tugas: <span class="text-cyan-600">${mpFleetMode}</span></h2></div>
         <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
-            <div class="flex gap-1 overflow-x-auto hide-scrollbar bg-white p-0.5 rounded-full shadow-sm border border-slate-200">${['ON PROGRESS', 'PENDING', 'COMPLETED', 'CANCELED'].map(panel => `<button onclick="currentMpPanel='${panel}'; renderApp()" class="px-2.5 py-1 rounded-full text-[9px] font-bold whitespace-nowrap transition-colors ${currentMpPanel === panel ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}">${panel}</button>`).join('')}</div>
-            <select id="mp_filter_unit" onchange="renderApp()" class="text-[9px] font-bold bg-white border border-slate-300 text-slate-700 rounded-full px-2 py-1 outline-none shadow-sm focus:border-cyan-500"><option value="ALL">Semua Unit</option>${unitOptions.map(u => `<option value="${u}" ${filterUnit === u ? 'selected' : ''}>${u}</option>`).join('')}</select>
+            <div class="flex gap-1 overflow-x-auto hide-scrollbar bg-white p-0.5 rounded-full shadow-sm border border-slate-200">${['ON PROGRESS', 'PENDING', 'COMPLETED', 'CANCELED'].map(panel => `<button onclick="currentMpPanel='${panel}'; renderApp(true)" class="px-2.5 py-1 rounded-full text-[9px] font-bold whitespace-nowrap transition-colors ${currentMpPanel === panel ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}">${panel}</button>`).join('')}</div>
+            <select id="mp_filter_unit" onchange="renderApp(true)" class="text-[9px] font-bold bg-white border border-slate-300 text-slate-700 rounded-full px-2 py-1 outline-none shadow-sm focus:border-cyan-500"><option value="ALL">Semua Unit</option>${unitOptions.map(u => `<option value="${u}" ${filterUnit === u ? 'selected' : ''}>${u}</option>`).join('')}</select>
         </div>
         <div class="space-y-2 pb-4">`;
 
@@ -1241,7 +1255,7 @@
     }
 
     let tempMpData = null; let activeCancelWo = null;
-    function initiateCancelJob(wo) { activeCancelWo = wo; document.getElementById('cancelReasonInput').value = ''; document.getElementById('cancelPromptModal').classList.remove('hidden'); document.getElementById('mpActionModal').classList.add('hidden'); document.getElementById('btnSubmitCancelJob').onclick = function() { let alasan = document.getElementById('cancelReasonInput').value.trim(); if(!alasan) return showToast('Alasan wajib diisi!', 'error'); let jobs = getOrders(); let idx = jobs.findIndex(j => j.no_wo === activeCancelWo); jobs[idx].status = 'CANCELED'; jobs[idx].alasan_telat = "Dibatalkan: " + alasan; saveOrders(jobs); showToast('Dibatalkan!'); document.getElementById('cancelPromptModal').classList.add('hidden'); renderApp(); }; }
+    function initiateCancelJob(wo) { activeCancelWo = wo; document.getElementById('cancelReasonInput').value = ''; document.getElementById('cancelPromptModal').classList.remove('hidden'); document.getElementById('mpActionModal').classList.add('hidden'); document.getElementById('btnSubmitCancelJob').onclick = function() { let alasan = document.getElementById('cancelReasonInput').value.trim(); if(!alasan) return showToast('Alasan wajib diisi!', 'error'); let jobs = getOrders(); let idx = jobs.findIndex(j => j.no_wo === activeCancelWo); jobs[idx].status = 'CANCELED'; jobs[idx].alasan_telat = "Dibatalkan: " + alasan; saveOrders(jobs); showToast('Dibatalkan!'); document.getElementById('cancelPromptModal').classList.add('hidden'); renderApp(true); }; }
 
     function processMpAction(e, wo, targetStatus) {
         e.preventDefault(); const job = getOrders().find(j => j.no_wo === wo); if(!job) return;
@@ -1273,7 +1287,7 @@
         jobs[idx].operator = tempMpData.op; jobs[idx].rigger = tempMpData.rig; if (tempMpData.rig2) jobs[idx].rigger2 = tempMpData.rig2;
         jobs[idx].jam_start_aktual = tempMpData.start; jobs[idx].jam_end_aktual = tempMpData.end; jobs[idx].final_inspeksi = tempMpData.inspeksi; jobs[idx].durasi_aktual = (tempMpData.actualMins / 60).toFixed(2); jobs[idx].status = tempMpData.status;
         if(alasanTelat) jobs[idx].alasan_telat = alasanTelat; if(alasanOvertime) jobs[idx].alasan_overtime = alasanOvertime;
-        saveOrders(jobs); showToast('Tersimpan!'); document.getElementById('mpActionModal').classList.add('hidden'); renderApp();
+        saveOrders(jobs); showToast('Tersimpan!'); document.getElementById('mpActionModal').classList.add('hidden'); renderApp(true);
     }
 
     let tempPendingData = null;
@@ -1292,7 +1306,7 @@
         let alasan = document.getElementById('pendingReasonInput').value.trim(); if(!alasan) return showToast('Mohon isi alasan pending!', 'error');
         let jobs = getOrders(); let idx = jobs.findIndex(j => j.no_wo === tempPendingData.wo);
         jobs[idx].operator = tempPendingData.op; jobs[idx].rigger = tempPendingData.rig; if (tempPendingData.rig2) jobs[idx].rigger2 = tempPendingData.rig2; jobs[idx].jam_start_aktual = tempPendingData.start; jobs[idx].jam_end_aktual = tempPendingData.end; jobs[idx].final_inspeksi = tempPendingData.inspeksi; jobs[idx].durasi_aktual = tempPendingData.durasi_aktual; jobs[idx].alasan_telat = "Dipending: " + alasan; jobs[idx].status = 'PENDING';
-        saveOrders(jobs); showToast('Jam kerja tersimpan. Status: PENDING.'); document.getElementById('pendingPromptModal').classList.add('hidden'); document.getElementById('mpActionModal').classList.add('hidden'); tempPendingData = null; renderApp();
+        saveOrders(jobs); showToast('Jam kerja tersimpan. Status: PENDING.'); document.getElementById('pendingPromptModal').classList.add('hidden'); document.getElementById('mpActionModal').classList.add('hidden'); tempPendingData = null; renderApp(true);
     }
 
     function promptLanjutPending(wo) { openCustomConfirm('Lanjutkan Pekerjaan?', 'Shift ini akan ditutup (Completed) dan job lanjutan akan diteruskan ke Admin/GL untuk validasi shift baru.', () => { processLanjutPending(wo); }); }
@@ -1302,7 +1316,7 @@
         let currentJob = jobs[idx]; currentJob.status = 'COMPLETED'; let newJob = JSON.parse(JSON.stringify(currentJob));
         let baseWo = currentJob.no_wo; let lanjutanCount = 1; if (baseWo.includes('-L')) { let parts = baseWo.split('-L'); baseWo = parts[0]; lanjutanCount = parseInt(parts[1] || 1) + 1; }
         newJob.no_wo = `${baseWo}-L${lanjutanCount}`; newJob.timestamp = new Date().toISOString(); newJob.status = 'PENDING'; newJob.operator = ''; newJob.rigger = ''; newJob.rigger2 = ''; newJob.jam_start_aktual = ''; newJob.jam_end_aktual = ''; newJob.durasi_aktual = ''; newJob.alasan_telat = ''; newJob.alasan_overtime = ''; newJob.final_inspeksi = '';
-        jobs.unshift(newJob); saveOrders(jobs); showToast('Shift ditutup, Lanjutan dikirim ke GL!'); renderApp();
+        jobs.unshift(newJob); saveOrders(jobs); showToast('Shift ditutup, Lanjutan dikirim ke GL!'); renderApp(true);
     }
 
     let currentMasterTab = 'branding';
@@ -1342,7 +1356,7 @@
         }
 
         return `
-        <div class="bg-white rounded-md shadow-sm border border-slate-200 p-1 mb-2 flex flex-wrap gap-1">${tabs.map(t => `<button onclick="currentMasterTab='${t.id}'; renderApp();" class="px-2 py-1 text-[9px] font-semibold rounded-sm transition-colors ${currentMasterTab === t.id ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}">${t.label}</button>`).join('')}</div>
+        <div class="bg-white rounded-md shadow-sm border border-slate-200 p-1 mb-2 flex flex-wrap gap-1">${tabs.map(t => `<button onclick="currentMasterTab='${t.id}'; renderApp(false);" class="px-2 py-1 text-[9px] font-semibold rounded-sm transition-colors ${currentMasterTab === t.id ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}">${t.label}</button>`).join('')}</div>
         <div class="bg-white rounded-md shadow-sm border border-slate-200 p-3 min-h-[50vh]"><h3 class="text-xs font-bold text-slate-800 capitalize mb-2">Data: ${currentMasterTab.replace('_', ' ')}</h3>${contentHtml}</div>
         <div id="resetPwdModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 hidden p-3"><div class="bg-white rounded-md shadow-xl w-full max-w-[250px] overflow-hidden"><div class="p-2 border-b border-slate-100 flex justify-between items-center"><h3 class="font-bold text-slate-800 text-xs">Reset Password</h3><button onclick="document.getElementById('resetPwdModal').classList.add('hidden')" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-xs"></i></button></div><form onsubmit="processResetPassword(event)" class="p-3 space-y-2"><p class="text-[9px] text-slate-500 mb-1">NRP: <strong id="resetNrpLabel" class="text-slate-800"></strong></p><input type="hidden" id="resetNrpVal"><div class="relative"><input type="password" id="resetPwdInput" class="w-full border border-slate-300 rounded-sm px-2 py-1 pr-6 text-[10px] focus:outline-none focus:border-cyan-500" required><i id="toggleResetPwd" class="fa-regular fa-eye absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer pwd-toggle text-[9px]" onclick="togglePassword('resetPwdInput', 'toggleResetPwd')"></i></div><button type="submit" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-1.5 rounded-sm text-[10px] mt-1">Simpan</button></form></div></div>`;
     }
@@ -1373,7 +1387,7 @@
 
             localStorage.setItem('lifting_settings', JSON.stringify(newSettings));
             showToast('Branding berhasil disimpan ke Cloud untuk semua pengguna!'); 
-            renderApp();
+            renderApp(true);
         } catch(err) {
             showToast('Gagal simpan branding ke cloud!', 'error');
         } finally { 
@@ -1381,11 +1395,11 @@
         }
     }
 
-    function addMasterData(e, key) { e.preventDefault(); const val = document.getElementById('new_master_val').value.trim(); const m = getMasterData(); if(m[key].includes(val)) return showToast('Data sudah ada!', 'error'); m[key].push(val); localStorage.setItem('lifting_master_data', JSON.stringify(m)); showToast('Ditambahkan!'); renderApp(); }
-    function addAccountMasterData(e, key) { e.preventDefault(); const name = document.getElementById('new_master_name').value.trim(); const nrp = document.getElementById('new_master_nrp').value.trim(); const pwd = document.getElementById('new_master_pwd').value; const users = getUsers(); if (users.find(u => u.nrp === nrp)) return showToast('NRP terdaftar!', 'error'); const m = getMasterData(); if(m[key].includes(name)) return showToast('Nama sudah ada!', 'error'); m[key].push(name); localStorage.setItem('lifting_master_data', JSON.stringify(m)); let role = key === 'gl' ? 'GL' : 'MANPOWER'; let jabatan = key === 'gl' ? 'Group Leader' : (key === 'operator' ? 'Operator' : 'Rigger'); users.push({ nrp: nrp, nama_lengkap: name, jabatan: jabatan, perusahaan: 'PPA', departemen: 'Operation', section: 'Lifting', no_wa: '-', password_hash: pwd, role: role, status_akun: 'ACTIVE' }); saveUsers(users); showToast(`Akun dibuat!`); renderApp(); }
-    function confirmDeleteMasterData(key, index) { openCustomConfirm('Hapus Master Data', 'Yakin ingin menghapus item ini dari data master?', () => { const m = getMasterData(); m[key].splice(index, 1); localStorage.setItem('lifting_master_data', JSON.stringify(m)); showToast('Dihapus!'); renderApp(); }); }
+    function addMasterData(e, key) { e.preventDefault(); const val = document.getElementById('new_master_val').value.trim(); const m = getMasterData(); if(m[key].includes(val)) return showToast('Data sudah ada!', 'error'); m[key].push(val); localStorage.setItem('lifting_master_data', JSON.stringify(m)); showToast('Ditambahkan!'); renderApp(true); }
+    function addAccountMasterData(e, key) { e.preventDefault(); const name = document.getElementById('new_master_name').value.trim(); const nrp = document.getElementById('new_master_nrp').value.trim(); const pwd = document.getElementById('new_master_pwd').value; const users = getUsers(); if (users.find(u => u.nrp === nrp)) return showToast('NRP terdaftar!', 'error'); const m = getMasterData(); if(m[key].includes(name)) return showToast('Nama sudah ada!', 'error'); m[key].push(name); localStorage.setItem('lifting_master_data', JSON.stringify(m)); let role = key === 'gl' ? 'GL' : 'MANPOWER'; let jabatan = key === 'gl' ? 'Group Leader' : (key === 'operator' ? 'Operator' : 'Rigger'); users.push({ nrp: nrp, nama_lengkap: name, jabatan: jabatan, perusahaan: 'PPA', departemen: 'Operation', section: 'Lifting', no_wa: '-', password_hash: pwd, role: role, status_akun: 'ACTIVE' }); saveUsers(users); showToast(`Akun dibuat!`); renderApp(true); }
+    function confirmDeleteMasterData(key, index) { openCustomConfirm('Hapus Master Data', 'Yakin ingin menghapus item ini dari data master?', () => { const m = getMasterData(); m[key].splice(index, 1); localStorage.setItem('lifting_master_data', JSON.stringify(m)); showToast('Dihapus!'); renderApp(true); }); }
     function openResetPwd(nrp) { document.getElementById('resetNrpLabel').innerText = nrp; document.getElementById('resetNrpVal').value = nrp; document.getElementById('resetPwdInput').value = ''; document.getElementById('resetPwdModal').classList.remove('hidden'); }
-    function processResetPassword(e) { e.preventDefault(); const nrp = document.getElementById('resetNrpVal').value; const newPwd = document.getElementById('resetPwdInput').value; const users = getUsers(); const idx = users.findIndex(u => u.nrp === nrp); if(idx !== -1) { users[idx].password_hash = newPwd; saveUsers(users); showToast(`Password direset!`); document.getElementById('resetPwdModal').classList.add('hidden'); renderApp(); } }
+    function processResetPassword(e) { e.preventDefault(); const nrp = document.getElementById('resetNrpVal').value; const newPwd = document.getElementById('resetPwdInput').value; const users = getUsers(); const idx = users.findIndex(u => u.nrp === nrp); if(idx !== -1) { users[idx].password_hash = newPwd; saveUsers(users); showToast(`Password direset!`); document.getElementById('resetPwdModal').classList.add('hidden'); renderApp(true); } }
 
     function getProfileView() {
         const user = JSON.parse(localStorage.getItem('lifting_user'));
@@ -1414,13 +1428,13 @@
         </div>`;
     }
 
-    function saveProfile(e) { e.preventDefault(); let user = JSON.parse(localStorage.getItem('lifting_user')); let users = getUsers(); let idx = users.findIndex(u => u.nrp === user.nrp); user.nama_lengkap = document.getElementById('profName').value; user.jabatan = document.getElementById('profJabatan').value; user.perusahaan = document.getElementById('profPerusahaan').value; user.departemen = document.getElementById('profDepartemen').value; user.section = document.getElementById('profSection').value; user.no_wa = document.getElementById('profWa').value; users[idx] = user; saveUsers(users); localStorage.setItem('lifting_user', JSON.stringify(user)); showToast('Profil diupdate!'); renderApp(); }
+    function saveProfile(e) { e.preventDefault(); let user = JSON.parse(localStorage.getItem('lifting_user')); let users = getUsers(); let idx = users.findIndex(u => u.nrp === user.nrp); user.nama_lengkap = document.getElementById('profName').value; user.jabatan = document.getElementById('profJabatan').value; user.perusahaan = document.getElementById('profPerusahaan').value; user.departemen = document.getElementById('profDepartemen').value; user.section = document.getElementById('profSection').value; user.no_wa = document.getElementById('profWa').value; users[idx] = user; saveUsers(users); localStorage.setItem('lifting_user', JSON.stringify(user)); showToast('Profil diupdate!'); renderApp(true); }
     function savePassword(e) { e.preventDefault(); let pwd1 = document.getElementById('profPwd1').value; let pwd2 = document.getElementById('profPwd2').value; if (pwd1 !== pwd2) return showToast('Password tidak cocok!', 'error'); let user = JSON.parse(localStorage.getItem('lifting_user')); let users = getUsers(); let idx = users.findIndex(u => u.nrp === user.nrp); users[idx].password_hash = pwd1; saveUsers(users); document.getElementById('profPwd1').value = ''; document.getElementById('profPwd2').value = ''; showToast('Password diubah!'); }
 
     // Memuat saat pertama kali dibuka
     window.addEventListener('load', () => {
         fetchFromSupabase().then(() => {
-            renderApp();
+            renderApp(false); // Beri animasi saat pertama kali web dibuka
         });
     });
 
@@ -1429,7 +1443,7 @@
         if (document.visibilityState === "visible") {
             const user = localStorage.getItem('lifting_user');
             if (user) {
-                fetchFromSupabase().then(() => { renderApp(); });
+                fetchFromSupabase().then(() => { renderApp(true); });
             }
         }
     });
