@@ -26,12 +26,12 @@
     // ================= KONFIGURASI DATABASE CLOUD =================
     const SUPABASE_URL = 'https://ustlhxarxxslcmjezqyu.supabase.co';
     // PASTIKAN KUNCI DI BAWAH INI ADALAH KUNCI ANON PUBLIC ANDA YANG LENGKAP
-    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVzdGxoeGFyeHhzbGNtamV6cXl1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg4NzMwMjEsImV4cCI6MjEwNDQ0OTAyMX0.sY19qVqNnDG-ttSG316CtcPZ79FvPTBpqCn37YP7nag';
+    const SUPABASE_KEY = 'PASTE_KUNCI_ANON_PUBLIC_LENGKAP_DISINI';
 
     // Google Apps Script (Untuk Upload Foto Bukti ke Google Drive)
     const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwioh3MCzAz6QIxsrfUKruiqq2STeONkkO5o0dcYLu0_JcsdTp2yiHxWrqQi8nUJdrI3Q/exec'; 
 
-    // ================= DEFAULT DATA =================
+    // ================= DEFAULT DATA (FALLBACK) =================
     const defaultUsers = [
         { nrp: 'admin', nama_lengkap: 'Budi Admin', jabatan: 'Dispatcher', perusahaan: 'PPA', departemen: 'Operation', section: 'Control', no_wa: '081111111', password_hash: 'admin', role: 'ADMIN', status_akun: 'ACTIVE' },
         { nrp: 'gl', nama_lengkap: 'Achmad Hariyanto', jabatan: 'Group Leader', perusahaan: 'PPA', departemen: 'Operation', section: 'Lifting', no_wa: '082222222', password_hash: 'gl', role: 'GL', status_akun: 'ACTIVE' },
@@ -71,7 +71,7 @@
 
     // ================= SUPABASE AUTO-SYNC ENGINE =================
     
-    // Mesin Auto-Sync yang berjalan di latar belakang setiap 2 detik
+    // Mesin Auto-Sync yang berjalan di latar belakang setiap 3 detik
     setInterval(async () => {
         if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
         const user = localStorage.getItem('lifting_user');
@@ -124,7 +124,7 @@
         } catch(e) {
             // Abaikan error jika koneksi terputus (PWA mode offline)
         }
-    }, 2000);
+    }, 3000);
 
     // Fungsi fetch manual (untuk load pertama / tombol tarik paksa)
     async function fetchFromSupabase(isManual = false) {
@@ -788,7 +788,7 @@
                                         </div>
                                     </td>
                                     <td class="px-2 py-1.5 align-top">
-                                        <div class="font-bold text-cyan-600 text-[9px] md:text-[10px] cursor-pointer hover:underline leading-tight" onclick="viewJobDetail('${job.no_wo}')">${job.no_wo}</div>
+                                        <div class="font-bold text-cyan-600 text-[9px] md:text-[10px] cursor-pointer hover:underline leading-tight" onclick="viewJobDetail('${job.no_wo}')" title="Klik untuk lihat detail">${job.no_wo}</div>
                                         <div class="text-[8px] md:text-[9px] text-slate-500 mb-1 leading-tight">${job.timestamp.split('T')[0]} ${job.timestamp.split('T')[1].substring(0,5)}</div>
                                         <div class="md:hidden"><span class="${statusColor} border text-[7px] px-1 py-0.5 rounded-sm font-bold leading-none whitespace-nowrap inline-block">${job.status}</span></div>
                                     </td>
@@ -878,7 +878,6 @@
             </div>`;
         });
 
-        // Modal diletakkan di global render agar tidak duplikat
         return html;
     }
 
@@ -905,7 +904,7 @@
             }
         }
 
-        // Tampilan Modal Detail
+        // Tampilan Modal Detail (Global)
         let modal = document.getElementById('globalDetailJobModal');
         if (!modal) {
             document.body.insertAdjacentHTML('beforeend', `
@@ -953,7 +952,7 @@
             ${fotoHtml}
             <div class="flex gap-2 mt-2">
                 <!-- Tombol salin job resmi di dalam modal -->
-                <button onclick="copyJobToWA('${job.no_wo}')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1.5 rounded-sm text-[10px] flex items-center justify-center gap-1 shadow-sm"><i class="fa-regular fa-copy"></i> Salin Job</button>
+                <button onclick="copyJobToWA('${job.no_wo}')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1.5 rounded-sm text-[10px] flex items-center justify-center gap-1 shadow-sm"><i class="fa-brands fa-whatsapp"></i> Salin Job</button>
                 <button onclick="document.getElementById('globalDetailJobModal').classList.add('hidden')" class="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-bold py-1.5 rounded-sm text-[10px] shadow-sm">Tutup Detail</button>
             </div>
         `;
@@ -1040,7 +1039,7 @@
                     ${riggerHTML}
                 </div>
                 
-                <div class="flex gap-1.5 mt-3 pt-2 border-t border-slate-200">
+                <div class="flex gap-1.5 mt-3 pt-2 border-t border-slate-100">
                     <!-- Tombol delete job resmi disembunyikan di dalam form edit -->
                     ${currentUser.role === 'ADMIN' ? `<button type="button" onclick="confirmHapusOrder('${job.no_wo}')" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold px-3 py-1.5 rounded-sm text-[11px] transition-colors shadow-sm" title="Hapus Order"><i class="fa-solid fa-trash"></i> Hapus</button>` : ''}
                     <button type="submit" class="flex-1 bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-1.5 rounded-sm text-[11px] transition-colors shadow-sm">Simpan & Validasi</button>
@@ -1163,6 +1162,7 @@
             ? `<div class="absolute inset-0 bg-slate-900/40 group-hover:bg-slate-900/20 transition-colors"></div><span class="font-bold text-white text-sm sm:text-base uppercase relative z-10 tracking-widest drop-shadow-lg text-center leading-tight px-2">Lowboy</span>`
             : `<div class="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-slate-50 group-hover:bg-cyan-50 flex items-center justify-center transition-colors"><i class="fa-solid fa-trailer text-2xl sm:text-3xl text-slate-400 group-hover:text-cyan-600"></i></div><span class="font-bold text-slate-700 text-[11px] sm:text-xs uppercase tracking-wide text-center leading-tight mt-2 px-2">Lowboy</span>`;
 
+        // Boxy styling implementation: using aspect-square for mobile, and aspect-[4/3] for desktop, with w-full to make them expand nicely.
         const btnCT = `<button onclick="userOrderFleetMode='Crane Truck'; renderApp();" class="relative bg-white border border-slate-200 hover:border-cyan-500 hover:shadow-md rounded-xl flex flex-col items-center justify-center shadow-sm transition-all group aspect-square sm:aspect-[4/3] w-full sm:w-44 overflow-hidden" ${styleCard(settings.icon_ct_url)}>${contentCardCT}</button>`;
         const btnBC = `<button onclick="userOrderFleetMode='Big Crane'; renderApp();" class="relative bg-white border border-slate-200 hover:border-cyan-500 hover:shadow-md rounded-xl flex flex-col items-center justify-center shadow-sm transition-all group aspect-square sm:aspect-[4/3] w-full sm:w-44 overflow-hidden" ${styleCard(settings.icon_bc_url)}>${contentCardBC}</button>`;
         const btnLB = `<button onclick="userOrderFleetMode='Lowboy'; renderApp();" class="relative bg-white border border-slate-200 hover:border-cyan-500 hover:shadow-md rounded-xl flex flex-col items-center justify-center shadow-sm transition-all group aspect-square sm:aspect-[4/3] w-full sm:w-44 overflow-hidden" ${styleCard(settings.icon_lb_url)}>${contentCardLB}</button>`;
@@ -1507,9 +1507,7 @@
         if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return showToast('Error: API Supabase belum dipasang!', 'error');
 
         const btn = e.target.querySelector('button[type="submit"]');
-        const originalText = btn.innerHTML; 
-        btn.innerHTML = "Menyimpan ke Cloud..."; 
-        btn.disabled = true;
+        const originalText = btn.innerHTML; btn.innerHTML = "Menyimpan ke Cloud..."; btn.disabled = true;
         
         let newSettings = {
             id: 1, 
@@ -1580,15 +1578,6 @@
         });
     });
 
-    // Tarik data seketika saat aplikasi dibuka kembali dari background (HP/Minimize)
-    document.addEventListener("visibilitychange", () => {
-        if (document.visibilityState === "visible") {
-            const user = localStorage.getItem('lifting_user');
-            if (user) {
-                fetchFromSupabase().then(() => { renderApp(); });
-            }
-        }
-    });
 </script>
 </body>
 </html>
