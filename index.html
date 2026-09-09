@@ -6,8 +6,8 @@
     <title>Sistem Pemesanan Alat Berat PPA</title>
     
     <!-- Favicon / Logo Tab Web -->
-    <link rel="icon" href="https://drive.google.com/uc?export=view&id=1hQZopiZU-_bQC9aRmyZndlmEF--k4h5U">
-    <link rel="apple-touch-icon" href="https://drive.google.com/uc?export=view&id=1hQZopiZU-_bQC9aRmyZndlmEF--k4h5U">
+    <link rel="icon" href="https://lh3.googleusercontent.com/d/1hQZopiZU-_bQC9aRmyZndlmEF--k4h5U">
+    <link rel="apple-touch-icon" href="https://lh3.googleusercontent.com/d/1hQZopiZU-_bQC9aRmyZndlmEF--k4h5U">
     
     <link rel="manifest" href="./manifest.json">
     <meta name="theme-color" content="#0891b2">
@@ -74,22 +74,22 @@
 
     // ================= DEFAULT DATA (FALLBACK) =================
     const defaultUsers = [
-        { nrp: 'admin', nama_lengkap: 'Budi Admin', jabatan: 'Dispatcher', perusahaan: 'PPA', departemen: 'Operation', section: 'Control', no_wa: '081111111', password_hash: 'admin', role: 'ADMIN', status_akun: 'ACTIVE' },
-        { nrp: 'gl', nama_lengkap: 'Achmad Hariyanto', jabatan: 'Group Leader', perusahaan: 'PPA', departemen: 'Operation', section: 'Lifting', no_wa: '082222222', password_hash: 'gl', role: 'GL', status_akun: 'ACTIVE' },
-        { nrp: 'user', nama_lengkap: 'Andi Requester', jabatan: 'Foreman', perusahaan: 'Subkon A', departemen: 'Plant', section: 'Maintenance', no_wa: '08987654321', password_hash: 'user', role: 'USER', status_akun: 'ACTIVE' },
-        { nrp: 'mp', nama_lengkap: 'Joko Operator', jabatan: 'Operator', perusahaan: 'PPA', departemen: 'Operation', section: 'Lifting', no_wa: '084444444', password_hash: 'mp', role: 'MANPOWER', status_akun: 'ACTIVE' }
+        { nrp: 'ADMIN', nama_lengkap: 'BUDI ADMIN', jabatan: 'DISPATCHER', perusahaan: 'PPA', departemen: 'OPERATION', section: 'CONTROL', no_wa: '081111111', password_hash: 'admin', role: 'ADMIN', status_akun: 'ACTIVE' },
+        { nrp: 'GL', nama_lengkap: 'ACHMAD HARIYANTO', jabatan: 'GROUP LEADER', perusahaan: 'PPA', departemen: 'OPERATION', section: 'LIFTING', no_wa: '082222222', password_hash: 'gl', role: 'GL', status_akun: 'ACTIVE' },
+        { nrp: 'USER', nama_lengkap: 'ANDI REQUESTER', jabatan: 'FOREMAN', perusahaan: 'SUBKON A', departemen: 'PLANT', section: 'MAINTENANCE', no_wa: '08987654321', password_hash: 'user', role: 'USER', status_akun: 'ACTIVE' },
+        { nrp: 'MP', nama_lengkap: 'JOKO OPERATOR', jabatan: 'OPERATOR', perusahaan: 'PPA', departemen: 'OPERATION', section: 'LIFTING', no_wa: '084444444', password_hash: 'mp', role: 'MANPOWER', status_akun: 'ACTIVE' }
     ];
 
     const defaultMasterData = {
-        perusahaan: ['PPA', 'Subkon A', 'Subkon B', 'PT. BIB'],
-        departemen: ['Mining', 'Plant', 'Safety', 'HR'],
-        section: ['Operation', 'Maintenance', 'HSE', 'Recruitment'],
+        perusahaan: ['PPA', 'SUBKON A', 'SUBKON B', 'PT. BIB'],
+        departemen: ['MINING', 'PLANT', 'SAFETY', 'HR'],
+        section: ['OPERATION', 'MAINTENANCE', 'HSE', 'RECRUITMENT'],
         unit_ct: ['CT-01', 'CT-02', 'CT-03'],
         unit_big_crane: ['BC-01', 'BC-02'],
         unit_lowboy: ['LB-01', 'LB-02'],
-        gl: ['Achmad Hariyanto', 'Lukmanul Hakim'],
-        operator: ['Joko Operator', 'Supriadi'],
-        rigger: ['Agus Rigger', 'Bambang', 'Candra']
+        gl: ['ACHMAD HARIYANTO', 'LUKMANUL HAKIM'],
+        operator: ['JOKO OPERATOR', 'SUPRIADI'],
+        rigger: ['AGUS RIGGER', 'BAMBANG', 'CANDRA']
     };
 
     if (!localStorage.getItem('lifting_users')) localStorage.setItem('lifting_users', JSON.stringify(defaultUsers));
@@ -115,7 +115,6 @@
     let sortDirection = 'desc';
 
     // ================= SUPABASE AUTO-SYNC ENGINE =================
-    
     setInterval(async () => {
         if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
         const user = localStorage.getItem('lifting_user');
@@ -130,31 +129,19 @@
         try {
             let shouldRender = false;
 
-            const resOrders = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=timestamp.desc`, {
-                headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-            });
+            const resOrders = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=timestamp.desc`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
             if (resOrders.ok) {
                 const data = await resOrders.json();
-                const oldData = localStorage.getItem('lifting_orders');
                 const newData = JSON.stringify(data);
-                if (oldData !== newData) {
-                    localStorage.setItem('lifting_orders', newData);
-                    shouldRender = true; 
-                }
+                if (localStorage.getItem('lifting_orders') !== newData) { localStorage.setItem('lifting_orders', newData); shouldRender = true; }
             }
 
-            const resSettings = await fetch(`${SUPABASE_URL}/rest/v1/settings?id=eq.1`, {
-                headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-            });
+            const resSettings = await fetch(`${SUPABASE_URL}/rest/v1/settings?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
             if (resSettings.ok) {
                 const sData = await resSettings.json();
                 if (sData && sData.length > 0) {
                     const newSettings = JSON.stringify(sData[0]);
-                    const oldSettings = localStorage.getItem('lifting_settings');
-                    if (oldSettings !== newSettings) {
-                        localStorage.setItem('lifting_settings', newSettings);
-                        shouldRender = true;
-                    }
+                    if (localStorage.getItem('lifting_settings') !== newSettings) { localStorage.setItem('lifting_settings', newSettings); shouldRender = true; }
                 }
             }
 
@@ -163,9 +150,7 @@
                 const data = await resUsers.json();
                 if (data && data.length > 0) {
                     const newData = JSON.stringify(data);
-                    if (localStorage.getItem('lifting_users') !== newData) {
-                        localStorage.setItem('lifting_users', newData); shouldRender = true;
-                    }
+                    if (localStorage.getItem('lifting_users') !== newData) { localStorage.setItem('lifting_users', newData); shouldRender = true; }
                 }
             }
 
@@ -174,9 +159,7 @@
                 const data = await resMaster.json();
                 if (data && data.length > 0) {
                     const newData = JSON.stringify(data[0]);
-                    if (localStorage.getItem('lifting_master_data') !== newData) {
-                        localStorage.setItem('lifting_master_data', newData); shouldRender = true;
-                    }
+                    if (localStorage.getItem('lifting_master_data') !== newData) { localStorage.setItem('lifting_master_data', newData); shouldRender = true; }
                 }
             }
 
@@ -242,7 +225,6 @@
         } catch (e) { console.error("Koneksi gagal:", e); }
     }
 
-    // Accessors
     function getOrders() { return JSON.parse(localStorage.getItem('lifting_orders')) || []; }
     function saveOrders(orders) { localStorage.setItem('lifting_orders', JSON.stringify(orders)); syncToSupabase(orders); }
     function getUsers() { return JSON.parse(localStorage.getItem('lifting_users')) || []; }
@@ -284,7 +266,6 @@
         document.body.removeChild(el);
     }
 
-    // SMART COPY KE WA
     function copyJobToWA(wo) {
         let job = getOrders().find(j => j.no_wo === wo);
         if(!job) return;
@@ -374,7 +355,6 @@
             </div>
 
             <!-- ALL GLOBAL MODALS -->
-            
             <div id="globalConfirmModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[100] hidden p-3">
                 <div class="bg-white rounded-md shadow-xl w-full max-w-[280px] overflow-hidden flex flex-col">
                     <div class="p-4 text-center border-b border-slate-100 shrink-0">
@@ -551,7 +531,7 @@
             </button>
             
             ${(user.role === 'USER' || user.role === 'ADMIN' || user.role === 'GL') ? `
-            <button onclick="switchTab('order')" class="relative flex flex-col items-center justify-center -mt-8">
+            <button onclick="switchTab('order')" class="relative flex flex-col items-center justify-center -mt-8 z-50">
                 <div class="w-14 h-14 rounded-full flex items-center justify-center border-[4px] border-white shadow-md transition-transform duration-300 ${currentTab === 'order' ? 'bg-cyan-600 text-white scale-110' : 'bg-cyan-500 text-white hover:scale-105'}">
                     <i class="fa-solid fa-plus text-3xl ${currentTab === 'order' ? 'animate-[spin_0.3s_ease-out]' : ''}"></i>
                 </div>
@@ -626,11 +606,11 @@
                         <datalist id="listSection">${m.section.map(s=>`<option value="${s}"></option>`).join('')}</datalist>
 
                         <div class="grid grid-cols-2 gap-2">
-                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Perusahaan</label><input list="listPerusahaan" id="regPerusahaan" oninput="this.value = this.value.toUpperCase()" placeholder="Pilih/Ketik..." class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
-                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Departemen</label><input list="listDepartemen" id="regDepartemen" oninput="this.value = this.value.toUpperCase()" placeholder="Pilih/Ketik..." class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Perusahaan</label><input list="listPerusahaan" id="regPerusahaan" oninput="this.value = this.value.toUpperCase()" placeholder="Pilih / Ketik..." class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Departemen</label><input list="listDepartemen" id="regDepartemen" oninput="this.value = this.value.toUpperCase()" placeholder="Pilih / Ketik..." class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
                         </div>
                         <div class="grid grid-cols-2 gap-2">
-                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Section</label><input list="listSection" id="regSection" oninput="this.value = this.value.toUpperCase()" placeholder="Pilih/Ketik..." class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Section</label><input list="listSection" id="regSection" oninput="this.value = this.value.toUpperCase()" placeholder="Pilih / Ketik..." class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
                             <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Jabatan</label><input type="text" id="regJabatan" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
                         </div>
 
@@ -990,6 +970,15 @@
                 if (comparison > 0) return sortDirection === 'asc' ? 1 : -1; 
                 return 0;
             });
+
+            // PRIORITASKAN YANG BUTUH VALIDASI DI ATAS JIKA SORT ASCENDING
+            if (sortColumn === 'status' || sortColumn === 'timestamp') {
+               jobs.sort((a,b) => {
+                   let aNeed = (a.status === 'SCHEDULED' || a.status === 'UNSCHEDULED' || (a.status === 'PENDING' && (!a.operator || !a.rigger))) ? 1 : 0;
+                   let bNeed = (b.status === 'SCHEDULED' || b.status === 'UNSCHEDULED' || (b.status === 'PENDING' && (!b.operator || !b.rigger))) ? 1 : 0;
+                   return bNeed - aNeed;
+               });
+            }
 
             let pendingCount = jobs.filter(j => j.status === 'SCHEDULED' || j.status === 'UNSCHEDULED' || (j.status === 'PENDING' && (!j.operator || !j.rigger))).length;
 
@@ -1369,6 +1358,321 @@
         saveOrders(jobs);
         document.getElementById('editJobModal').classList.add('hidden');
         renderApp(true); 
+    }
+
+    function getOrderFormView() {
+        const user = JSON.parse(localStorage.getItem('lifting_user'));
+        const m = getMasterData();
+        const isAdminGL = user.role === 'ADMIN' || user.role === 'GL';
+        const settings = getSettings();
+        
+        const getUnitCard = (type, modeVar, iconUrl, iconClass, label) => {
+            const bgStyle = iconUrl ? `style="background-image: url('${iconUrl}'); background-size: cover; background-position: center;"` : '';
+            const content = iconUrl 
+                ? `<div class="absolute inset-0 bg-slate-900/40 group-hover:bg-slate-900/20 transition-colors"></div><span class="font-bold text-white text-sm sm:text-base uppercase relative z-10 tracking-widest drop-shadow-lg text-center leading-tight px-2">${label}</span>`
+                : `<div class="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-slate-50 group-hover:bg-cyan-50 flex items-center justify-center transition-colors"><i class="fa-solid ${iconClass} text-2xl sm:text-3xl text-slate-400 group-hover:text-cyan-600"></i></div><span class="font-bold text-slate-700 text-[11px] sm:text-xs uppercase tracking-wide text-center leading-tight mt-2 px-2">${label}</span>`;
+            
+            return `<button onclick="${modeVar}='${type}'; renderApp(false);" class="relative bg-white border border-slate-200 hover:border-cyan-500 hover:shadow-md rounded-xl flex flex-col items-center justify-center shadow-sm transition-all group aspect-square sm:aspect-[4/3] w-full sm:w-44 overflow-hidden" ${bgStyle}>${content}</button>`;
+        };
+
+        const btnCT = getUnitCard('Crane Truck', 'userOrderFleetMode', settings.icon_ct_url, 'fa-truck-moving', 'Crane Truck');
+        const btnBC = getUnitCard('Big Crane', 'userOrderFleetMode', settings.icon_bc_url, 'fa-truck-ramp-box', 'Big Crane');
+        const btnLB = getUnitCard('Lowboy', 'userOrderFleetMode', settings.icon_lb_url, 'fa-trailer', 'Lowboy');
+
+        if (!userOrderFleetMode) {
+            return `
+            <div class="min-h-[70vh] flex flex-col items-center justify-center max-w-[900px] mx-auto w-full px-4 py-8">
+                <h2 class="text-sm sm:text-base font-bold text-slate-800 mb-6 text-center"><i class="fa-solid fa-list-check mr-1.5 text-cyan-600"></i>Pilih Unit Armada</h2>
+                <div class="grid grid-cols-2 sm:flex sm:flex-row sm:justify-center gap-4 sm:gap-6 w-full max-w-2xl mx-auto">
+                    ${btnCT}
+                    ${btnBC}
+                    ${btnLB}
+                </div>
+            </div>`;
+        }
+
+        const cat = userOrderFleetMode;
+        let formFields = '';
+        if (cat === 'Crane Truck') {
+            formFields = `
+                <div class="grid grid-cols-2 gap-2">
+                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Tgl Pelaksanaan *</label><input type="date" id="tgl_pelaksanaan" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Jam Req (HH:mm) *</label><input type="time" id="jam_pelaksanaan" onchange="calculateShift()" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Shift Kerja</label><input type="text" id="shift" class="w-full border border-slate-200 bg-slate-50 rounded-sm px-2 py-1.5 text-xs text-slate-500 cursor-not-allowed" placeholder="Otomatis" readonly></div>
+                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Durasi (Jam) *</label><input type="number" id="durasi_req" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                </div>
+                <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Lokasi Angkat *</label><input type="text" id="lok_angkat" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" placeholder="Muat..." required></div>
+                <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Lokasi Tujuan *</label><input type="text" id="lok_tujuan" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" placeholder="Bongkar..." required></div>
+                <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Deskripsi & Tonase Beban *</label><textarea id="deskripsi" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500 h-14" placeholder="Rincian..." required></textarea></div>
+                <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Upload Foto Bukti (Opsional)</label><input type="file" id="foto_evidence" accept="image/*" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] focus:outline-none focus:border-cyan-500 file:mr-2 file:py-0.5 file:px-2 file:rounded-sm file:border-0 file:text-[9px] file:font-semibold file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100 cursor-pointer"></div>
+            `;
+        } else if (cat === 'Big Crane') {
+            formFields = `
+                <div class="grid grid-cols-2 gap-2">
+                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Tgl Pelaksanaan *</label><input type="date" id="tgl_pelaksanaan" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Durasi *</label><div class="flex gap-1"><input type="number" id="durasi_req" class="w-2/3 border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" required><select id="satuan_durasi" class="w-1/3 border border-slate-300 rounded-sm px-1 py-1.5 text-xs focus:outline-none focus:border-cyan-500"><option value="JAM">Jam</option><option value="HARI">Hari</option></select></div></div>
+                </div>
+                <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Deskripsi Pekerjaan *</label><textarea id="deskripsi" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500 h-14" placeholder="Rincian..." required></textarea></div>
+                <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Upload Foto Bukti (Opsional)</label><input type="file" id="foto_evidence" accept="image/*" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] focus:outline-none focus:border-cyan-500 file:mr-2 file:py-0.5 file:px-2 file:rounded-sm file:border-0 file:text-[9px] file:font-semibold file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100 cursor-pointer"></div>
+            `;
+        } else if (cat === 'Lowboy') {
+             formFields = `
+                <div class="grid grid-cols-2 gap-2">
+                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Tgl Pelaksanaan *</label><input type="date" id="tgl_pelaksanaan" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Durasi *</label><div class="flex gap-1"><input type="number" id="durasi_req" class="w-2/3 border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" required><select id="satuan_durasi" class="w-1/3 border border-slate-300 rounded-sm px-1 py-1.5 text-xs focus:outline-none focus:border-cyan-500"><option value="JAM">Jam</option><option value="HARI">Hari</option></select></div></div>
+                </div>
+                <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Rute Naikan Barang *</label><input type="text" id="lok_angkat" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" placeholder="Titik muat..." required></div>
+                <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Rute Turunkan Barang *</label><input type="text" id="lok_tujuan" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500" placeholder="Titik bongkar..." required></div>
+                <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Deskripsi Pekerjaan *</label><textarea id="deskripsi" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500 h-14" placeholder="Rincian..." required></textarea></div>
+                <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Upload Foto Bukti (Opsional)</label><input type="file" id="foto_evidence" accept="image/*" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] focus:outline-none focus:border-cyan-500 file:mr-2 file:py-0.5 file:px-2 file:rounded-sm file:border-0 file:text-[9px] file:font-semibold file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100 cursor-pointer"></div>
+            `;
+        }
+
+        let requesterHtml = isAdminGL ? `
+            <div class="bg-cyan-50 border border-cyan-200 rounded-sm p-2 mb-3">
+                <p class="text-[9px] font-bold text-cyan-700 mb-1 uppercase tracking-wider"><i class="fa-solid fa-user-pen mr-1"></i>Delegasi: Info Pemohon</p>
+                <div class="grid grid-cols-2 gap-2 text-[10px]">
+                    <input type="text" id="del_nama" placeholder="Nama Pemohon..." value="${user.nama_lengkap}" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-sm px-1.5 py-1" required>
+                    <input list="profListDepartemen" id="del_dept" placeholder="Departemen..." value="${user.departemen}" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-sm px-1.5 py-1" required>
+                    <input list="profListPerusahaan" id="del_vendor" placeholder="Perusahaan/Vendor..." value="${user.perusahaan}" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-sm px-1.5 py-1" required>
+                    <input type="number" id="del_wa" placeholder="No WA..." value="${user.no_wa}" class="w-full border border-slate-300 rounded-sm px-1.5 py-1" required>
+                </div>
+                <div class="text-[9px] text-cyan-700 mt-1 font-semibold border-t border-cyan-200 pt-1">Section: <span id="del_section">${user.section || '-'}</span> (Tarik Otomatis)</div>
+            </div>` : `
+            <div class="bg-slate-50 border border-slate-200 rounded-sm p-2 mb-3">
+                <p class="text-[9px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Info Pemohon</p>
+                <div class="grid grid-cols-2 gap-y-1 gap-x-2 text-[10px]">
+                    <div><p class="text-slate-500 text-[9px]">Nama:</p><p class="font-semibold text-slate-800">${user.nama_lengkap}</p></div><div><p class="text-slate-500 text-[9px]">Dept:</p><p class="font-semibold text-slate-800">${user.departemen}</p></div>
+                    <div><p class="text-slate-500 text-[9px]">No. WA:</p><p class="font-semibold text-slate-800">${user.no_wa}</p></div><div><p class="text-slate-500 text-[9px]">Vendor:</p><p class="font-semibold text-slate-800">${user.perusahaan}</p></div>
+                    <div class="col-span-2 mt-0.5 pt-0.5 border-t border-slate-100"><p class="text-slate-500 text-[9px]">Section:</p><p class="font-semibold text-slate-800">${user.section || '-'}</p></div>
+                </div>
+            </div>`;
+
+        return `
+        <div class="max-w-md mx-auto bg-white rounded-md shadow-sm border border-slate-200 overflow-hidden mt-2">
+            <div class="p-2 border-b border-slate-100 flex items-center gap-2"><button onclick="userOrderFleetMode=null; renderApp(false);" class="w-6 h-6 rounded-sm border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50"><i class="fa-solid fa-arrow-left text-[10px]"></i></button><h2 class="text-sm font-bold text-slate-800">Order: <span class="text-cyan-600">${cat}</span></h2></div>
+            <div class="p-3">
+                <datalist id="profListPerusahaan">${m.perusahaan.map(p=>`<option value="${p}"></option>`).join('')}</datalist><datalist id="profListDepartemen">${m.departemen.map(d=>`<option value="${d}"></option>`).join('')}</datalist>
+                ${requesterHtml}
+                <form onsubmit="submitOrder(event)" class="space-y-2">${formFields}<div class="pt-2 mt-3 border-t border-slate-100"><button id="btnSubmitOrder" type="submit" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-1.5 rounded-sm transition-colors text-xs shadow-sm">Submit Order</button></div></form>
+            </div>
+        </div>`;
+    }
+
+    function calculateShift() {
+        const jamInput = document.getElementById('jam_pelaksanaan'); if (!jamInput || !jamInput.value) return;
+        const shiftField = document.getElementById('shift'); if(!shiftField) return;
+        const h = parseInt(jamInput.value.split(':')[0]); shiftField.value = (h >= 5 && h < 17) ? "Shift 1" : "Shift 2";
+    }
+
+    async function submitOrder(e) {
+        e.preventDefault();
+        const btnSubmit = document.getElementById('btnSubmitOrder'); btnSubmit.disabled = true; btnSubmit.innerText = "Orderan sedang diproses...";
+        const user = JSON.parse(localStorage.getItem('lifting_user')); const cat = userOrderFleetMode; const isAdminGL = user.role === 'ADMIN' || user.role === 'GL';
+        
+        let tgl = document.getElementById('tgl_pelaksanaan')?.value || ''; let jam = document.getElementById('jam_pelaksanaan')?.value || ''; let statusTag = 'SCHEDULED';
+        if (tgl) {
+            let reqDate = new Date(`${tgl}T00:00:00`); let now = new Date(); now.setHours(0,0,0,0); let diffDays = (reqDate - now) / (1000 * 60 * 60 * 24);
+            if (cat === 'Big Crane') { if (diffDays < 3) statusTag = 'UNSCHEDULED'; } 
+            else if (cat === 'Crane Truck' && jam) { let reqTime = new Date(`${tgl}T${jam}:00`); let diffHours = (reqTime - new Date()) / (1000 * 60 * 60); if (diffHours < 6) statusTag = 'UNSCHEDULED'; }
+        }
+
+        let durasiVal = document.getElementById('durasi_req')?.value || ''; let satuan = document.getElementById('satuan_durasi')?.value || 'JAM';
+        const baseOrder = {
+            no_wo: generateWO(cat), timestamp: new Date().toISOString(), kategori: cat, nrp_pemohon: user.nrp, 
+            nama_pemohon: isAdminGL ? document.getElementById('del_nama').value : user.nama_lengkap, perusahaan: isAdminGL ? document.getElementById('del_vendor').value : user.perusahaan, 
+            departemen: isAdminGL ? document.getElementById('del_dept').value : user.departemen, section: user.section || '-', no_wa: isAdminGL ? document.getElementById('del_wa').value : user.no_wa,
+            tgl_pelaksanaan: tgl, jam_pelaksanaan: jam, shift: document.getElementById('shift')?.value || '-', durasi_request: `${durasiVal} ${satuan}`,
+            lokasi_angkat: document.getElementById('lok_angkat')?.value || '', lokasi_tujuan: document.getElementById('lok_tujuan')?.value || '', deskripsi: document.getElementById('deskripsi')?.value || '',
+            status: statusTag, foto_evidence: '', gl: '', unit: '', operator: '', rigger: '', rigger2: '', jam_start_aktual: '', jam_end_aktual: '', durasi_aktual: '', final_inspeksi: '', alasan_telat: '', alasan_overtime: '', alasan_pending: ''
+        };
+
+        const fotoInput = document.getElementById('foto_evidence');
+        if (fotoInput && fotoInput.files.length > 0) {
+            const file = fotoInput.files[0]; const reader = new FileReader();
+            reader.onload = function(event) {
+                const img = new Image();
+                img.onload = async function() {
+                    const canvas = document.createElement('canvas'); const MAX_WIDTH = 800; const MAX_HEIGHT = 800; let width = img.width; let height = img.height;
+                    if (width > height) { if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; } } else { if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; } }
+                    canvas.width = width; canvas.height = height; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, width, height);
+                    let compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
+
+                    if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.startsWith('http')) {
+                        try {
+                            let base64Data = compressedBase64.split(',')[1];
+                            let response = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fileName: `Bukti_${baseOrder.no_wo}.jpg`, mimeType: 'image/jpeg', data: base64Data }) });
+                            let result = await response.json(); if (result.status === 'success' && result.fileUrl) { baseOrder.foto_evidence = result.fileUrl; } else { baseOrder.foto_evidence = compressedBase64; }
+                        } catch(err) { console.warn("Drive upload error, fallback to local:", err); baseOrder.foto_evidence = compressedBase64; }
+                    } else { baseOrder.foto_evidence = compressedBase64; }
+                    finishSubmitOrder(baseOrder, user);
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        } else { finishSubmitOrder(baseOrder, user); }
+    }
+
+    function finishSubmitOrder(newOrder, user) {
+        const orders = getOrders();
+        orders.unshift(newOrder);
+        saveOrders(orders);
+        
+        currentTab = (user.role === 'ADMIN' || user.role === 'GL') ? 'dashboard' : 'monitoring';
+        userOrderFleetMode = null;
+        renderApp(false);
+        showSuccessAnim('check', 'Order Terkirim!', 'Pemesanan alat berat Anda berhasil disubmit.');
+    }
+
+    function getManpowerWorkflow() {
+        const settings = getSettings() || {};
+        
+        const getUnitCard = (type, modeVar, iconUrl, iconClass, label) => {
+            const bgStyle = iconUrl ? `style="background-image: url('${iconUrl}'); background-size: cover; background-position: center;"` : '';
+            const content = iconUrl 
+                ? `<div class="absolute inset-0 bg-slate-900/40 group-hover:bg-slate-900/20 transition-colors"></div><span class="font-bold text-white text-sm sm:text-base uppercase relative z-10 tracking-widest drop-shadow-lg text-center leading-tight px-2">${label}</span>`
+                : `<div class="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-slate-50 group-hover:bg-cyan-50 flex items-center justify-center transition-colors"><i class="fa-solid ${iconClass} text-2xl sm:text-3xl text-slate-400 group-hover:text-cyan-600"></i></div><span class="font-bold text-slate-700 text-[11px] sm:text-xs uppercase tracking-wide text-center leading-tight mt-2 px-2">${label}</span>`;
+            return `<button onclick="${modeVar}='${type}'; renderApp(false);" class="relative bg-white border border-slate-200 hover:border-cyan-500 hover:shadow-md rounded-xl flex flex-col items-center justify-center shadow-sm transition-all group aspect-square sm:aspect-[4/3] w-full sm:w-44 overflow-hidden" ${bgStyle}>${content}</button>`;
+        };
+
+        const btnCT = getUnitCard('Crane Truck', 'mpFleetMode', settings.icon_ct_url, 'fa-truck-moving', 'Crane Truck');
+        const btnBC = getUnitCard('Big Crane', 'mpFleetMode', settings.icon_bc_url, 'fa-truck-ramp-box', 'Big Crane');
+        const btnLB = getUnitCard('Lowboy', 'mpFleetMode', settings.icon_lb_url, 'fa-trailer', 'Lowboy');
+
+        if (!mpFleetMode) return `<div class="min-h-[70vh] flex flex-col items-center justify-center max-w-[900px] mx-auto w-full px-4 py-8"><h2 class="text-sm sm:text-base font-bold text-slate-800 mb-6 text-center"><i class="fa-solid fa-list-check mr-1.5 text-cyan-600"></i>Pilih Unit Armada</h2><div class="grid grid-cols-2 sm:flex sm:flex-row sm:justify-center gap-4 sm:gap-6 w-full max-w-2xl mx-auto">${btnCT}${btnBC}${btnLB}</div></div>`;
+
+        const m = getMasterData(); let unitOptions = [];
+        if (mpFleetMode === 'Crane Truck') unitOptions = m.unit_ct; else if (mpFleetMode === 'Big Crane') unitOptions = m.unit_big_crane; else if (mpFleetMode === 'Lowboy') unitOptions = m.unit_lowboy;
+        let filterUnit = document.getElementById('mp_filter_unit') ? document.getElementById('mp_filter_unit').value : 'ALL';
+        
+        let jobs = getOrders().filter(j => j.kategori === mpFleetMode);
+        if (currentMpPanel === 'PENDING') jobs = jobs.filter(j => j.status === 'PENDING' && j.operator); else jobs = jobs.filter(j => j.status === currentMpPanel);
+        if (filterUnit !== 'ALL') jobs = jobs.filter(j => j.unit === filterUnit);
+
+        let html = `
+        <div class="flex items-center gap-2 mb-2 mt-2"><button onclick="mpFleetMode=null; renderApp(false);" class="w-6 h-6 rounded-sm border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 bg-white shadow-sm"><i class="fa-solid fa-arrow-left text-[10px]"></i></button><h2 class="text-xs font-bold text-slate-800">Tugas: <span class="text-cyan-600">${mpFleetMode}</span></h2></div>
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <div class="flex gap-1 overflow-x-auto hide-scrollbar bg-white p-0.5 rounded-full shadow-sm border border-slate-200">${['ON PROGRESS', 'PENDING', 'COMPLETED', 'CANCELED'].map(panel => `<button onclick="currentMpPanel='${panel}'; renderApp(true)" class="px-2.5 py-1 rounded-full text-[9px] font-bold whitespace-nowrap transition-colors ${currentMpPanel === panel ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}">${panel}</button>`).join('')}</div>
+            <select id="mp_filter_unit" onchange="renderApp(true)" class="text-[9px] font-bold bg-white border border-slate-300 text-slate-700 rounded-full px-2 py-1 outline-none shadow-sm focus:border-cyan-500"><option value="ALL">Semua Unit</option>${unitOptions.map(u => `<option value="${u}" ${filterUnit === u ? 'selected' : ''}>${u}</option>`).join('')}</select>
+        </div>
+        <div class="space-y-2 pb-4">`;
+
+        if (jobs.length === 0) html += `<div class="bg-white rounded-md p-4 text-center border shadow-sm"><p class="text-slate-400 text-[11px]">Kosong.</p></div>`;
+
+        jobs.forEach(job => {
+            html += `
+            <div class="bg-white rounded-md p-2.5 border border-slate-200 shadow-sm relative text-[11px]">
+                <div class="flex justify-between items-start mb-1.5"><div class="text-[9px] font-mono font-bold text-cyan-600 cursor-pointer hover:underline" onclick="viewJobDetail('${job.no_wo}')" title="Buka Detail">${job.no_wo}</div><div class="text-[9px] bg-cyan-50 text-cyan-700 border border-cyan-100 px-1.5 py-0.5 rounded-sm font-semibold">Unit: ${job.unit || '-'}</div></div>
+                <div class="font-bold text-slate-800 text-xs mb-0.5">Req: ${job.tgl_pelaksanaan} ${job.jam_pelaksanaan || ''}</div>
+                ${job.kategori !== 'Big Crane' ? `<div class="text-[10px] text-slate-500 mb-2 truncate">Lokasi: ${job.lokasi_angkat||'-'} ➔ ${job.lokasi_tujuan||'-'}</div>` : `<div class="text-[10px] text-slate-500 mb-2 truncate border-l-2 border-slate-300 pl-1">${job.deskripsi}</div>`}
+                <div class="flex gap-1.5">
+                    ${job.status === 'ON PROGRESS' ? `<button onclick="openManpowerAction('${job.no_wo}')" class="flex-1 bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-1 rounded-sm text-[10px] transition-colors shadow-sm">Eksekusi</button>` : ''}
+                    ${job.status === 'PENDING' ? `<button onclick="promptLanjutPending('${job.no_wo}')" class="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-bold py-1 rounded-sm text-[10px] transition-colors shadow-sm"><i class="fa-solid fa-forward mr-1"></i> Lanjut Job</button>` : ''}
+                </div>
+            </div>`;
+        });
+
+        html += `</div>`;
+        return html;
+    }
+
+    function openManpowerAction(wo) {
+        const job = getOrders().find(j => j.no_wo === wo); const m = getMasterData();
+        let opOptions = m.operator.map(o => `<option value="${o}">${o}</option>`).join(''); let rigOptions = m.rigger.map(r => `<option value="${r}">${r}</option>`).join('');
+        let mpRiggerHtml = `<div><label class="block text-[9px] text-slate-500 mb-0.5">Rigger 1</label><select id="mp_rig" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px]"><option value="">-- Pilih --</option>${rigOptions}</select></div>`;
+        if (job.kategori === 'Big Crane') mpRiggerHtml += `<div><label class="block text-[9px] text-slate-500 mb-0.5">Rigger 2</label><select id="mp_rig2" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px]"><option value="">-- Pilih --</option>${rigOptions}</select></div>`;
+
+        document.getElementById('mpActionContent').innerHTML = `
+            <div class="bg-blue-50 border border-blue-100 text-blue-700 p-1.5 text-[9px] rounded-sm mb-2"><strong>Target:</strong> Jam ${job.jam_pelaksanaan || '-'} | Durasi ${job.durasi_request}</div>
+            <div id="mpFormError" class="bg-red-50 border border-red-200 text-red-600 font-bold p-1.5 text-[9px] rounded-sm mb-2 hidden"></div>
+            <form id="formMpAction" class="space-y-2">
+                <div><label class="block text-[9px] text-slate-500 mb-0.5">Operator</label><select id="mp_op" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px]"><option value="">-- Pilih --</option>${opOptions}</select></div>
+                <div class="grid grid-cols-${job.kategori === 'Big Crane' ? '2' : '1'} gap-2">${mpRiggerHtml}</div>
+                <div class="grid grid-cols-2 gap-2"><div><label class="block text-[9px] text-slate-500 mb-0.5">Mulai Aktual</label><input type="time" id="mp_start" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px]"></div><div><label class="block text-[9px] text-slate-500 mb-0.5">Selesai Aktual</label><input type="time" id="mp_end" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px]"></div></div>
+                <div class="mt-1 mb-2"><label class="block text-[9px] font-bold text-green-700 mb-0.5"><i class="fa-solid fa-clipboard-check mr-0.5"></i>Final Inspeksi</label><input type="time" id="mp_inspeksi" class="w-full border border-green-300 bg-green-50 rounded-sm px-1.5 py-1 text-[10px] focus:border-green-500 outline-none"></div>
+                <div class="grid grid-cols-3 gap-1.5 pt-2 border-t border-slate-100">
+                    <button type="button" onclick="processMpAction(event, '${wo}', 'COMPLETED')" class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-1.5 rounded-sm text-[9px]"><i class="fa-solid fa-check"></i> Selesai</button>
+                    <button type="button" onclick="initiatePendingJob('${wo}')" class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-1.5 rounded-sm text-[9px]"><i class="fa-solid fa-pause"></i> Pending</button>
+                    <button type="button" onclick="initiateCancelJob('${wo}')" class="bg-red-500 hover:bg-red-600 text-white font-bold py-1.5 rounded-sm text-[9px]"><i class="fa-solid fa-xmark"></i> Batal</button>
+                </div>
+            </form>`;
+        document.getElementById('mpActionModal').classList.remove('hidden');
+    }
+
+    let tempMpData = null; let activeCancelWo = null;
+    function initiateCancelJob(wo) { activeCancelWo = wo; document.getElementById('cancelReasonInput').value = ''; document.getElementById('cancelPromptModal').classList.remove('hidden'); document.getElementById('mpActionModal').classList.add('hidden'); document.getElementById('btnSubmitCancelJob').onclick = function() { let alasan = document.getElementById('cancelReasonInput').value.trim(); if(!alasan) return showToast('Alasan wajib diisi!', 'error'); let jobs = getOrders(); let idx = jobs.findIndex(j => j.no_wo === activeCancelWo); jobs[idx].status = 'CANCELED'; jobs[idx].alasan_telat = "Dibatalkan: " + alasan; saveOrders(jobs); showToast('Dibatalkan!'); document.getElementById('cancelPromptModal').classList.add('hidden'); renderApp(true); }; }
+
+    function processMpAction(e, wo, targetStatus) {
+        e.preventDefault(); const job = getOrders().find(j => j.no_wo === wo); if(!job) return;
+        const elStart = document.getElementById('mp_start'); const elEnd = document.getElementById('mp_end'); const elOp = document.getElementById('mp_op'); const elRig = document.getElementById('mp_rig'); const elRig2 = document.getElementById('mp_rig2'); const errorBox = document.getElementById('mpFormError');
+        let isMissing = false; const markError = (el) => { if(!el) return false; if(!el.value) { el.classList.add('border-red-500', 'bg-red-50', 'text-red-600'); el.classList.remove('border-slate-300'); return true; } else { el.classList.remove('border-red-500', 'bg-red-50', 'text-red-600'); el.classList.add('border-slate-300'); return false; } };
+        if (markError(elStart)) isMissing = true; if (markError(elEnd)) isMissing = true; if (markError(elOp)) isMissing = true; if (markError(elRig)) isMissing = true; if (job.kategori === 'Big Crane' && markError(elRig2)) isMissing = true;
+        if (isMissing) { errorBox.innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-1"></i> Lengkapi seluruh form waktu dan personal!'; errorBox.classList.remove('hidden'); return; } else { errorBox.classList.add('hidden'); }
+        const start = elStart.value; const end = elEnd.value; const op = elOp.value; const rig = elRig.value; const rig2 = elRig2 ? elRig2.value : ''; const inspeksi = document.getElementById('mp_inspeksi').value;
+        let dStart = new Date(`2000-01-01T${start}:00`); let dEnd = new Date(`2000-01-01T${end}:00`); if(dEnd < dStart) dEnd = new Date(`2000-01-02T${end}:00`); let actualMins = (dEnd - dStart) / (1000 * 60);
+        let reqMins = 0; if(job.durasi_request.includes('JAM')) reqMins = parseFloat(job.durasi_request) * 60; else if(job.durasi_request.includes('HARI')) reqMins = parseFloat(job.durasi_request) * 24 * 60;
+        let diffStartMins = 0; if(job.jam_pelaksanaan) { let reqStart = new Date(`2000-01-01T${job.jam_pelaksanaan}:00`); diffStartMins = (dStart - reqStart) / (1000 * 60); }
+        let isLate = diffStartMins > 15; let isOvertime = actualMins > (reqMins + 15);
+        tempMpData = { wo, start, end, op, rig, rig2, inspeksi, actualMins, isLate, isOvertime, diffStartMins, diffOvertime: actualMins - reqMins, status: targetStatus };
+        if(isLate || isOvertime) showKendalaModal(); else saveMpFinal(null, null); 
+    }
+
+    function showKendalaModal() {
+        document.getElementById('mpActionModal').classList.add('hidden'); let html = `<div class="bg-red-50 border border-red-200 text-red-600 p-1.5 text-[9px] rounded-sm mb-2"><strong>Wajib Diisi:</strong> Jam aktual > toleransi.</div><form onsubmit="submitKendala(event)" class="space-y-2">`;
+        if(tempMpData.isLate) html += `<div><label class="block text-[9px] font-bold text-red-600 mb-0.5"><i class="fa-regular fa-clock mr-1"></i>Alasan Telat (${Math.round(tempMpData.diffStartMins)} Menit):</label><textarea id="alasan_telat" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px]" required></textarea></div>`;
+        if(tempMpData.isOvertime) html += `<div><label class="block text-[9px] font-bold text-red-600 mb-0.5"><i class="fa-solid fa-stopwatch mr-1"></i>Alasan Over (${Math.round(tempMpData.diffOvertime)} Menit):</label><textarea id="alasan_over" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px]" required></textarea></div>`;
+        html += `<div class="flex gap-1.5 pt-1 mt-1 border-t border-slate-100"><button type="button" onclick="document.getElementById('kendalaModal').classList.add('hidden'); document.getElementById('mpActionModal').classList.remove('hidden');" class="flex-1 bg-slate-100 text-slate-600 font-bold py-1.5 rounded-sm text-[10px]">Cancel</button><button type="submit" class="flex-1 bg-red-500 text-white font-bold py-1.5 rounded-sm text-[10px]">Simpan Kendala</button></div></form>`;
+        document.getElementById('kendalaContent').innerHTML = html; document.getElementById('kendalaModal').classList.remove('hidden');
+    }
+
+    function submitKendala(e) { e.preventDefault(); let aTelat = tempMpData.isLate ? document.getElementById('alasan_telat').value : null; let aOver = tempMpData.isOvertime ? document.getElementById('alasan_over').value : null; saveMpFinal(aTelat, aOver); document.getElementById('kendalaModal').classList.add('hidden'); }
+
+    function saveMpFinal(alasanTelat, alasanOvertime) {
+        let jobs = getOrders(); let idx = jobs.findIndex(j => j.no_wo === tempMpData.wo);
+        jobs[idx].operator = tempMpData.op; jobs[idx].rigger = tempMpData.rig; if (tempMpData.rig2) jobs[idx].rigger2 = tempMpData.rig2;
+        jobs[idx].jam_start_aktual = tempMpData.start; jobs[idx].jam_end_aktual = tempMpData.end; jobs[idx].final_inspeksi = tempMpData.inspeksi; jobs[idx].durasi_aktual = (tempMpData.actualMins / 60).toFixed(2); jobs[idx].status = tempMpData.status;
+        if(alasanTelat) jobs[idx].alasan_telat = alasanTelat; if(alasanOvertime) jobs[idx].alasan_overtime = alasanOvertime;
+        
+        saveOrders(jobs); 
+        document.getElementById('mpActionModal').classList.add('hidden'); 
+        renderApp(true);
+        
+        if (tempMpData.status === 'COMPLETED') {
+            showSuccessAnim('thumb', 'Kerja Bagus!', 'Pekerjaan telah diselesaikan dan laporan siap.');
+        } else {
+            showToast('Tersimpan!');
+        }
+    }
+
+    let tempPendingData = null;
+    function initiatePendingJob(wo) {
+        const job = getOrders().find(j => j.no_wo === wo); if(!job) return;
+        const elStart = document.getElementById('mp_start'); const elEnd = document.getElementById('mp_end'); const elOp = document.getElementById('mp_op'); const elRig = document.getElementById('mp_rig'); const elRig2 = document.getElementById('mp_rig2'); const errorBox = document.getElementById('mpFormError');
+        let isMissing = false; const markError = (el) => { if(!el) return false; if(!el.value) { el.classList.add('border-red-500', 'bg-red-50', 'text-red-600'); el.classList.remove('border-slate-300'); return true; } else { el.classList.remove('border-red-500', 'bg-red-50', 'text-red-600'); el.classList.add('border-slate-300'); return false; } };
+        if (markError(elStart)) isMissing = true; if (markError(elEnd)) isMissing = true; if (markError(elOp)) isMissing = true; if (markError(elRig)) isMissing = true; if (job.kategori === 'Big Crane' && markError(elRig2)) isMissing = true;
+        if (isMissing) { errorBox.innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-1"></i> Isi jam aktual & personal shift ini sebelum pending!'; errorBox.classList.remove('hidden'); return; } else { errorBox.classList.add('hidden'); }
+        const start = elStart.value; const end = elEnd.value; const op = elOp.value; const rig = elRig.value; const rig2 = elRig2 ? elRig2.value : ''; const inspeksi = document.getElementById('mp_inspeksi') ? document.getElementById('mp_inspeksi').value : '';
+        let dStart = new Date(`2000-01-01T${start}:00`); let dEnd = new Date(`2000-01-01T${end}:00`); if(dEnd < dStart) dEnd = new Date(`2000-01-02T${end}:00`); let actualMins = (dEnd - dStart) / (1000 * 60); let durasi_aktual = (actualMins / 60).toFixed(2);
+        tempPendingData = { wo, start, end, op, rig, rig2, inspeksi, durasi_aktual }; document.getElementById('pendingReasonInput').value = ''; document.getElementById('pendingPromptModal').classList.remove('hidden');
+    }
+
+    function submitPendingJob() {
+        let alasan = document.getElementById('pendingReasonInput').value.trim(); if(!alasan) return showToast('Mohon isi alasan pending!', 'error');
+        let jobs = getOrders(); let idx = jobs.findIndex(j => j.no_wo === tempPendingData.wo);
+        jobs[idx].operator = tempPendingData.op; jobs[idx].rigger = tempPendingData.rig; if (tempPendingData.rig2) jobs[idx].rigger2 = tempPendingData.rig2; jobs[idx].jam_start_aktual = tempPendingData.start; jobs[idx].jam_end_aktual = tempPendingData.end; jobs[idx].final_inspeksi = tempPendingData.inspeksi; jobs[idx].durasi_aktual = tempPendingData.durasi_aktual; jobs[idx].alasan_telat = "Dipending: " + alasan; jobs[idx].status = 'PENDING';
+        saveOrders(jobs); showToast('Jam kerja tersimpan. Status: PENDING.'); document.getElementById('pendingPromptModal').classList.add('hidden'); document.getElementById('mpActionModal').classList.add('hidden'); tempPendingData = null; renderApp(true);
+    }
+
+    function promptLanjutPending(wo) { openCustomConfirm('Lanjutkan Pekerjaan?', 'Shift ini akan ditutup (Completed) dan job lanjutan akan diteruskan ke Admin/GL untuk validasi shift baru.', () => { processLanjutPending(wo); }); }
+
+    function processLanjutPending(wo) {
+        let jobs = getOrders(); let idx = jobs.findIndex(j => j.no_wo === wo); if (idx === -1) return;
+        let currentJob = jobs[idx]; currentJob.status = 'COMPLETED'; let newJob = JSON.parse(JSON.stringify(currentJob));
+        let baseWo = currentJob.no_wo; let lanjutanCount = 1; if (baseWo.includes('-L')) { let parts = baseWo.split('-L'); baseWo = parts[0]; lanjutanCount = parseInt(parts[1] || 1) + 1; }
+        newJob.no_wo = `${baseWo}-L${lanjutanCount}`; newJob.timestamp = new Date().toISOString(); newJob.status = 'PENDING'; newJob.operator = ''; newJob.rigger = ''; newJob.rigger2 = ''; newJob.jam_start_aktual = ''; newJob.jam_end_aktual = ''; newJob.durasi_aktual = ''; newJob.alasan_telat = ''; newJob.alasan_overtime = ''; newJob.final_inspeksi = '';
+        jobs.unshift(newJob); saveOrders(jobs); showToast('Shift ditutup, Lanjutan dikirim ke GL!'); renderApp(true);
     }
 
     let currentMasterTab = 'branding';
