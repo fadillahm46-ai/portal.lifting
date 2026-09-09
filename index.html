@@ -19,13 +19,11 @@
 </head>
 <body class="antialiased text-[11px] sm:text-xs">
 
-    <!-- Container Utama -->
     <div id="app" class="min-h-screen"></div>
 
 <script>
     // ================= KONFIGURASI DATABASE CLOUD =================
     const SUPABASE_URL = 'https://ustlhxarxxslcmjezqyu.supabase.co';
-    // PASTIKAN KUNCI DI BAWAH INI ADALAH KUNCI ANON PUBLIC ANDA YANG LENGKAP
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVzdGxoeGFyeHhzbGNtamV6cXl1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg4NzMwMjEsImV4cCI6MjEwNDQ0OTAyMX0.sY19qVqNnDG-ttSG316CtcPZ79FvPTBpqCn37YP7nag';
 
     // Google Apps Script (Untuk Upload Foto Bukti ke Google Drive)
@@ -58,9 +56,7 @@
     const defaultSettings = { id: 1, bg_url: '', logo_url: '', icon_ct_url: '', icon_bc_url: '', icon_lb_url: '' };
     if (!localStorage.getItem('lifting_settings')) localStorage.setItem('lifting_settings', JSON.stringify(defaultSettings));
     
-    function getSettings() { 
-        return JSON.parse(localStorage.getItem('lifting_settings')) || defaultSettings; 
-    }
+    function getSettings() { return JSON.parse(localStorage.getItem('lifting_settings')) || defaultSettings; }
 
     let currentTab = 'monitoring'; 
     let currentMpPanel = 'ON PROGRESS';
@@ -75,7 +71,7 @@
     setInterval(async () => {
         if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
         const user = localStorage.getItem('lifting_user');
-        if (!user) return; // Berhenti jika belum login
+        if (!user) return; // Stop jika tidak login
 
         // Keamanan UI: Cegah render layar saat user sedang mengetik atau modal pop-up terbuka
         const isTyping = document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
@@ -87,10 +83,11 @@
         try {
             let shouldRender = false;
 
-            // Tarik Data Order Baru
-            const resOrders = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*`, {
+            // Tarik Data Order Baru dengan sorting dari timestamp terdahulu
+            const resOrders = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=timestamp.desc`, {
                 headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
             });
+            
             if (resOrders.ok) {
                 const data = await resOrders.json();
                 const oldData = localStorage.getItem('lifting_orders');
@@ -105,6 +102,7 @@
             const resSettings = await fetch(`${SUPABASE_URL}/rest/v1/settings?id=eq.1`, {
                 headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
             });
+
             if (resSettings.ok) {
                 const sData = await resSettings.json();
                 if (sData && sData.length > 0) {
@@ -117,13 +115,11 @@
                 }
             }
 
-            // Eksekusi update UI (Refresh layar) hanya jika aman
+            // Eksekusi update UI jika aman
             if (shouldRender && !isTyping && !isModalOpen && currentTab !== 'order') {
                 renderApp();
             }
-        } catch(e) {
-            // Abaikan error jika koneksi terputus (PWA mode offline)
-        }
+        } catch(e) {}
     }, 3000);
 
     // Fungsi fetch manual (untuk load pertama / tombol tarik paksa)
@@ -131,7 +127,7 @@
         if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
         try {
             const [resOrders, resSettings] = await Promise.all([
-                fetch(`${SUPABASE_URL}/rest/v1/orders?select=*`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }),
+                fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=timestamp.desc`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }),
                 fetch(`${SUPABASE_URL}/rest/v1/settings?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } })
             ]);
 
@@ -143,13 +139,8 @@
                 const sData = await resSettings.json();
                 if(sData && sData.length > 0) localStorage.setItem('lifting_settings', JSON.stringify(sData[0]));
             }
-            if(isManual) { 
-                showToast("Data terbaru berhasil ditarik!", "success"); 
-                renderApp(); 
-            }
-        } catch(e) { 
-            console.warn("Mode Offline: Gagal mengambil data cloud", e); 
-        }
+            if(isManual) { showToast("Data berhasil ditarik!", "success"); renderApp(); }
+        } catch(e) { console.warn("Gagal mengambil data:", e); }
     }
 
     async function syncToSupabase(orders) {
@@ -158,21 +149,14 @@
             if (!orders || orders.length === 0) return;
             const res = await fetch(`${SUPABASE_URL}/rest/v1/orders?on_conflict=no_wo`, {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json', 
-                    'apikey': SUPABASE_KEY, 
-                    'Authorization': `Bearer ${SUPABASE_KEY}`, 
-                    'Prefer': 'resolution=merge-duplicates' 
-                },
+                headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'resolution=merge-duplicates' },
                 body: JSON.stringify(orders)
             });
             if (!res.ok) {
                 const errDetail = await res.text();
                 showToast("Gagal sync ke cloud: " + errDetail, "error");
             }
-        } catch (e) { 
-            console.error("Koneksi internet tidak ada. Data tersimpan lokal.", e); 
-        }
+        } catch (e) { console.error("Koneksi gagal:", e); }
     }
 
     function getOrders() { return JSON.parse(localStorage.getItem('lifting_orders')) || []; }
@@ -193,9 +177,7 @@
 
     function getSortIcon(col) {
         if (sortColumn !== col) return '<i class="fa-solid fa-sort text-slate-300 ml-1"></i>';
-        return sortDirection === 'asc' 
-            ? '<i class="fa-solid fa-sort-up text-cyan-600 ml-1"></i>' 
-            : '<i class="fa-solid fa-sort-down text-cyan-600 ml-1"></i>';
+        return sortDirection === 'asc' ? '<i class="fa-solid fa-sort-up text-cyan-600 ml-1"></i>' : '<i class="fa-solid fa-sort-down text-cyan-600 ml-1"></i>';
     }
 
     function showToast(message, type = 'success') {
@@ -203,10 +185,7 @@
         toast.className = `fixed top-2 right-2 z-[100] px-3 py-1.5 rounded shadow-md text-white text-[10px] font-medium transition-opacity duration-300 ${type === 'success' ? 'bg-emerald-500' : 'bg-red-500'}`;
         toast.innerHTML = `<i class="fa-solid ${type === 'success' ? 'fa-check-circle' : 'fa-circle-exclamation'} mr-1"></i>${message}`;
         document.body.appendChild(toast);
-        setTimeout(() => { 
-            toast.style.opacity = '0'; 
-            setTimeout(() => toast.remove(), 300); 
-        }, 3000);
+        setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3000);
     }
 
     function togglePassword(inputId, iconId) {
@@ -214,27 +193,20 @@
         let icon = document.getElementById(iconId);
         if (input.type === "password") { 
             input.type = "text"; 
-            icon.classList.replace('fa-eye', 'fa-eye-slash'); 
+            icon.classList.remove('fa-eye');
+            icon.classList.add('fa-eye-slash');
         } else { 
             input.type = "password"; 
-            icon.classList.replace('fa-eye-slash', 'fa-eye'); 
+            icon.classList.remove('fa-eye-slash');
+            icon.classList.add('fa-eye');
         }
     }
 
     function copyText(text, label) {
         const el = document.createElement('textarea');
-        el.value = text; 
-        el.setAttribute('readonly', ''); 
-        el.style.position = 'absolute'; 
-        el.style.left = '-9999px';
-        document.body.appendChild(el); 
-        el.select();
-        try { 
-            document.execCommand('copy'); 
-            showToast(label + ' disalin!'); 
-        } catch (err) { 
-            showToast('Gagal menyalin', 'error'); 
-        }
+        el.value = text; el.setAttribute('readonly', ''); el.style.position = 'absolute'; el.style.left = '-9999px';
+        document.body.appendChild(el); el.select();
+        try { document.execCommand('copy'); showToast(label + ' disalin!'); } catch (err) { showToast('Gagal menyalin', 'error'); }
         document.body.removeChild(el);
     }
 
@@ -276,11 +248,9 @@
             app.innerHTML = getAuthView(); 
             return; 
         }
+        
         const isMobile = window.innerWidth < 768;
-
-        const logoHtmlMobile = settings.logo_url 
-            ? `<img src="${settings.logo_url}" alt="Logo" class="w-5 h-5 object-contain">` 
-            : `<div class="bg-cyan-600 text-white p-1 rounded-sm flex items-center justify-center"><i class="fa-solid fa-truck-moving text-[10px]"></i></div>`;
+        const logoHtmlMobile = settings.logo_url ? `<img src="${settings.logo_url}" alt="Logo" class="w-5 h-5 object-contain">` : `<div class="bg-cyan-600 text-white p-1 rounded-sm flex items-center justify-center"><i class="fa-solid fa-truck-moving text-[10px]"></i></div>`;
 
         app.innerHTML = `
             <div class="flex h-screen bg-slate-50 overflow-hidden">
@@ -291,10 +261,7 @@
                         <div class="flex items-center gap-1.5 text-cyan-700 font-bold text-xs uppercase tracking-tight">
                             ${logoHtmlMobile} ${user.role === 'MANPOWER' ? 'PANEL LAPANGAN' : 'Support Equipment'}
                         </div>
-                        ${user.role === 'MANPOWER' ? `
-                        <div class="flex items-center gap-2">
-                            <span class="text-[9px] font-semibold text-slate-600 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-sm">${user.nama_lengkap}</span>
-                        </div>` : ''}
+                        ${user.role === 'MANPOWER' ? `<div class="flex items-center gap-2"><span class="text-[9px] font-semibold text-slate-600 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-sm">${user.nama_lengkap}</span></div>` : ''}
                     </div>` : ''}
                     
                     <div class="flex-1 overflow-y-auto p-2 sm:p-3 pb-16 sm:pb-3 relative w-full hide-scrollbar">
@@ -342,9 +309,7 @@
         const isUSER = user.role === 'USER'; 
         const isMP = user.role === 'MANPOWER';
         
-        const logoHtmlDesktop = settings.logo_url 
-            ? `<img src="${settings.logo_url}" alt="Logo" class="w-6 h-6 object-contain rounded-sm shadow-sm">` 
-            : `<div class="bg-cyan-600 text-white p-1.5 rounded shadow-sm flex items-center justify-center"><i class="fa-solid fa-truck-moving text-[10px]"></i></div>`;
+        const logoHtmlDesktop = settings.logo_url ? `<img src="${settings.logo_url}" alt="Logo" class="w-6 h-6 object-contain rounded-sm shadow-sm">` : `<div class="bg-cyan-600 text-white p-1.5 rounded shadow-sm flex items-center justify-center"><i class="fa-solid fa-truck-moving text-[10px]"></i></div>`;
 
         return `
         <div class="w-44 bg-white border-r border-slate-200 flex flex-col h-full shrink-0 z-20">
@@ -354,17 +319,12 @@
             
             <div class="flex-1 overflow-y-auto py-3 px-2 flex flex-col gap-0.5 hide-scrollbar">
                 <div class="text-[9px] font-bold text-slate-400 tracking-wider mb-1 ml-1 uppercase">${isMP ? 'Panel Lapangan' : 'Menu Utama'}</div>
-                
                 ${(isAdmin || isGL) ? `<button onclick="switchTab('dashboard')" class="w-full text-left px-2 py-1.5 rounded-sm text-[11px] font-medium transition-all flex items-center gap-2 ${currentTab === 'dashboard' ? 'bg-cyan-50 text-cyan-700 border-l-2 border-cyan-600 font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-2 border-transparent'}"><i class="fa-solid fa-chart-pie w-3 text-center text-[10px]"></i> Dashboard</button>` : ''}
-                
                 <button onclick="switchTab('monitoring')" class="w-full text-left px-2 py-1.5 rounded-sm text-[11px] font-medium transition-all flex items-center gap-2 mt-0.5 ${currentTab === 'monitoring' ? 'bg-cyan-50 text-cyan-700 border-l-2 border-cyan-600 font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-2 border-transparent'}"><i class="fa-solid ${isMP ? 'fa-hard-hat' : 'fa-list-check'} w-3 text-center text-[10px]"></i> ${isMP ? 'Tugas Aktif' : 'Data Order'}</button>
-                
                 ${(isUSER || isAdmin || isGL) ? `<button onclick="switchTab('order')" class="w-full text-left px-2 py-1.5 rounded-sm text-[11px] font-medium transition-all flex items-center gap-2 mt-0.5 ${currentTab === 'order' ? 'bg-cyan-50 text-cyan-700 border-l-2 border-cyan-600 font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-2 border-transparent'}"><i class="fa-solid fa-plus w-3 text-center text-[10px]"></i> Buat Order</button>` : ''}
                 
                 <div class="text-[9px] font-bold text-slate-400 tracking-wider mt-4 mb-1 ml-1 uppercase">Akun</div>
-                
                 ${isAdmin ? `<button onclick="switchTab('master')" class="w-full text-left px-2 py-1.5 rounded-sm text-[11px] font-medium transition-all flex items-center gap-2 ${currentTab === 'master' ? 'bg-cyan-50 text-cyan-700 border-l-2 border-cyan-600 font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-2 border-transparent'}"><i class="fa-solid fa-database w-3 text-center text-[10px]"></i> Master Data</button>` : ''}
-                
                 <button onclick="switchTab('profile')" class="w-full text-left px-2 py-1.5 rounded-sm text-[11px] font-medium transition-all flex items-center gap-2 mt-0.5 ${currentTab === 'profile' ? 'bg-cyan-50 text-cyan-700 border-l-2 border-cyan-600 font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-2 border-transparent'}"><i class="fa-solid fa-user w-3 text-center text-[10px]"></i> Profil Saya</button>
             </div>
             
@@ -381,13 +341,9 @@
         return `
         <div class="fixed bottom-0 w-full bg-white border-t border-slate-200 px-2 py-0.5 flex justify-around items-center z-40 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
             ${(user.role === 'ADMIN' || user.role === 'GL') ? `<button onclick="switchTab('dashboard')" class="flex flex-col items-center p-1 ${currentTab === 'dashboard' ? 'text-cyan-600' : 'text-slate-400'}"><i class="fa-solid fa-chart-pie text-base mb-0"></i><span class="text-[8px] font-medium">Dashboard</span></button>` : ''}
-            
             <button onclick="switchTab('monitoring')" class="flex flex-col items-center p-1 ${currentTab === 'monitoring' ? 'text-cyan-600' : 'text-slate-400'}"><i class="fa-solid ${user.role === 'MANPOWER' ? 'fa-hard-hat' : 'fa-list-check'} text-base mb-0"></i><span class="text-[8px] font-medium">${user.role === 'MANPOWER' ? 'Tugas Aktif' : 'Data'}</span></button>
-            
             ${(user.role === 'USER' || user.role === 'ADMIN' || user.role === 'GL') ? `<button onclick="switchTab('order')" class="relative flex flex-col items-center -mt-4"><div class="w-8 h-8 rounded-full flex items-center justify-center border-2 border-white shadow-sm ${currentTab === 'order' ? 'bg-cyan-600 text-white' : 'bg-cyan-500 text-white'}"><i class="fa-solid fa-plus text-sm"></i></div><span class="text-[8px] font-medium text-slate-500 mt-0.5">Order</span></button>` : ''}
-            
             ${user.role === 'ADMIN' ? `<button onclick="switchTab('master')" class="flex flex-col items-center p-1 ${currentTab === 'master' ? 'text-cyan-600' : 'text-slate-400'}"><i class="fa-solid fa-database text-base mb-0"></i><span class="text-[8px] font-medium">Master</span></button>` : ''}
-            
             <button onclick="switchTab('profile')" class="flex flex-col items-center p-1 ${currentTab === 'profile' ? 'text-cyan-600' : 'text-slate-400'}"><i class="fa-solid fa-user text-base mb-0"></i><span class="text-[8px] font-medium">Profil</span></button>
         </div>`;
     }
@@ -438,23 +394,44 @@
                 </div>
                 <div class="p-3">
                     <form onsubmit="handleSignup(event)" class="space-y-2">
-                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">NRP</label><input type="text" id="regNrp" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
-                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Nama Lengkap</label><input type="text" id="regName" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                        <div>
+                            <label class="block text-[9px] font-bold text-slate-500 mb-0.5">NRP</label>
+                            <input type="text" id="regNrp" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required>
+                        </div>
+                        <div>
+                            <label class="block text-[9px] font-bold text-slate-500 mb-0.5">Nama Lengkap</label>
+                            <input type="text" id="regName" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required>
+                        </div>
                         
                         <datalist id="listPerusahaan">${getMasterData().perusahaan.map(p=>`<option value="${p}">`).join('')}</datalist>
                         <datalist id="listDepartemen">${getMasterData().departemen.map(d=>`<option value="${d}">`).join('')}</datalist>
                         <datalist id="listSection">${getMasterData().section.map(s=>`<option value="${s}">`).join('')}</datalist>
 
                         <div class="grid grid-cols-2 gap-2">
-                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Perusahaan</label><input list="listPerusahaan" id="regPerusahaan" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
-                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Departemen</label><input list="listDepartemen" id="regDepartemen" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                            <div>
+                                <label class="block text-[9px] font-bold text-slate-500 mb-0.5">Perusahaan</label>
+                                <input list="listPerusahaan" id="regPerusahaan" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required>
+                            </div>
+                            <div>
+                                <label class="block text-[9px] font-bold text-slate-500 mb-0.5">Departemen</label>
+                                <input list="listDepartemen" id="regDepartemen" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required>
+                            </div>
                         </div>
                         <div class="grid grid-cols-2 gap-2">
-                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Section</label><input list="listSection" id="regSection" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
-                            <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Jabatan</label><input type="text" id="regJabatan" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                            <div>
+                                <label class="block text-[9px] font-bold text-slate-500 mb-0.5">Section</label>
+                                <input list="listSection" id="regSection" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required>
+                            </div>
+                            <div>
+                                <label class="block text-[9px] font-bold text-slate-500 mb-0.5">Jabatan</label>
+                                <input type="text" id="regJabatan" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required>
+                            </div>
                         </div>
 
-                        <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">No WhatsApp</label><input type="number" id="regWa" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
+                        <div>
+                            <label class="block text-[9px] font-bold text-slate-500 mb-0.5">No WhatsApp</label>
+                            <input type="number" id="regWa" class="w-full border border-slate-300 rounded-none px-2 py-1 text-xs focus:outline-none focus:border-cyan-500" required>
+                        </div>
                         <div>
                             <label class="block text-[9px] font-bold text-slate-500 mb-0.5">Password</label>
                             <div class="relative">
@@ -472,68 +449,87 @@
         </div>`;
     }
 
-    function toggleAuthMode() { 
-        document.getElementById('authForm').classList.toggle('hidden'); 
-        document.getElementById('signupForm').classList.toggle('hidden'); 
+    function toggleAuthMode() {
+        document.getElementById('authForm').classList.toggle('hidden');
+        document.getElementById('signupForm').classList.toggle('hidden');
     }
 
     function handleLogin(e) {
         e.preventDefault();
-        const nrp = document.getElementById('loginNrp').value.trim(); 
+        const nrp = document.getElementById('loginNrp').value.trim();
         const pwd = document.getElementById('loginPwd').value;
-        const users = getUsers(); 
+        const users = getUsers();
         const user = users.find(u => u.nrp === nrp && u.password_hash === pwd && u.status_akun === 'ACTIVE');
         const errorMsg = document.getElementById('loginErrorMsg');
         
         if (user) {
             localStorage.setItem('lifting_user', JSON.stringify(user));
             currentTab = (user.role === 'ADMIN' || user.role === 'GL') ? 'dashboard' : 'monitoring';
-            userOrderFleetMode = null; 
-            mpFleetMode = null; 
+            userOrderFleetMode = null;
+            mpFleetMode = null;
             renderApp();
         } else {
-            errorMsg.innerHTML = '<i class="fa-solid fa-circle-exclamation mr-1"></i>NRP atau Password salah!'; 
+            errorMsg.innerHTML = '<i class="fa-solid fa-circle-exclamation mr-1"></i>NRP atau Password salah!';
             errorMsg.classList.remove('hidden');
         }
     }
 
-    function handleLogout() { 
-        localStorage.removeItem('lifting_user'); 
-        renderApp(); 
+    function handleLogout() {
+        localStorage.removeItem('lifting_user');
+        renderApp();
     }
 
     function handleSignup(e) {
         e.preventDefault();
-        const users = getUsers(); 
+        const users = getUsers();
         const nrp = document.getElementById('regNrp').value.trim();
+        
         if (users.find(u => u.nrp === nrp)) return showToast('NRP terdaftar!', 'error');
 
         const newUser = {
-            nrp: nrp, nama_lengkap: document.getElementById('regName').value, jabatan: document.getElementById('regJabatan').value,
-            perusahaan: document.getElementById('regPerusahaan').value, departemen: document.getElementById('regDepartemen').value,
-            section: document.getElementById('regSection').value, no_wa: document.getElementById('regWa').value,
-            password_hash: document.getElementById('regPwd').value, role: 'USER', status_akun: 'ACTIVE'
+            nrp: nrp, 
+            nama_lengkap: document.getElementById('regName').value, 
+            jabatan: document.getElementById('regJabatan').value,
+            perusahaan: document.getElementById('regPerusahaan').value, 
+            departemen: document.getElementById('regDepartemen').value,
+            section: document.getElementById('regSection').value, 
+            no_wa: document.getElementById('regWa').value,
+            password_hash: document.getElementById('regPwd').value, 
+            role: 'USER', 
+            status_akun: 'ACTIVE'
         };
-        users.push(newUser); 
-        saveUsers(users); 
-        showToast('Pendaftaran sukses!'); 
+        
+        users.push(newUser);
+        saveUsers(users);
+        showToast('Pendaftaran sukses!');
         toggleAuthMode();
     }
 
     function openCustomConfirm(title, message, onConfirm) {
-        document.getElementById('confirmTitle').innerText = title; 
+        document.getElementById('confirmTitle').innerText = title;
         document.getElementById('confirmMessage').innerText = message;
-        document.getElementById('confirmButtons').innerHTML = `
+        
+        const btnContainer = document.getElementById('confirmButtons');
+        btnContainer.innerHTML = `
             <button class="flex-1 bg-slate-100 text-slate-600 font-bold py-2 text-[10px] hover:bg-slate-200 transition-colors border-t border-slate-200" id="btnConfirmCancel">Batal</button>
             <button class="flex-1 bg-red-500 text-white font-bold py-2 text-[10px] hover:bg-red-600 transition-colors border-t border-red-500" id="btnConfirmOk">Ya, Lanjutkan</button>
         `;
+        
         document.getElementById('globalConfirmModal').classList.remove('hidden');
-        document.getElementById('btnConfirmCancel').onclick = () => { document.getElementById('globalConfirmModal').classList.add('hidden'); };
-        document.getElementById('btnConfirmOk').onclick = () => { document.getElementById('globalConfirmModal').classList.add('hidden'); onConfirm(); };
+        
+        document.getElementById('btnConfirmCancel').onclick = () => {
+            document.getElementById('globalConfirmModal').classList.add('hidden');
+        };
+        
+        document.getElementById('btnConfirmOk').onclick = () => {
+            document.getElementById('globalConfirmModal').classList.add('hidden');
+            onConfirm();
+        };
     }
 
     function getDashboardView() {
         let jobs = getOrders();
+        
         let tglMulai = document.getElementById('dash_tgl_mulai') ? document.getElementById('dash_tgl_mulai').value : '';
         let tglSelesai = document.getElementById('dash_tgl_selesai') ? document.getElementById('dash_tgl_selesai').value : '';
         
@@ -547,26 +543,26 @@
         let cntDone = jobs.filter(j => j.status === 'COMPLETED').length;
         let cntCancel = jobs.filter(j => j.status === 'CANCELED').length;
 
-        let cntCT = jobs.filter(j => j.kategori === 'Crane Truck').length; 
-        let cntBC = jobs.filter(j => j.kategori === 'Big Crane').length; 
+        let cntCT = jobs.filter(j => j.kategori === 'Crane Truck').length;
+        let cntBC = jobs.filter(j => j.kategori === 'Big Crane').length;
         let cntLB = jobs.filter(j => j.kategori === 'Lowboy').length;
         let totalUnits = cntCT + cntBC + cntLB || 1; 
 
-        let pctCT = Math.round((cntCT / totalUnits) * 100) || 0; 
-        let pctBC = Math.round((cntBC / totalUnits) * 100) || 0; 
+        let pctCT = Math.round((cntCT / totalUnits) * 100) || 0;
+        let pctBC = Math.round((cntBC / totalUnits) * 100) || 0;
         let pctLB = Math.round((cntLB / totalUnits) * 100) || 0;
-        let degCT = (pctCT / 100) * 360; 
+        let degCT = (pctCT / 100) * 360;
         let degBC = degCT + ((pctBC / 100) * 360);
         let pieStyle = `background: conic-gradient(#0891b2 0deg ${degCT}deg, #6366f1 ${degCT}deg ${degBC}deg, #94a3b8 ${degBC}deg 360deg);`;
 
-        function getTopData(field) { 
-            let counts = {}; 
-            jobs.forEach(j => { if(j[field]) counts[j[field]] = (counts[j[field]] || 0) + 1; }); 
-            return Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0, 5); 
+        function getTopData(field) {
+            let counts = {};
+            jobs.forEach(j => { if(j[field]) counts[j[field]] = (counts[j[field]] || 0) + 1; });
+            return Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0, 5);
         }
         
-        let topPerusahaan = getTopData('perusahaan'); 
-        let topDept = getTopData('departemen'); 
+        let topPerusahaan = getTopData('perusahaan');
+        let topDept = getTopData('departemen');
         let topSection = getTopData('section');
 
         function renderBarList(data, colorClass) {
@@ -705,12 +701,22 @@
             if (filterShift !== 'ALL') jobs = jobs.filter(j => j.shift === filterShift);
             if (filterKategori !== 'ALL') jobs = jobs.filter(j => j.kategori === filterKategori);
 
+            // Logika Sorting Super Cerdas
             jobs.sort((a, b) => {
-                let valA = (a[sortColumn] || '').toString().toLowerCase(); 
-                let valB = (b[sortColumn] || '').toString().toLowerCase();
-                if (valA < valB) return sortDirection === 'asc' ? -1 : 1; 
-                if (valA > valB) return sortDirection === 'asc' ? 1 : -1; 
-                return 0;
+                let valA = a[sortColumn];
+                let valB = b[sortColumn];
+                
+                if (valA === null || valA === undefined) valA = '';
+                if (valB === null || valB === undefined) valB = '';
+
+                valA = valA.toString();
+                valB = valB.toString();
+
+                if (sortDirection === 'asc') {
+                    return valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' });
+                } else {
+                    return valB.localeCompare(valA, undefined, { numeric: true, sensitivity: 'base' });
+                }
             });
 
             let pendingCount = jobs.filter(j => j.status === 'SCHEDULED' || j.status === 'UNSCHEDULED' || (j.status === 'PENDING' && (!j.operator || !j.rigger))).length;
@@ -722,9 +728,7 @@
                         <h2 class="text-sm font-bold text-slate-800 shrink-0"><i class="fa-solid fa-database mr-1.5 text-cyan-600"></i>Data Order</h2>
                         <div class="flex items-center gap-1.5 shrink-0">
                             <div class="bg-red-50 text-red-600 border border-red-200 px-1.5 py-0.5 rounded-sm font-semibold text-[10px]" title="Butuh Validasi/Penugasan">Validasi: ${pendingCount}</div>
-                            <button onclick="downloadCSV()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-0.5 rounded-sm transition-colors flex items-center gap-1 shadow-sm text-[10px]">
-                                <i class="fa-solid fa-file-excel"></i> Export
-                            </button>
+                            <button onclick="downloadCSV()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-0.5 rounded-sm transition-colors flex items-center gap-1 shadow-sm text-[10px]"><i class="fa-solid fa-file-excel"></i> Export</button>
                         </div>
                     </div>
                     <div class="flex items-center gap-1 text-[10px] w-full sm:w-auto overflow-x-auto hide-scrollbar pb-0.5 sm:pb-0">
@@ -753,12 +757,14 @@
                                 <th class="px-2 py-1.5 font-semibold w-24 md:w-28 cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('no_wo')">No LIFT & Waktu ${getSortIcon('no_wo')}</th>
                                 <th class="px-2 py-1.5 font-semibold w-20 md:w-auto cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('nama_pemohon')">Pemohon ${getSortIcon('nama_pemohon')}</th>
                                 <th class="px-2 py-1.5 font-semibold w-24 hidden md:table-cell cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('tgl_pelaksanaan')">Jadwal ${getSortIcon('tgl_pelaksanaan')}</th>
-                                <th class="px-2 py-1.5 font-semibold w-28 md:w-32 cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('lokasi_angkat')">Lokasi / Tugas ${getSortIcon('lokasi_angkat')}</th>
+                                <!-- Kolom Lokasi Diperbesar (w-1/4) -->
+                                <th class="px-2 py-1.5 font-semibold min-w-[180px] md:w-1/4 cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('lokasi_angkat')">Lokasi / Tugas ${getSortIcon('lokasi_angkat')}</th>
                                 <th class="px-2 py-1.5 text-center font-semibold w-24 hidden md:table-cell cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('status')">Status ${getSortIcon('status')}</th>
                                 <th class="px-2 py-1.5 font-semibold min-w-[140px] w-40 hidden md:table-cell cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('unit')">Penugasan ${getSortIcon('unit')}</th>
                                 <th class="px-2 py-1.5 font-semibold w-24 hidden md:table-cell cursor-pointer hover:bg-slate-200 select-none transition-colors whitespace-nowrap" onclick="handleSort('jam_start_aktual')">Waktu Aktual ${getSortIcon('jam_start_aktual')}</th>
-                                <th class="px-2 py-1.5 text-center font-semibold w-16 hidden md:table-cell cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('durasi_aktual')">Durasi ${getSortIcon('durasi_aktual')}</th>
-                                <th class="px-2 py-1.5 font-semibold min-w-[150px] hidden md:table-cell">Kendala</th>
+                                <!-- Kolom Durasi dan Kendala Diperkecil -->
+                                <th class="px-2 py-1.5 text-center font-semibold w-12 hidden md:table-cell cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('durasi_aktual')">Durasi ${getSortIcon('durasi_aktual')}</th>
+                                <th class="px-2 py-1.5 font-semibold w-20 md:w-28 hidden md:table-cell">Kendala</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100 text-[11px]">
@@ -781,14 +787,12 @@
                                 <tr class="hover:bg-slate-50 transition-colors">
                                     <td class="px-1 md:px-2 py-1.5 text-center align-top">
                                         <div class="flex items-center justify-center">
-                                            <!-- HANYA TOMBOL EDIT (Hapus ada di dalam pop-up Edit, Salin ada di dalam Detail) -->
-                                            <button onclick="openAdminEditJob('${job.no_wo}')" class="${editColorClass} text-[10px] px-2 py-1 rounded-sm border shadow-sm w-full md:w-auto flex justify-center items-center gap-1" title="Edit/Validasi Job">
-                                                <i class="fa-solid fa-pen"></i> <span class="hidden md:inline font-bold">Edit</span>
-                                            </button>
+                                            <!-- HANYA TOMBOL EDIT -->
+                                            <button onclick="openAdminEditJob('${job.no_wo}')" class="${editColorClass} text-[10px] px-2 py-1 rounded-sm border shadow-sm w-full md:w-auto flex justify-center items-center gap-1" title="Edit/Validasi Job"><i class="fa-solid fa-pen"></i> <span class="hidden md:inline font-bold">Edit</span></button>
                                         </div>
                                     </td>
                                     <td class="px-2 py-1.5 align-top">
-                                        <div class="font-bold text-cyan-600 text-[9px] md:text-[10px] cursor-pointer hover:underline leading-tight" onclick="viewJobDetail('${job.no_wo}')" title="Klik untuk lihat detail">${job.no_wo}</div>
+                                        <div class="font-bold text-cyan-600 text-[9px] md:text-[10px] cursor-pointer hover:underline leading-tight" onclick="viewJobDetail('${job.no_wo}')">${job.no_wo}</div>
                                         <div class="text-[8px] md:text-[9px] text-slate-500 mb-1 leading-tight">${job.timestamp.split('T')[0]} ${job.timestamp.split('T')[1].substring(0,5)}</div>
                                         <div class="md:hidden"><span class="${statusColor} border text-[7px] px-1 py-0.5 rounded-sm font-bold leading-none whitespace-nowrap inline-block">${job.status}</span></div>
                                     </td>
@@ -802,7 +806,7 @@
                                     </td>
                                     <td class="px-2 py-1.5 align-top">
                                         ${job.kategori !== 'Big Crane' ? `<div class="text-[9px] md:text-[10px] text-orange-600 font-semibold flex items-start gap-1 mb-0.5 leading-tight"><i class="fa-solid fa-location-dot mt-0.5"></i> <span>${job.lokasi_angkat || '-'} <i class="fa-solid fa-arrow-right text-[7px] mx-0.5 text-slate-400"></i> ${job.lokasi_tujuan || '-'}</span></div>` : ''}
-                                        <div class="text-[9px] text-emerald-700 flex items-start gap-1"><i class="fa-solid fa-flag-checkered mt-0.5"></i> <span class="leading-tight truncate max-w-[100px]" title="${job.deskripsi}">${job.deskripsi}</span></div>
+                                        <div class="text-[9px] text-emerald-700 flex items-start gap-1"><i class="fa-solid fa-flag-checkered mt-0.5"></i> <span class="leading-tight truncate max-w-[100px] md:max-w-full" title="${job.deskripsi}">${job.deskripsi}</span></div>
                                     </td>
                                     <td class="px-2 py-1.5 text-center align-top hidden md:table-cell">
                                         <span class="${statusColor} border text-[9px] px-1.5 py-0.5 rounded-sm font-semibold whitespace-nowrap inline-block">${job.status}</span>
@@ -833,12 +837,15 @@
             return html;
         }
 
-        // ================= JIKA USER ADALAH PEMOHON (MOBILE VIEW) =================
+        // Monitoring View Khusus USER (Mobile view)
         jobs = jobs.filter(j => j.nrp_pemohon === currentUser.nrp);
 
         let filterCat = document.getElementById('filter_kategori') ? document.getElementById('filter_kategori').value : 'ALL';
         if (filterCat !== 'ALL') jobs = jobs.filter(j => j.kategori === filterCat);
         
+        // Memaksa pengurutan waktu untuk USER mobile
+        jobs.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+
         let html = `<h2 class="text-sm font-bold text-slate-800 mb-2"><i class="fa-solid fa-list-check mr-1.5 text-cyan-600"></i>Data Order Pekerjaan</h2>`;
 
         if (jobs.length === 0) {
@@ -878,6 +885,16 @@
             </div>`;
         });
 
+        html += `
+        <div id="detailJobModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 hidden p-3">
+            <div class="bg-white rounded-md shadow-xl w-full max-w-sm overflow-hidden flex flex-col max-h-[90vh]">
+                <div class="p-2 border-b border-slate-200 flex justify-between items-center shrink-0">
+                    <h3 class="font-bold text-slate-800 text-xs">Detail Pekerjaan</h3>
+                    <button onclick="document.getElementById('detailJobModal').classList.add('hidden'); event.stopPropagation();" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-sm"></i></button>
+                </div>
+                <div class="p-3 overflow-y-auto" id="detailJobContent"></div>
+            </div>
+        </div>`;
         return html;
     }
 
@@ -904,23 +921,7 @@
             }
         }
 
-        // Tampilan Modal Detail (Global)
-        let modal = document.getElementById('globalDetailJobModal');
-        if (!modal) {
-            document.body.insertAdjacentHTML('beforeend', `
-            <div id="globalDetailJobModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[150] hidden p-3">
-                <div class="bg-white rounded-md shadow-xl w-full max-w-sm overflow-hidden flex flex-col max-h-[90vh]">
-                    <div class="p-2 border-b border-slate-200 flex justify-between items-center shrink-0">
-                        <h3 class="font-bold text-slate-800 text-xs">Detail Pekerjaan</h3>
-                        <button onclick="document.getElementById('globalDetailJobModal').classList.add('hidden');" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-sm"></i></button>
-                    </div>
-                    <div class="p-3 overflow-y-auto" id="globalDetailJobContent"></div>
-                </div>
-            </div>`);
-            modal = document.getElementById('globalDetailJobModal');
-        }
-
-        document.getElementById('globalDetailJobContent').innerHTML = `
+        document.getElementById('detailJobContent').innerHTML = `
             <div class="bg-cyan-50 border border-cyan-100 rounded-sm p-2 mb-3 relative">
                 <div class="text-[8px] font-bold text-cyan-600 mb-0.5">PEMOHON</div>
                 <div class="font-bold text-cyan-900 text-[11px] mb-0.5">${job.nama_pemohon}</div>
@@ -951,12 +952,12 @@
             </div>
             ${fotoHtml}
             <div class="flex gap-2 mt-2">
-                <!-- Tombol salin job resmi di dalam modal -->
-                <button onclick="copyJobToWA('${job.no_wo}')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1.5 rounded-sm text-[10px] flex items-center justify-center gap-1 shadow-sm"><i class="fa-brands fa-whatsapp"></i> Salin Job</button>
-                <button onclick="document.getElementById('globalDetailJobModal').classList.add('hidden')" class="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-bold py-1.5 rounded-sm text-[10px] shadow-sm">Tutup Detail</button>
+                <!-- Tombol salin job resmi dipindah ke sini -->
+                <button onclick="copyJobToWA('${job.no_wo}')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1.5 rounded-sm text-[10px] flex items-center justify-center gap-1 shadow-sm"><i class="fa-regular fa-copy"></i> Salin Job</button>
+                <button onclick="document.getElementById('detailJobModal').classList.add('hidden')" class="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-bold py-1.5 rounded-sm text-[10px] shadow-sm">Tutup Detail</button>
             </div>
         `;
-        modal.classList.remove('hidden');
+        document.getElementById('detailJobModal').classList.remove('hidden');
     }
 
     function openAdminEditJob(wo) {
@@ -987,22 +988,7 @@
             `;
         }
 
-        let modal = document.getElementById('globalEditJobModal');
-        if (!modal) {
-            document.body.insertAdjacentHTML('beforeend', `
-            <div id="globalEditJobModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex justify-center items-center z-[150] hidden p-3">
-                <div class="bg-white rounded-md shadow-xl w-full max-w-sm overflow-hidden flex flex-col max-h-[90vh]">
-                    <div class="p-3 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
-                        <h3 class="font-bold text-slate-800 text-xs"><i class="fa-solid fa-pen-to-square mr-1.5 text-cyan-600"></i>Edit / Validasi Job</h3>
-                        <button onclick="document.getElementById('globalEditJobModal').classList.add('hidden')" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-sm"></i></button>
-                    </div>
-                    <div class="p-3 overflow-y-auto" id="globalEditJobContent"></div>
-                </div>
-            </div>`);
-            modal = document.getElementById('globalEditJobModal');
-        }
-
-        document.getElementById('globalEditJobContent').innerHTML = `
+        document.getElementById('editJobContent').innerHTML = `
             <form onsubmit="saveAdminEditJob(event, '${wo}')" class="space-y-2">
                 <div class="bg-cyan-50 border border-cyan-100 p-1.5 rounded-sm mb-1 text-center">
                     <p class="text-[10px] font-bold text-cyan-700">${job.no_wo} (${job.kategori})</p>
@@ -1039,14 +1025,14 @@
                     ${riggerHTML}
                 </div>
                 
-                <div class="flex gap-1.5 mt-3 pt-2 border-t border-slate-100">
+                <div class="flex gap-1.5 mt-3 pt-2 border-t border-slate-200">
                     <!-- Tombol delete job resmi disembunyikan di dalam form edit -->
                     ${currentUser.role === 'ADMIN' ? `<button type="button" onclick="confirmHapusOrder('${job.no_wo}')" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold px-3 py-1.5 rounded-sm text-[11px] transition-colors shadow-sm" title="Hapus Order"><i class="fa-solid fa-trash"></i> Hapus</button>` : ''}
                     <button type="submit" class="flex-1 bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-1.5 rounded-sm text-[11px] transition-colors shadow-sm">Simpan & Validasi</button>
                 </div>
             </form>
         `;
-        modal.classList.remove('hidden');
+        document.getElementById('editJobModal').classList.remove('hidden');
     }
 
     function saveAdminEditJob(e, wo) {
@@ -1097,47 +1083,8 @@
         }
 
         saveOrders(jobs);
-        document.getElementById('globalEditJobModal').classList.add('hidden');
+        document.getElementById('editJobModal').classList.add('hidden');
         renderApp();
-    }
-
-    function downloadCSV() {
-        const jobs = getOrders();
-        if(jobs.length === 0) return showToast("Tidak ada data", "error");
-        
-        let csvContent = "data:text/csv;charset=utf-8,No WO,Status,Pemohon,Dept,Kategori,Tgl Pelaksanaan,Jam Req,Shift,Durasi Req,Lokasi Angkat,Lokasi Tujuan,Deskripsi,GL,Unit,Operator,Rigger,Jam Start,Jam End,Durasi Aktual,Final Inspeksi,Alasan Telat,Alasan Overtime\n";
-        
-        jobs.forEach(j => {
-            let riggerCombined = j.rigger || '';
-            if (j.rigger2) riggerCombined += ' & ' + j.rigger2;
-            let row = [
-                j.no_wo, j.status, j.nama_pemohon, j.departemen, j.kategori,
-                j.tgl_pelaksanaan, j.jam_pelaksanaan||'', j.shift, j.durasi_request,
-                `"${(j.lokasi_angkat||'').replace(/"/g, '""')}"`, `"${(j.lokasi_tujuan||'').replace(/"/g, '""')}"`, `"${(j.deskripsi||'').replace(/"/g, '""')}"`,
-                j.gl||'', j.unit||'', j.operator||'', `"${riggerCombined}"`,
-                j.jam_start_aktual||'', j.jam_end_aktual||'', j.durasi_aktual||'',
-                j.final_inspeksi||'', `"${(j.alasan_telat||'').replace(/"/g, '""')}"`, `"${(j.alasan_overtime||'').replace(/"/g, '""')}"`
-            ].join(",");
-            csvContent += row + "\n";
-        });
-        const encodedUri = encodeURI(csvContent); const link = document.createElement("a");
-        link.setAttribute("href", encodedUri); link.setAttribute("download", `Data_Lifting_${new Date().toISOString().split('T')[0]}.csv`);
-        document.body.appendChild(link); link.click(); document.body.removeChild(link);
-    }
-
-    function confirmHapusOrder(wo) {
-        openCustomConfirm('Hapus Data', `Apakah Anda yakin ingin menghapus order ${wo}?`, async () => {
-            let jobs = getOrders().filter(j => j.no_wo !== wo);
-            localStorage.setItem('lifting_orders', JSON.stringify(jobs));
-            
-            if (SUPABASE_KEY && !SUPABASE_KEY.includes('PASTE_KUNCI')) {
-                try { await fetch(`${SUPABASE_URL}/rest/v1/orders?no_wo=eq.${wo}`, { method: 'DELETE', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }); } 
-                catch(e) { console.warn(e); }
-            }
-            showToast('Data dihapus!'); 
-            document.getElementById('globalEditJobModal').classList.add('hidden'); 
-            renderApp();
-        });
     }
 
     function getOrderFormView() {
@@ -1146,26 +1093,18 @@
         const isAdminGL = user.role === 'ADMIN' || user.role === 'GL';
         const settings = getSettings();
         
-        const styleCard = (url) => url 
-            ? `style="background-image: url('${url}'); background-size: cover; background-position: center;"` 
-            : ``;
+        const getUnitCard = (type, modeVar, iconUrl, iconClass, label) => {
+            const bgStyle = iconUrl ? `style="background-image: url('${iconUrl}'); background-size: cover; background-position: center;"` : '';
+            const content = iconUrl 
+                ? `<div class="absolute inset-0 bg-slate-900/40 group-hover:bg-slate-900/20 transition-colors"></div><span class="font-bold text-white text-sm sm:text-base uppercase relative z-10 tracking-widest drop-shadow-lg text-center leading-tight px-2">${label}</span>`
+                : `<div class="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-slate-50 group-hover:bg-cyan-50 flex items-center justify-center transition-colors"><i class="fa-solid ${iconClass} text-2xl sm:text-3xl text-slate-400 group-hover:text-cyan-600"></i></div><span class="font-bold text-slate-700 text-[11px] sm:text-xs uppercase tracking-wide text-center leading-tight mt-2 px-2">${label}</span>`;
             
-        const contentCardCT = settings.icon_ct_url
-            ? `<div class="absolute inset-0 bg-slate-900/40 group-hover:bg-slate-900/20 transition-colors"></div><span class="font-bold text-white text-sm sm:text-base uppercase relative z-10 tracking-widest drop-shadow-lg text-center leading-tight px-2">Crane Truck</span>`
-            : `<div class="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-slate-50 group-hover:bg-cyan-50 flex items-center justify-center transition-colors"><i class="fa-solid fa-truck-moving text-2xl sm:text-3xl text-slate-400 group-hover:text-cyan-600"></i></div><span class="font-bold text-slate-700 text-[11px] sm:text-xs uppercase tracking-wide text-center leading-tight mt-2 px-2">Crane Truck</span>`;
+            return `<button onclick="${modeVar}='${type}'; renderApp();" class="relative bg-white border border-slate-200 hover:border-cyan-500 hover:shadow-md rounded-xl flex flex-col items-center justify-center shadow-sm transition-all group aspect-square sm:aspect-[4/3] w-full sm:w-44 overflow-hidden" ${bgStyle}>${content}</button>`;
+        };
 
-        const contentCardBC = settings.icon_bc_url
-            ? `<div class="absolute inset-0 bg-slate-900/40 group-hover:bg-slate-900/20 transition-colors"></div><span class="font-bold text-white text-sm sm:text-base uppercase relative z-10 tracking-widest drop-shadow-lg text-center leading-tight px-2">Big Crane</span>`
-            : `<div class="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-slate-50 group-hover:bg-cyan-50 flex items-center justify-center transition-colors"><i class="fa-solid fa-truck-ramp-box text-2xl sm:text-3xl text-slate-400 group-hover:text-cyan-600"></i></div><span class="font-bold text-slate-700 text-[11px] sm:text-xs uppercase tracking-wide text-center leading-tight mt-2 px-2">Big Crane</span>`;
-
-        const contentCardLB = settings.icon_lb_url
-            ? `<div class="absolute inset-0 bg-slate-900/40 group-hover:bg-slate-900/20 transition-colors"></div><span class="font-bold text-white text-sm sm:text-base uppercase relative z-10 tracking-widest drop-shadow-lg text-center leading-tight px-2">Lowboy</span>`
-            : `<div class="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-slate-50 group-hover:bg-cyan-50 flex items-center justify-center transition-colors"><i class="fa-solid fa-trailer text-2xl sm:text-3xl text-slate-400 group-hover:text-cyan-600"></i></div><span class="font-bold text-slate-700 text-[11px] sm:text-xs uppercase tracking-wide text-center leading-tight mt-2 px-2">Lowboy</span>`;
-
-        // Boxy styling implementation: using aspect-square for mobile, and aspect-[4/3] for desktop, with w-full to make them expand nicely.
-        const btnCT = `<button onclick="userOrderFleetMode='Crane Truck'; renderApp();" class="relative bg-white border border-slate-200 hover:border-cyan-500 hover:shadow-md rounded-xl flex flex-col items-center justify-center shadow-sm transition-all group aspect-square sm:aspect-[4/3] w-full sm:w-44 overflow-hidden" ${styleCard(settings.icon_ct_url)}>${contentCardCT}</button>`;
-        const btnBC = `<button onclick="userOrderFleetMode='Big Crane'; renderApp();" class="relative bg-white border border-slate-200 hover:border-cyan-500 hover:shadow-md rounded-xl flex flex-col items-center justify-center shadow-sm transition-all group aspect-square sm:aspect-[4/3] w-full sm:w-44 overflow-hidden" ${styleCard(settings.icon_bc_url)}>${contentCardBC}</button>`;
-        const btnLB = `<button onclick="userOrderFleetMode='Lowboy'; renderApp();" class="relative bg-white border border-slate-200 hover:border-cyan-500 hover:shadow-md rounded-xl flex flex-col items-center justify-center shadow-sm transition-all group aspect-square sm:aspect-[4/3] w-full sm:w-44 overflow-hidden" ${styleCard(settings.icon_lb_url)}>${contentCardLB}</button>`;
+        const btnCT = getUnitCard('Crane Truck', 'userOrderFleetMode', settings.icon_ct_url, 'fa-truck-moving', 'Crane Truck');
+        const btnBC = getUnitCard('Big Crane', 'userOrderFleetMode', settings.icon_bc_url, 'fa-truck-ramp-box', 'Big Crane');
+        const btnLB = getUnitCard('Lowboy', 'userOrderFleetMode', settings.icon_lb_url, 'fa-trailer', 'Lowboy');
 
         if (!userOrderFleetMode) {
             return `
@@ -1231,26 +1170,40 @@
             <div class="bg-slate-50 border border-slate-200 rounded-sm p-2 mb-3">
                 <p class="text-[9px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Info Pemohon</p>
                 <div class="grid grid-cols-2 gap-y-1 gap-x-2 text-[10px]">
-                    <div><p class="text-slate-500 text-[9px]">Nama:</p><p class="font-semibold text-slate-800">${user.nama_lengkap}</p></div><div><p class="text-slate-500 text-[9px]">Dept:</p><p class="font-semibold text-slate-800">${user.departemen}</p></div>
-                    <div><p class="text-slate-500 text-[9px]">No. WA:</p><p class="font-semibold text-slate-800">${user.no_wa}</p></div><div><p class="text-slate-500 text-[9px]">Vendor:</p><p class="font-semibold text-slate-800">${user.perusahaan}</p></div>
+                    <div><p class="text-slate-500 text-[9px]">Nama:</p><p class="font-semibold text-slate-800">${user.nama_lengkap}</p></div>
+                    <div><p class="text-slate-500 text-[9px]">Dept:</p><p class="font-semibold text-slate-800">${user.departemen}</p></div>
+                    <div><p class="text-slate-500 text-[9px]">No. WA:</p><p class="font-semibold text-slate-800">${user.no_wa}</p></div>
+                    <div><p class="text-slate-500 text-[9px]">Vendor:</p><p class="font-semibold text-slate-800">${user.perusahaan}</p></div>
                 </div>
             </div>`;
 
         return `
         <div class="max-w-md mx-auto bg-white rounded-md shadow-sm border border-slate-200 overflow-hidden mt-2">
-            <div class="p-2 border-b border-slate-100 flex items-center gap-2"><button onclick="userOrderFleetMode=null; renderApp();" class="w-6 h-6 rounded-sm border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50"><i class="fa-solid fa-arrow-left text-[10px]"></i></button><h2 class="text-sm font-bold text-slate-800">Order: <span class="text-cyan-600">${cat}</span></h2></div>
+            <div class="p-2 border-b border-slate-100 flex items-center gap-2">
+                <button onclick="userOrderFleetMode=null; renderApp();" class="w-6 h-6 rounded-sm border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50"><i class="fa-solid fa-arrow-left text-[10px]"></i></button>
+                <h2 class="text-sm font-bold text-slate-800">Order: <span class="text-cyan-600">${cat}</span></h2>
+            </div>
             <div class="p-3">
-                <datalist id="profListPerusahaan">${m.perusahaan.map(p=>`<option value="${p}">`).join('')}</datalist><datalist id="profListDepartemen">${m.departemen.map(d=>`<option value="${d}">`).join('')}</datalist>
+                <datalist id="profListPerusahaan">${m.perusahaan.map(p=>`<option value="${p}">`).join('')}</datalist>
+                <datalist id="profListDepartemen">${m.departemen.map(d=>`<option value="${d}">`).join('')}</datalist>
                 ${requesterHtml}
-                <form onsubmit="submitOrder(event)" class="space-y-2">${formFields}<div class="pt-2 mt-3 border-t border-slate-100"><button id="btnSubmitOrder" type="submit" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-1.5 rounded-sm transition-colors text-xs shadow-sm">Submit Order</button></div></form>
+                <form onsubmit="submitOrder(event)" class="space-y-2">
+                    ${formFields}
+                    <div class="pt-2 mt-3 border-t border-slate-100">
+                        <button id="btnSubmitOrder" type="submit" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-1.5 rounded-sm transition-colors text-xs shadow-sm">Submit Order</button>
+                    </div>
+                </form>
             </div>
         </div>`;
     }
 
     function calculateShift() {
-        const jamInput = document.getElementById('jam_pelaksanaan'); if (!jamInput || !jamInput.value) return;
-        const shiftField = document.getElementById('shift'); if(!shiftField) return;
-        const h = parseInt(jamInput.value.split(':')[0]); shiftField.value = (h >= 5 && h < 17) ? "Shift 1" : "Shift 2";
+        const jamInput = document.getElementById('jam_pelaksanaan'); 
+        if (!jamInput || !jamInput.value) return;
+        const shiftField = document.getElementById('shift'); 
+        if(!shiftField) return;
+        const h = parseInt(jamInput.value.split(':')[0]); 
+        shiftField.value = (h >= 5 && h < 17) ? "Shift 1" : "Shift 2";
     }
 
     async function submitOrder(e) {
@@ -1350,10 +1303,7 @@
         jobs.forEach(job => {
             html += `
             <div class="bg-white rounded-md p-2.5 border border-slate-200 shadow-sm relative text-[11px]">
-                <div class="flex justify-between items-start mb-1.5">
-                    <div class="text-[9px] font-mono font-bold text-cyan-600 cursor-pointer hover:underline" onclick="viewJobDetail('${job.no_wo}')" title="Buka Detail">${job.no_wo}</div>
-                    <div class="text-[9px] bg-cyan-50 text-cyan-700 border border-cyan-100 px-1.5 py-0.5 rounded-sm font-semibold">Unit: ${job.unit || '-'}</div>
-                </div>
+                <div class="flex justify-between items-start mb-1.5"><div class="text-[9px] font-mono font-bold text-cyan-600 cursor-pointer hover:underline" onclick="viewJobDetail('${job.no_wo}')" title="Buka Detail">${job.no_wo}</div><div class="text-[9px] bg-cyan-50 text-cyan-700 border border-cyan-100 px-1.5 py-0.5 rounded-sm font-semibold">Unit: ${job.unit || '-'}</div></div>
                 <div class="font-bold text-slate-800 text-xs mb-0.5">Req: ${job.tgl_pelaksanaan} ${job.jam_pelaksanaan || ''}</div>
                 ${job.kategori !== 'Big Crane' ? `<div class="text-[10px] text-slate-500 mb-2 truncate">Lokasi: ${job.lokasi_angkat||'-'} ➔ ${job.lokasi_tujuan||'-'}</div>` : `<div class="text-[10px] text-slate-500 mb-2 truncate border-l-2 border-slate-300 pl-1">${job.deskripsi}</div>`}
                 <div class="flex gap-1.5">
@@ -1572,12 +1522,22 @@
     function saveProfile(e) { e.preventDefault(); let user = JSON.parse(localStorage.getItem('lifting_user')); let users = getUsers(); let idx = users.findIndex(u => u.nrp === user.nrp); user.nama_lengkap = document.getElementById('profName').value; user.jabatan = document.getElementById('profJabatan').value; user.perusahaan = document.getElementById('profPerusahaan').value; user.departemen = document.getElementById('profDepartemen').value; user.section = document.getElementById('profSection').value; user.no_wa = document.getElementById('profWa').value; users[idx] = user; saveUsers(users); localStorage.setItem('lifting_user', JSON.stringify(user)); showToast('Profil diupdate!'); renderApp(); }
     function savePassword(e) { e.preventDefault(); let pwd1 = document.getElementById('profPwd1').value; let pwd2 = document.getElementById('profPwd2').value; if (pwd1 !== pwd2) return showToast('Password tidak cocok!', 'error'); let user = JSON.parse(localStorage.getItem('lifting_user')); let users = getUsers(); let idx = users.findIndex(u => u.nrp === user.nrp); users[idx].password_hash = pwd1; saveUsers(users); document.getElementById('profPwd1').value = ''; document.getElementById('profPwd2').value = ''; showToast('Password diubah!'); }
 
+    // Memuat saat pertama kali dibuka
     window.addEventListener('load', () => {
         fetchFromSupabase().then(() => {
             renderApp();
         });
     });
 
+    // Auto-sync ekstra saat layar HP kembali dinyalakan
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") {
+            const user = localStorage.getItem('lifting_user');
+            if (user) {
+                fetchFromSupabase().then(() => { renderApp(); });
+            }
+        }
+    });
 </script>
 </body>
 </html>
