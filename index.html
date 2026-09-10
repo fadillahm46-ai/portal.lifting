@@ -910,7 +910,9 @@
 
         let pctCT = Math.round((cntCT / totalUnits) * 100) || 0; let pctBC = Math.round((cntBC / totalUnits) * 100) || 0; let pctLB = Math.round((cntLB / totalUnits) * 100) || 0;
         let degCT = (pctCT / 100) * 360; let degBC = degCT + ((pctBC / 100) * 360);
-        let pieStyle = `background: conic-gradient(#0891b2 0deg ${degCT}deg, #6366f1 ${degCT}deg ${degBC}deg, #94a3b8 ${degBC}deg 360deg);`;
+        
+        // Warna disinkronkan dengan Rigger Chart: Merah (#ef4444), Orange (#f97316), Coklat (#92400e)
+        let pieStyle = `background: conic-gradient(#ef4444 0deg ${degCT}deg, #f97316 ${degCT}deg ${degBC}deg, #92400e ${degBC}deg 360deg);`;
 
         function getTopData(field) { 
             let counts = {}; 
@@ -991,26 +993,7 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-3">
-                <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm flex flex-col items-center justify-center lg:col-span-1 order-last lg:order-none">
-                    <h3 class="text-[10px] font-bold text-slate-600 mb-3 w-full text-left">Distribusi Unit</h3>
-                    ${totalUnits > 1 ? `
-                    <div class="w-24 h-24 rounded-full mb-4 shadow-inner" style="${pieStyle}"></div>
-                    <div class="w-full space-y-1.5 text-[9px] font-semibold text-slate-600">
-                        <div class="flex justify-between items-center"><div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 rounded-sm bg-cyan-600"></div>Crane Truck</div><span>${pctCT}%</span></div>
-                        <div class="flex justify-between items-center"><div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 rounded-sm bg-indigo-500"></div>Big Crane</div><span>${pctBC}%</span></div>
-                        <div class="flex justify-between items-center"><div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 rounded-sm bg-slate-400"></div>Lowboy</div><span>${pctLB}%</span></div>
-                    </div>
-                    ` : `<div class="text-[9px] text-slate-400 italic my-auto">Data kosong</div>`}
-                </div>
-                
-                <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm mt-3 lg:mt-0 flex flex-col lg:col-span-3">
-                    <h3 class="text-[10px] font-bold text-slate-600 mb-2">Performa Rigger (Total Jam Kerja)</h3>
-                    <div class="relative h-60 w-full"><canvas id="riggerChart"></canvas></div>
-                </div>
-            </div>
-
-            <!-- Bagian Data Perusahaan Order & Dept Plant -->
+            <!-- Bagian Data Perusahaan Order & Dept Plant DITAIKKAN -->
             <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm mt-3 flex flex-col lg:flex-row gap-6 items-start">
                 <div class="w-full lg:w-1/4 flex flex-col items-center justify-center">
                     <h3 class="text-[10px] font-bold text-slate-600 mb-2 w-full text-left">Data Perusahaan</h3>
@@ -1044,6 +1027,26 @@
                             })()}
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Distribusi Unit & Performa Rigger DITURUNKAN -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-3">
+                <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm flex flex-col items-center justify-center lg:col-span-1 order-last lg:order-none">
+                    <h3 class="text-[10px] font-bold text-slate-600 mb-3 w-full text-left">Distribusi Unit</h3>
+                    ${totalUnits > 1 ? `
+                    <div class="w-24 h-24 rounded-full mb-4 shadow-inner" style="${pieStyle}"></div>
+                    <div class="w-full space-y-1.5 text-[9px] font-semibold text-slate-600">
+                        <div class="flex justify-between items-center"><div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 rounded-sm" style="background-color: #ef4444;"></div>Crane Truck</div><span>${pctCT}%</span></div>
+                        <div class="flex justify-between items-center"><div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 rounded-sm" style="background-color: #f97316;"></div>Big Crane</div><span>${pctBC}%</span></div>
+                        <div class="flex justify-between items-center"><div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 rounded-sm" style="background-color: #92400e;"></div>Lowboy</div><span>${pctLB}%</span></div>
+                    </div>
+                    ` : `<div class="text-[9px] text-slate-400 italic my-auto">Data kosong</div>`}
+                </div>
+                
+                <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm mt-3 lg:mt-0 flex flex-col lg:col-span-3">
+                    <h3 class="text-[10px] font-bold text-slate-600 mb-2">Performa Rigger (Total Jam Kerja)</h3>
+                    <div class="relative h-60 w-full"><canvas id="riggerChart"></canvas></div>
                 </div>
             </div>
             
