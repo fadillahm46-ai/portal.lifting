@@ -424,7 +424,7 @@
                 <div class="bg-white rounded-md shadow-xl w-full max-w-[280px] overflow-hidden flex flex-col max-h-[90vh]">
                     <div class="p-3 text-center border-b border-slate-100 shrink-0 relative">
                         <button onclick="document.getElementById('mpActionModal').classList.add('hidden')" class="absolute top-3 right-3 text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-sm"></i></button>
-                        <h2 class="text-sm font-bold text-slate-700 tracking-tight mt-1">Konfirmasi Job</h2>
+                        <h2 id="mpActionTitle" class="text-sm font-bold text-slate-700 tracking-tight mt-1">Konfirmasi Job</h2>
                     </div>
                     <div class="p-3 overflow-y-auto" id="mpActionContent"></div>
                 </div>
@@ -450,23 +450,7 @@
                         <textarea id="cancelReasonInput" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-[10px] focus:outline-none focus:border-red-500 h-16" placeholder="Alasan..."></textarea>
                         <div class="flex gap-1.5 mt-2">
                             <button onclick="document.getElementById('cancelPromptModal').classList.add('hidden')" class="flex-1 bg-slate-100 text-slate-600 font-bold py-1.5 rounded-sm text-[10px]">Tutup</button>
-                            <button onclick="confirmCancelJob()" class="flex-1 bg-red-500 text-white font-bold py-1.5 rounded-sm text-[10px]">Konfirmasi Batal</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="pendingPromptModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex justify-center items-center z-[90] hidden p-3">
-                <div class="bg-white rounded-md shadow-xl w-full max-w-[280px] overflow-hidden flex flex-col">
-                    <div class="p-4 border-b border-slate-100">
-                        <h2 class="text-xs font-bold text-orange-600 mb-1"><i class="fa-solid fa-pause mr-1"></i>Pending Pekerjaan</h2>
-                        <p class="text-[9px] text-slate-500 leading-tight">Kerja hari/shift ini direkam dan menetap di tab Pending.</p>
-                    </div>
-                    <div class="p-3">
-                        <textarea id="pendingReasonInput" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-[10px] focus:outline-none focus:border-orange-500 h-16" placeholder="Alasan pending..."></textarea>
-                        <div class="flex gap-1.5 mt-2">
-                            <button onclick="document.getElementById('pendingPromptModal').classList.add('hidden'); document.getElementById('mpActionModal').classList.remove('hidden');" class="flex-1 bg-slate-100 text-slate-600 font-bold py-1.5 rounded-sm text-[10px]">Batal</button>
-                            <button onclick="submitPendingJob()" class="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-bold py-1.5 rounded-sm text-[10px] transition-colors">Simpan PENDING</button>
+                            <button id="btnSubmitCancelJob" class="flex-1 bg-red-500 text-white font-bold py-1.5 rounded-sm text-[10px]">Konfirmasi Batal</button>
                         </div>
                     </div>
                 </div>
@@ -1617,8 +1601,8 @@
                 
                 ${aktualHtml}
                 
-                <div class="flex gap-1.5 mt-3 pt-2 border-t border-slate-200">
-                    ${currentUser.role === 'ADMIN' ? `<button type="button" onclick="confirmHapusOrder('${job.no_wo}')" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold px-3 py-1.5 rounded-sm text-[11px] transition-colors shadow-sm" title="Hapus Order"><i class="fa-solid fa-trash"></i> Hapus</button>` : ''}
+                <div class="flex gap-2 mt-3 pt-2 border-t border-slate-200">
+                    ${currentUser.role === 'ADMIN' ? `<button type="button" onclick="confirmHapusOrder('${job.no_wo}')" class="bg-red-50 hover:bg-red-100 text-red-600 border-2 border-slate-900 font-bold px-4 py-1.5 rounded-sm text-[11px] transition-colors shadow-sm flex items-center justify-center gap-1.5" title="Hapus Order"><i class="fa-solid fa-trash"></i> Hapus</button>` : ''}
                     <button type="submit" class="flex-1 bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-1.5 rounded-sm text-[11px] transition-colors shadow-sm">${job.status === 'COMPLETED' ? 'Simpan Revisi' : 'Simpan & Validasi'}</button>
                 </div>
             </form>
@@ -1678,6 +1662,21 @@
         saveOrders(jobs);
         document.getElementById('editJobModal').classList.add('hidden');
         renderApp(true); 
+    }
+
+    function confirmHapusOrder(wo) {
+        openCustomConfirm('Hapus Data', `Apakah Anda yakin ingin menghapus order ${wo}?`, async () => {
+            let jobs = getOrders().filter(j => j.no_wo !== wo);
+            localStorage.setItem('lifting_orders', JSON.stringify(jobs));
+            
+            if (SUPABASE_KEY && !SUPABASE_KEY.includes('PASTE_KUNCI')) {
+                try { await fetch(`${SUPABASE_URL}/rest/v1/orders?no_wo=eq.${wo}`, { method: 'DELETE', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }); } 
+                catch(e) { console.warn(e); }
+            }
+            showToast('Data dihapus!'); 
+            document.getElementById('editJobModal').classList.add('hidden'); 
+            renderApp(true);
+        });
     }
 
     function getOrderFormView() {
@@ -1951,12 +1950,16 @@
         jobs.forEach(job => {
             html += `
             <div class="bg-white rounded-md p-3 border border-slate-200 shadow-sm relative text-[11px]">
-                <div class="flex justify-between items-start mb-2"><div class="text-[10px] font-mono font-bold text-cyan-600 cursor-pointer hover:underline" onclick="viewJobDetail('${job.no_wo}')" title="Buka Detail">${job.no_wo}</div><div class="text-[14px] bg-cyan-50 text-cyan-900 border border-cyan-300 px-3 py-1.5 rounded-md font-bold shadow-md">Unit: ${job.unit || '-'}</div></div>
+                <div class="flex justify-between items-start mb-2"><div class="text-[10px] font-mono font-bold text-cyan-600 cursor-pointer hover:underline" onclick="viewJobDetail('${job.no_wo}')" title="Buka Detail">${job.no_wo}</div><div class="text-[14px] bg-cyan-50 text-cyan-700 border border-cyan-200 px-2 py-1 rounded-md font-bold shadow-sm">Unit: ${job.unit || '-'}</div></div>
                 <div class="font-bold text-slate-800 text-xs mb-1">Req: ${job.tgl_pelaksanaan} ${job.jam_pelaksanaan || ''}</div>
                 ${job.kategori !== 'Big Crane' ? `<div class="text-[11px] text-slate-500 mb-3 truncate">Lokasi: ${job.lokasi_angkat||'-'} ➔ ${job.lokasi_tujuan||'-'}</div>` : `<div class="text-[11px] text-slate-500 mb-3 truncate border-l-2 border-slate-300 pl-1">${job.deskripsi}</div>`}
                 <div class="flex gap-1.5">
-                    ${job.status === 'ON PROGRESS' ? `<button onclick="openManpowerAction('${job.no_wo}')" class="flex-1 bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-1.5 rounded-sm text-[11px] transition-colors shadow-sm">Eksekusi</button>` : ''}
-                    ${job.status === 'PENDING' ? `<button onclick="promptLanjutPending('${job.no_wo}')" class="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-bold py-1.5 rounded-sm text-[11px] transition-colors shadow-sm"><i class="fa-solid fa-forward mr-1"></i> Lanjut Job</button>` : ''}
+                    ${job.status === 'ON PROGRESS' ? `
+                        <button onclick="openMpAction('${job.no_wo}', 'COMPLETED')" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-1.5 rounded-sm text-[9px] transition-colors shadow-sm flex items-center justify-center gap-1"><i class="fa-solid fa-check"></i> Close Job</button>
+                        <button onclick="openMpAction('${job.no_wo}', 'PENDING')" class="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-bold py-1.5 rounded-sm text-[9px] transition-colors shadow-sm flex items-center justify-center gap-1"><i class="fa-solid fa-pause"></i> Pending</button>
+                        <button onclick="initiateCancelJob('${job.no_wo}')" class="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-1.5 rounded-sm text-[9px] transition-colors shadow-sm flex items-center justify-center gap-1"><i class="fa-solid fa-xmark"></i> Cancel</button>
+                    ` : ''}
+                    ${job.status === 'PENDING' ? `<button onclick="promptLanjutPending('${job.no_wo}')" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-1.5 rounded-sm text-[11px] transition-colors shadow-sm flex justify-center items-center gap-1"><i class="fa-solid fa-play"></i> Lanjut Job</button>` : ''}
                 </div>
             </div>`;
         });
@@ -1965,50 +1968,137 @@
         return html;
     }
 
-    function openManpowerAction(wo) {
+    function openMpAction(wo, mode) {
         const job = getOrders().find(j => j.no_wo === wo); const m = getMasterData();
-        let opOptions = (m.operator || []).map(o => `<option value="${o}">${o}</option>`).join(''); let rigOptions = (m.rigger || []).map(r => `<option value="${r}">${r}</option>`).join('');
-        let mpRiggerHtml = `<div><label class="block text-[9px] text-slate-500 mb-0.5">Rigger 1</label><select id="mp_rig" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] bg-white"><option value="">-- Pilih --</option>${rigOptions}</select></div>`;
-        if (job.kategori === 'Big Crane') mpRiggerHtml += `<div><label class="block text-[9px] text-slate-500 mb-0.5">Rigger 2</label><select id="mp_rig2" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] bg-white"><option value="">-- Pilih --</option>${rigOptions}</select></div>`;
+        let opOptions = (m.operator || []).map(o => `<option value="${o}" ${job.operator===o?'selected':''}>${o}</option>`).join(''); 
+        let rigOptions1 = (m.rigger || []).map(r => `<option value="${r}" ${job.rigger===r?'selected':''}>${r}</option>`).join('');
+        let rigOptions2 = (m.rigger || []).map(r => `<option value="${r}" ${job.rigger2===r?'selected':''}>${r}</option>`).join('');
+
+        let mpRiggerHtml = `<div><label class="block text-[9px] text-slate-500 mb-0.5">Rigger 1</label><select id="mp_rig" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] bg-white"><option value="">-- Pilih --</option>${rigOptions1}</select></div>`;
+        if (job.kategori === 'Big Crane') mpRiggerHtml += `<div><label class="block text-[9px] text-slate-500 mb-0.5">Rigger 2</label><select id="mp_rig2" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] bg-white"><option value="">-- Pilih --</option>${rigOptions2}</select></div>`;
+
+        let titleHtml = mode === 'COMPLETED' 
+            ? `<div class="text-center mb-2"><div class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 mb-1"><i class="fa-solid fa-check-double text-lg"></i></div><h2 class="text-sm font-bold text-slate-800">Close Job</h2></div>`
+            : `<div class="text-center mb-2"><div class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-orange-100 text-orange-600 mb-1"><i class="fa-solid fa-pause text-lg"></i></div><h2 class="text-sm font-bold text-slate-800">Pending Job</h2></div>`;
+
+        let pendingField = mode === 'PENDING' ? `
+            <div class="mt-2"><label class="block text-[9px] font-bold text-orange-600 mb-0.5"><i class="fa-solid fa-pen mr-0.5"></i> Alasan Pending *</label><textarea id="mp_pending_reason" class="w-full border border-orange-300 bg-orange-50 rounded-sm px-1.5 py-1 text-[10px] focus:border-orange-500 outline-none h-12" placeholder="Ketikan alasan job dipending..." required></textarea></div>
+        ` : '';
+
+        let btnLabel = mode === 'COMPLETED' ? '<i class="fa-solid fa-check"></i> Simpan Selesai' : '<i class="fa-solid fa-pause"></i> Simpan Pending';
+        let btnClass = mode === 'COMPLETED' ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-orange-500 hover:bg-orange-600';
 
         document.getElementById('mpActionContent').innerHTML = `
-            <div class="bg-blue-50 border border-blue-100 text-blue-700 p-1.5 text-[9px] rounded-sm mb-2"><strong>Target:</strong> Jam ${job.jam_pelaksanaan || '-'} | Durasi ${job.durasi_request}</div>
+            ${titleHtml}
+            <div class="bg-blue-50 border border-blue-100 text-blue-700 p-1.5 text-[9px] rounded-sm mb-2 text-center"><strong>Req:</strong> Jam ${job.jam_pelaksanaan || '-'} | Durasi ${job.durasi_request}</div>
             <div id="mpFormError" class="bg-red-50 border border-red-200 text-red-600 font-bold p-1.5 text-[9px] rounded-sm mb-2 hidden"></div>
             <form id="formMpAction" class="space-y-2">
                 <div><label class="block text-[9px] text-slate-500 mb-0.5">Operator</label><select id="mp_op" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] bg-white"><option value="">-- Pilih --</option>${opOptions}</select></div>
                 <div class="grid grid-cols-${job.kategori === 'Big Crane' ? '2' : '1'} gap-2">${mpRiggerHtml}</div>
-                <div class="grid grid-cols-2 gap-2"><div><label class="block text-[9px] text-slate-500 mb-0.5">Mulai Aktual</label><input type="time" id="mp_start" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px]"></div><div><label class="block text-[9px] text-slate-500 mb-0.5">Selesai Aktual</label><input type="time" id="mp_end" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px]"></div></div>
-                <div class="mt-1 mb-2"><label class="block text-[9px] font-bold text-green-700 mb-0.5"><i class="fa-solid fa-clipboard-check mr-0.5"></i>Final Inspeksi</label><input type="time" id="mp_inspeksi" class="w-full border border-green-300 bg-green-50 rounded-sm px-1.5 py-1 text-[10px] focus:border-green-500 outline-none"></div>
-                <div class="grid grid-cols-3 gap-1.5 pt-2 border-t border-slate-100">
-                    <button type="button" onclick="processMpAction(event, '${wo}', 'COMPLETED')" class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-1.5 rounded-sm text-[9px] shadow-sm"><i class="fa-solid fa-check"></i> Selesai</button>
-                    <button type="button" onclick="initiatePendingJob('${wo}')" class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-1.5 rounded-sm text-[9px] shadow-sm"><i class="fa-solid fa-pause"></i> Pending</button>
-                    <button type="button" onclick="initiateCancelJob('${wo}')" class="bg-red-500 hover:bg-red-600 text-white font-bold py-1.5 rounded-sm text-[9px] shadow-sm"><i class="fa-solid fa-xmark"></i> Batal</button>
+                <div class="grid grid-cols-2 gap-2">
+                    <div><label class="block text-[9px] text-slate-500 mb-0.5">Mulai Aktual</label><input type="time" id="mp_start" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px]" value="${job.jam_start_aktual||''}"></div>
+                    <div><label class="block text-[9px] text-slate-500 mb-0.5">Selesai Aktual</label><input type="time" id="mp_end" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px]" value="${job.jam_end_aktual||''}"></div>
+                </div>
+                <div class="mt-1 mb-2"><label class="block text-[9px] font-bold text-green-700 mb-0.5"><i class="fa-solid fa-clipboard-check mr-0.5"></i>Final Inspeksi</label><input type="time" id="mp_inspeksi" class="w-full border border-green-300 bg-green-50 rounded-sm px-1.5 py-1 text-[10px] focus:border-green-500 outline-none" value="${job.final_inspeksi||''}"></div>
+                ${pendingField}
+                <div class="flex gap-1.5 pt-2 mt-2 border-t border-slate-100">
+                    <button type="button" onclick="document.getElementById('mpActionModal').classList.add('hidden')" class="flex-1 bg-slate-100 text-slate-600 font-bold py-2 rounded-sm text-[10px] hover:bg-slate-200">Tutup</button>
+                    <button type="button" onclick="processMpAction(event, '${wo}', '${mode}')" class="flex-[2] ${btnClass} text-white font-bold py-2 rounded-sm text-[10px] shadow-sm">${btnLabel}</button>
                 </div>
             </form>`;
+        
+        const defaultTitle = document.querySelector('#mpActionModal h2.text-sm.font-bold');
+        if (defaultTitle) defaultTitle.style.display = 'none';
+
         document.getElementById('mpActionModal').classList.remove('hidden');
     }
 
     function processMpAction(e, wo, targetStatus) {
         e.preventDefault(); const job = getOrders().find(j => j.no_wo === wo); if(!job) return;
-        const elStart = document.getElementById('mp_start'); const elEnd = document.getElementById('mp_end'); const elOp = document.getElementById('mp_op'); const elRig = document.getElementById('mp_rig'); const elRig2 = document.getElementById('mp_rig2'); const errorBox = document.getElementById('mpFormError');
-        let isMissing = false; const markError = (el) => { if(!el) return false; if(!el.value) { el.classList.add('border-red-500', 'bg-red-50', 'text-red-600'); el.classList.remove('border-slate-300'); return true; } else { el.classList.remove('border-red-500', 'bg-red-50', 'text-red-600'); el.classList.add('border-slate-300'); return false; } };
-        if (markError(elStart)) isMissing = true; if (markError(elEnd)) isMissing = true; if (markError(elOp)) isMissing = true; if (markError(elRig)) isMissing = true; if (job.kategori === 'Big Crane' && markError(elRig2)) isMissing = true;
-        if (isMissing) { errorBox.innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-1"></i> Lengkapi seluruh form waktu dan personal!'; errorBox.classList.remove('hidden'); return; } else { errorBox.classList.add('hidden'); }
+        
+        const elStart = document.getElementById('mp_start'); 
+        const elEnd = document.getElementById('mp_end'); 
+        const elOp = document.getElementById('mp_op'); 
+        const elRig = document.getElementById('mp_rig'); 
+        const elRig2 = document.getElementById('mp_rig2'); 
+        const elPending = document.getElementById('mp_pending_reason');
+        const errorBox = document.getElementById('mpFormError');
+        
+        let isMissing = false; 
+        const markError = (el) => { 
+            if(!el) return false; 
+            if(!el.value) { el.classList.add('border-red-500', 'bg-red-50', 'text-red-600'); el.classList.remove('border-slate-300'); return true; } 
+            else { el.classList.remove('border-red-500', 'bg-red-50', 'text-red-600'); el.classList.add('border-slate-300'); return false; } 
+        };
+        
+        if (markError(elStart)) isMissing = true; 
+        if (markError(elEnd)) isMissing = true; 
+        if (markError(elOp)) isMissing = true; 
+        if (markError(elRig)) isMissing = true; 
+        if (job.kategori === 'Big Crane' && markError(elRig2)) isMissing = true;
+        if (targetStatus === 'PENDING' && markError(elPending)) isMissing = true;
+
+        if (isMissing) { 
+            errorBox.innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-1"></i> Lengkapi seluruh form wajib!'; 
+            errorBox.classList.remove('hidden'); 
+            return; 
+        } else { 
+            errorBox.classList.add('hidden'); 
+        }
+
         const start = elStart.value; const end = elEnd.value; const op = elOp.value; const rig = elRig.value; const rig2 = elRig2 ? elRig2.value : ''; const inspeksi = document.getElementById('mp_inspeksi').value;
-        let dStart = new Date(`2000-01-01T${start}:00`); let dEnd = new Date(`2000-01-01T${end}:00`); if(dEnd < dStart) dEnd = new Date(`2000-01-02T${end}:00`); let actualMins = (dEnd - dStart) / (1000 * 60);
-        let reqMins = 0; if(job.durasi_request.includes('JAM')) reqMins = parseFloat(job.durasi_request) * 60; else if(job.durasi_request.includes('HARI')) reqMins = parseFloat(job.durasi_request) * 24 * 60;
-        let diffStartMins = 0; if(job.jam_pelaksanaan) { let reqStart = new Date(`2000-01-01T${job.jam_pelaksanaan}:00`); diffStartMins = (dStart - reqStart) / (1000 * 60); }
+        
+        let dStart = new Date(`2000-01-01T${start}:00`); 
+        let dEnd = new Date(`2000-01-01T${end}:00`); 
+        if(dEnd < dStart) dEnd = new Date(`2000-01-02T${end}:00`); 
+        let actualMins = (dEnd - dStart) / (1000 * 60);
+        let reqMins = 0; 
+        if(job.durasi_request.includes('JAM')) reqMins = parseFloat(job.durasi_request) * 60; 
+        else if(job.durasi_request.includes('HARI')) reqMins = parseFloat(job.durasi_request) * 24 * 60;
+        
+        let diffStartMins = 0; 
+        if(job.jam_pelaksanaan) { 
+            let reqStart = new Date(`2000-01-01T${job.jam_pelaksanaan}:00`); 
+            diffStartMins = (dStart - reqStart) / (1000 * 60); 
+        }
+        
+        if (targetStatus === 'PENDING') {
+            let jobs = getOrders(); let idx = jobs.findIndex(j => j.no_wo === wo);
+            jobs[idx].operator = op; jobs[idx].rigger = rig; if(rig2) jobs[idx].rigger2 = rig2;
+            jobs[idx].jam_start_aktual = start; jobs[idx].jam_end_aktual = end; jobs[idx].final_inspeksi = inspeksi;
+            jobs[idx].durasi_aktual = (actualMins / 60).toFixed(2);
+            jobs[idx].status = 'PENDING';
+            jobs[idx].alasan_telat = "PENDING: " + elPending.value.trim();
+            saveOrders(jobs);
+            document.getElementById('mpActionModal').classList.add('hidden');
+            showToast('Job dipending!');
+            renderApp(true);
+            return;
+        }
+
         let isLate = diffStartMins > 15; let isOvertime = actualMins > (reqMins + 15);
         tempMpData = { wo, start, end, op, rig, rig2, inspeksi, actualMins, isLate, isOvertime, diffStartMins, diffOvertime: actualMins - reqMins, status: targetStatus };
         if(isLate || isOvertime) showKendalaModal(); else saveMpFinal(null, null); 
     }
 
     function showKendalaModal() {
-        document.getElementById('mpActionModal').classList.add('hidden'); let html = `<div class="bg-red-50 border border-red-200 text-red-600 p-1.5 text-[9px] rounded-sm mb-2"><strong>Wajib Diisi:</strong> Jam aktual > toleransi.</div><form onsubmit="submitKendala(event)" class="space-y-2">`;
-        if(tempMpData.isLate) html += `<div><label class="block text-[9px] font-bold text-red-600 mb-0.5"><i class="fa-regular fa-clock mr-1"></i>Alasan Telat (${Math.round(tempMpData.diffStartMins)} Menit):</label><textarea id="alasan_telat" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px]" required></textarea></div>`;
-        if(tempMpData.isOvertime) html += `<div><label class="block text-[9px] font-bold text-red-600 mb-0.5"><i class="fa-solid fa-stopwatch mr-1"></i>Alasan Over (${Math.round(tempMpData.diffOvertime)} Menit):</label><textarea id="alasan_over" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px]" required></textarea></div>`;
+        document.getElementById('mpActionModal').classList.add('hidden'); 
+        let html = `<div class="bg-red-50 border border-red-200 text-red-600 p-1.5 text-[9px] rounded-sm mb-2"><strong>Wajib Diisi:</strong> Jam aktual > toleransi.</div><form onsubmit="submitKendala(event)" class="space-y-2">`;
+        
+        const formatTime = (totalMins) => {
+            let mins = Math.round(totalMins);
+            let h = Math.floor(mins / 60);
+            let m = mins % 60;
+            return h > 0 ? `${h} Jam ${m} Menit` : `${m} Menit`;
+        };
+
+        if(tempMpData.isLate) html += `<div><label class="block text-[9px] font-bold text-red-600 mb-0.5"><i class="fa-regular fa-clock mr-1"></i>Alasan Telat (${formatTime(tempMpData.diffStartMins)}):</label><textarea id="alasan_telat" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px]" required></textarea></div>`;
+        if(tempMpData.isOvertime) html += `<div><label class="block text-[9px] font-bold text-red-600 mb-0.5"><i class="fa-solid fa-stopwatch mr-1"></i>Alasan Over (${formatTime(tempMpData.diffOvertime)}):</label><textarea id="alasan_over" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px]" required></textarea></div>`;
+        
         html += `<div class="flex gap-1.5 pt-1 mt-1 border-t border-slate-100"><button type="button" onclick="document.getElementById('kendalaModal').classList.add('hidden'); document.getElementById('mpActionModal').classList.remove('hidden');" class="flex-1 bg-slate-100 text-slate-600 font-bold py-1.5 rounded-sm text-[10px]">Cancel</button><button type="submit" class="flex-1 bg-red-500 text-white font-bold py-1.5 rounded-sm text-[10px]">Simpan Kendala</button></div></form>`;
-        document.getElementById('kendalaContent').innerHTML = html; document.getElementById('kendalaModal').classList.remove('hidden');
+        
+        document.getElementById('kendalaContent').innerHTML = html; 
+        document.getElementById('kendalaModal').classList.remove('hidden');
     }
 
     function submitKendala(e) { e.preventDefault(); let aTelat = tempMpData.isLate ? document.getElementById('alasan_telat').value : null; let aOver = tempMpData.isOvertime ? document.getElementById('alasan_over').value : null; saveMpFinal(aTelat, aOver); document.getElementById('kendalaModal').classList.add('hidden'); }
@@ -2026,13 +2116,12 @@
         if (tempMpData.status === 'COMPLETED') { showSuccessAnim('thumb', 'Kerja Bagus!', 'Pekerjaan telah diselesaikan dan laporan siap.'); } else { showToast('Tersimpan!'); }
     }
 
-    let tempMpDataCancelPending = null; let activeCancelWo = null; let activePendingWo = null;
+    let tempMpDataCancelPending = null; let activeCancelWo = null;
     
     function initiateCancelJob(wo) { 
         activeCancelWo = wo; 
         document.getElementById('cancelReasonInput').value = ''; 
         document.getElementById('cancelPromptModal').classList.remove('hidden'); 
-        document.getElementById('mpActionModal').classList.add('hidden'); 
     }
     
     function confirmCancelJob() {
@@ -2046,36 +2135,6 @@
             showToast('Dibatalkan!'); 
             document.getElementById('cancelPromptModal').classList.add('hidden'); 
             renderApp(true); 
-        }
-    }
-
-    function initiatePendingJob(wo) {
-        activePendingWo = wo;
-        document.getElementById('pendingReasonInput').value = '';
-        document.getElementById('pendingPromptModal').classList.remove('hidden');
-        document.getElementById('mpActionModal').classList.add('hidden');
-    }
-
-    function submitPendingJob() {
-        let alasan = document.getElementById('pendingReasonInput').value.trim();
-        if(!alasan) return showToast('Alasan wajib diisi!', 'error');
-        
-        let jobs = getOrders(); let idx = jobs.findIndex(j => j.no_wo === activePendingWo);
-        if(idx !== -1) {
-            jobs[idx].status = 'PENDING';
-            jobs[idx].alasan_telat = "PENDING: " + alasan;
-            
-            const elOp = document.getElementById('mp_op');
-            if(elOp && elOp.value) jobs[idx].operator = elOp.value;
-            const elRig = document.getElementById('mp_rig');
-            if(elRig && elRig.value) jobs[idx].rigger = elRig.value;
-            const elRig2 = document.getElementById('mp_rig2');
-            if(elRig2 && elRig2.value) jobs[idx].rigger2 = elRig2.value;
-
-            saveOrders(jobs);
-            showToast('Job dipending!');
-            document.getElementById('pendingPromptModal').classList.add('hidden');
-            renderApp(true);
         }
     }
 
