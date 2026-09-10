@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Order lifting PPA</title>
+    <title>Sistem Pemesanan Alat Berat PPA</title>
     
     <!-- Favicon / Logo Tab Web -->
     <link rel="icon" href="https://lh3.googleusercontent.com/d/1hQZopiZU-_bQC9aRmyZndlmEF--k4h5U">
@@ -189,30 +189,41 @@
 
     let activePendingWo = null;
     let activeCancelWo = null;
+    let isSyncError = false;
+
+    function canRenderApp() {
+        if (currentTab === 'order' || currentTab === 'profile' || currentTab === 'master') return false;
+        const isTyping = document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
+        if (isTyping) return false;
+        const modalIds = ['editJobModal', 'detailJobModal', 'mpActionModal', 'cancelPromptModal', 'pendingPromptModal', 'globalConfirmModal', 'resetPwdModal', 'successModal', 'successRegModal', 'profileBiodataModal', 'profileSettingsModal'];
+        for (let id of modalIds) {
+            const el = document.getElementById(id);
+            if (el && !el.classList.contains('hidden')) return false;
+        }
+        return true;
+    }
 
     setInterval(async () => {
         if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
         const user = localStorage.getItem('lifting_user');
         if (!user) return;
 
-        const isTyping = document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
-        const isModalOpen = ['editJobModal', 'detailJobModal', 'mpActionModal', 'kendalaModal', 'cancelPromptModal', 'pendingPromptModal', 'globalConfirmModal', 'resetPwdModal', 'successModal', 'successRegModal', 'profileBiodataModal', 'profileSettingsModal'].some(id => {
-            const el = document.getElementById(id);
-            return el && !el.classList.contains('hidden');
-        });
-
         try {
             let shouldRender = false;
 
-            const resOrders = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=timestamp.desc`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
-            if (resOrders.ok) {
-                const data = await resOrders.json();
-                if (Array.isArray(data) && data.length > 0) {
-                    const newData = JSON.stringify(data);
-                    if (localStorage.getItem('lifting_orders') !== newData) {
-                        localStorage.setItem('lifting_orders', newData); shouldRender = true; 
+            if (!isSyncError) {
+                const resOrders = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=timestamp.desc`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
+                if (resOrders.ok) {
+                    const data = await resOrders.json();
+                    if (Array.isArray(data)) {
+                        const newData = JSON.stringify(data);
+                        if (localStorage.getItem('lifting_orders') !== newData) {
+                            localStorage.setItem('lifting_orders', newData); shouldRender = true; 
+                        }
                     }
                 }
+            } else {
+                syncToSupabase(getOrders());
             }
 
             const resSettings = await fetch(`${SUPABASE_URL}/rest/v1/settings?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
@@ -229,7 +240,7 @@
             const resUsers = await fetch(`${SUPABASE_URL}/rest/v1/users?select=*`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
             if (resUsers.ok) {
                 const data = await resUsers.json();
-                if (Array.isArray(data) && data.length > 0) {
+                if (Array.isArray(data)) {
                     const newData = JSON.stringify(data);
                     if (localStorage.getItem('lifting_users') !== newData) {
                         localStorage.setItem('lifting_users', newData); shouldRender = true;
@@ -248,7 +259,7 @@
                 }
             }
 
-            if (shouldRender && !isTyping && !isModalOpen && currentTab !== 'order' && currentTab !== 'master' && currentTab !== 'profile') {
+            if (shouldRender && canRenderApp()) {
                 renderApp(true);
             }
         } catch(e) {}
@@ -264,9 +275,9 @@
                 fetch(`${SUPABASE_URL}/rest/v1/master_data?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } })
             ]);
 
-            if (resOrders.ok) { const data = await resOrders.json(); if(Array.isArray(data) && data.length > 0) localStorage.setItem('lifting_orders', JSON.stringify(data)); }
+            if (resOrders.ok && !isSyncError) { const data = await resOrders.json(); if(Array.isArray(data)) localStorage.setItem('lifting_orders', JSON.stringify(data)); }
             if (resSettings.ok) { const data = await resSettings.json(); if(data && data.length > 0) localStorage.setItem('lifting_settings', JSON.stringify(data[0])); }
-            if (resUsers.ok) { const data = await resUsers.json(); if(Array.isArray(data) && data.length > 0) localStorage.setItem('lifting_users', JSON.stringify(data)); }
+            if (resUsers.ok) { const data = await resUsers.json(); if(Array.isArray(data)) localStorage.setItem('lifting_users', JSON.stringify(data)); }
             if (resMaster.ok) { const data = await resMaster.json(); if(data && data.length > 0) localStorage.setItem('lifting_master_data', JSON.stringify(data[0])); }
             
             if(isManual) { showToast("Data berhasil disinkronisasi!", "success"); renderApp(false); }
@@ -277,8 +288,23 @@
         if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
         try {
             if (!orders || orders.length === 0) return;
-            await fetch(`${SUPABASE_URL}/rest/v1/orders?on_conflict=no_wo`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'resolution=merge-duplicates' }, body: JSON.stringify(orders) });
-        } catch (e) {}
+            const res = await fetch(`${SUPABASE_URL}/rest/v1/orders?on_conflict=no_wo`, { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'resolution=merge-duplicates' }, 
+                body: JSON.stringify(orders) 
+            });
+            if (!res.ok) {
+                isSyncError = true;
+                const errText = await res.text();
+                console.error("Supabase Sync Error:", errText);
+                showToast("Data aman di HP, tapi gagal upload ke Database Cloud (Cek RLS/Unique DB).", "error");
+            } else {
+                isSyncError = false;
+            }
+        } catch (e) {
+            isSyncError = true;
+            console.error("Supabase network error:", e);
+        }
     }
 
     async function syncUsersToSupabase(users) {
@@ -744,12 +770,12 @@
                     <form onsubmit="handleLogin(event)" class="space-y-3">
                         <div>
                             <label class="block text-[10px] font-bold text-slate-500 mb-1">NRP / ID Pengguna</label>
-                            <input type="text" id="loginNrp" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-cyan-500" placeholder="ADMIN / GL / USER / MP" required>
+                            <input type="text" id="loginNrp" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-cyan-500" placeholder="Masukan NRP" required>
                         </div>
                         <div>
                             <label class="block text-[10px] font-bold text-slate-500 mb-1">Password</label>
                             <div class="relative">
-                                <input type="password" id="loginPwd" class="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 pr-7 text-xs focus:outline-none focus:border-cyan-500" placeholder="admin / gl / user / mp" required>
+                                <input type="password" id="loginPwd" class="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 pr-7 text-xs focus:outline-none focus:border-cyan-500" placeholder="Masukan Password" required>
                                 <i id="toggleLoginPwd" class="fa-regular fa-eye absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer pwd-toggle text-[10px]" onclick="togglePassword('loginPwd', 'toggleLoginPwd')"></i>
                             </div>
                             <p id="loginErrorMsg" class="text-red-500 font-bold text-[10px] mt-1.5 hidden"></p>
@@ -2643,7 +2669,9 @@
             const user = localStorage.getItem('lifting_user'); 
             if (user) { 
                 fetchFromSupabase().then(() => { 
-                    renderApp(true); 
+                    if (canRenderApp()) {
+                        renderApp(true); 
+                    }
                 }); 
             } 
         } 
