@@ -646,12 +646,18 @@
 
     function getDesktopSidebar(user, settings) {
         const isAdmin = user.role === 'ADMIN'; const isGL = user.role === 'GL'; const isUSER = user.role === 'USER'; const isMP = user.role === 'MANPOWER';
-        const logoHtmlDesktop = settings.logo_url ? `<img src="${settings.logo_url}" alt="Logo" class="w-6 h-6 object-contain rounded-md shadow-sm">` : `<div class="bg-cyan-600 text-white p-1.5 rounded-lg shadow-sm flex items-center justify-center"><i class="fa-solid fa-truck-moving text-[10px]"></i></div>`;
+        
+        // Ukuran logo diperbesar sedikit (w-8 h-8) agar seimbang dengan 2 baris teks
+        const logoHtmlDesktop = settings.logo_url ? `<img src="${settings.logo_url}" alt="Logo" class="w-8 h-8 object-contain rounded-md shadow-sm">` : `<div class="bg-cyan-600 text-white w-8 h-8 rounded-lg shadow-sm flex items-center justify-center shrink-0"><i class="fa-solid fa-truck-moving text-xs"></i></div>`;
 
         return `
         <div class="w-48 bg-white border-r border-slate-200 flex flex-col h-full shrink-0 z-20 relative">
             <div class="p-3 border-b border-slate-100 flex items-center gap-2 shrink-0">
-                ${logoHtmlDesktop} <h1 class="font-bold text-slate-800 tracking-tight text-[11px] leading-tight uppercase">Support Equipment</h1>
+                ${logoHtmlDesktop} 
+                <div class="flex flex-col justify-center">
+                    <h1 class="font-bold text-slate-800 tracking-tight text-[11px] leading-tight uppercase">Support Equipment</h1>
+                    <span class="text-[9px] font-bold text-cyan-600 mt-0.5 leading-tight">PT Putra Perkasa Abadi</span>
+                </div>
             </div>
             
             <div class="flex-1 overflow-y-auto py-3 px-2 flex flex-col gap-1 hide-scrollbar">
@@ -675,7 +681,7 @@
             </div>
         </div>`;
     }
-
+    
     function getMobileNav(user) {
         return `
         <div class="fixed bottom-0 w-full bg-white border-t border-slate-200 px-1 sm:px-2 py-1.5 flex justify-around items-center z-40 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
