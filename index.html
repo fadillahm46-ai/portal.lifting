@@ -1666,14 +1666,7 @@
             jobs[idx].alasan_overtime = document.getElementById('edit_alasan_overtime').value;
         }
 
-        let isValidated = false;
-        if (jobs[idx].kategori === 'Big Crane') {
-            isValidated = (selectedGL && selectedUnit && op && rig && rig2);
-        } else if (jobs[idx].kategori === 'Lowboy') {
-            isValidated = (selectedGL && selectedUnit && op && rig);
-        } else {
-            isValidated = (selectedGL && selectedUnit);
-        }
+        let isValidated = (selectedGL && selectedUnit);
 
         if (isValidated && (jobs[idx].status === 'SCHEDULED' || jobs[idx].status === 'UNSCHEDULED' || jobs[idx].status === 'PENDING')) {
             jobs[idx].status = 'ON PROGRESS';
@@ -1930,21 +1923,26 @@
         jobs = jobs.filter(j => j.tgl_pelaksanaan >= mpTglMulai && j.tgl_pelaksanaan <= mpTglSelesai);
         
         if (currentMpPanel === 'PENDING') jobs = jobs.filter(j => j.status === 'PENDING' && j.operator); else jobs = jobs.filter(j => j.status === currentMpPanel);
-        if (filterUnit !== 'ALL') jobs = jobs.filter(j => j.unit === filterUnit);
+        
+        let unitFilterHtml = '';
+        if (mpFleetMode === 'Crane Truck') {
+            if (filterUnit !== 'ALL') jobs = jobs.filter(j => j.unit === filterUnit);
+            unitFilterHtml = `<select id="mp_filter_unit" onchange="renderApp(true)" class="text-[9px] font-bold bg-white border border-slate-300 text-slate-700 rounded-full px-2 py-1 outline-none shadow-sm focus:border-cyan-500 cursor-pointer"><option value="ALL">Semua Unit</option>${unitOptions.map(u => `<option value="${u}" ${filterUnit === u ? 'selected' : ''}>${u}</option>`).join('')}</select>`;
+        }
 
         let html = `
         <div class="flex items-center gap-2 mb-2 mt-2"><button onclick="mpFleetMode=null; renderApp(false);" class="w-6 h-6 rounded-sm border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 bg-white shadow-sm"><i class="fa-solid fa-arrow-left text-[10px]"></i></button><h2 class="text-xs font-bold text-slate-800">Tugas: <span class="text-cyan-600">${mpFleetMode}</span></h2></div>
         
-        <div class="flex items-center gap-1 mb-2 bg-white p-1.5 rounded-md shadow-sm border border-slate-200 text-[10px]">
-            <i class="fa-regular fa-calendar ml-1 text-slate-400"></i>
-            <input type="date" id="mp_filter_tgl_mulai" class="bg-transparent border-none outline-none text-slate-700 w-full" value="${mpTglMulai}" onchange="renderApp(true)">
-            <span class="text-slate-400">-</span>
-            <input type="date" id="mp_filter_tgl_selesai" class="bg-transparent border-none outline-none text-slate-700 w-full" value="${mpTglSelesai}" onchange="renderApp(true)">
+        <div class="inline-flex items-center gap-1 mb-2 bg-white px-2 py-1.5 rounded-md shadow-sm border border-slate-200 text-[10px] w-auto">
+            <i class="fa-regular fa-calendar text-slate-400"></i>
+            <input type="date" id="mp_filter_tgl_mulai" class="bg-transparent border-none outline-none text-slate-700 w-auto cursor-pointer" value="${mpTglMulai}" onchange="renderApp(true)">
+            <span class="text-slate-400 font-bold mx-0.5">s/d</span>
+            <input type="date" id="mp_filter_tgl_selesai" class="bg-transparent border-none outline-none text-slate-700 w-auto cursor-pointer" value="${mpTglSelesai}" onchange="renderApp(true)">
         </div>
 
         <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
             <div class="flex gap-1 overflow-x-auto hide-scrollbar bg-white p-0.5 rounded-full shadow-sm border border-slate-200">${['ON PROGRESS', 'PENDING', 'COMPLETED', 'CANCELED'].map(panel => `<button onclick="currentMpPanel='${panel}'; renderApp(true)" class="px-2.5 py-1 rounded-full text-[9px] font-bold whitespace-nowrap transition-colors ${currentMpPanel === panel ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}">${panel}</button>`).join('')}</div>
-            <select id="mp_filter_unit" onchange="renderApp(true)" class="text-[9px] font-bold bg-white border border-slate-300 text-slate-700 rounded-full px-2 py-1 outline-none shadow-sm focus:border-cyan-500 cursor-pointer"><option value="ALL">Semua Unit</option>${unitOptions.map(u => `<option value="${u}" ${filterUnit === u ? 'selected' : ''}>${u}</option>`).join('')}</select>
+            ${unitFilterHtml}
         </div>
         <div class="space-y-2 pb-4">`;
 
