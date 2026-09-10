@@ -121,7 +121,7 @@
         if (!user) return;
 
         const isTyping = document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
-        const isModalOpen = ['editJobModal', 'detailJobModal', 'mpActionModal', 'kendalaModal', 'cancelPromptModal', 'pendingPromptModal', 'globalConfirmModal', 'resetPwdModal', 'successModal', 'successRegModal', 'profileBiodataModal', 'profileSettingsModal'].some(id => {
+        const isModalOpen = ['editJobModal', 'detailJobModal', 'mpActionModal', 'kendalaModal', 'cancelPromptModal', 'globalConfirmModal', 'resetPwdModal', 'successModal', 'successRegModal', 'profileBiodataModal', 'profileSettingsModal', 'imageViewerModal'].some(id => {
             const el = document.getElementById(id);
             return el && !el.classList.contains('hidden');
         });
@@ -171,12 +171,12 @@
                 }
             }
 
-            // SMART SYNC BLOCKER: Hanya refresh jika tidak mengetik/modal terbuka, atau jika sedang di menu monitoring/dashboard
+            // SMART SYNC BLOCKER
             if (shouldRender && !isTyping && !isModalOpen && currentTab !== 'order' && currentTab !== 'master' && currentTab !== 'profile') {
                 renderApp(true);
             }
         } catch(e) {}
-    }, 3000);
+    }, 15000);
 
     async function fetchFromSupabase(isManual = false) {
         if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
@@ -223,7 +223,10 @@
 
     function getOrders() { return Array.isArray(JSON.parse(localStorage.getItem('lifting_orders'))) ? JSON.parse(localStorage.getItem('lifting_orders')) : []; }
     function saveOrders(orders) { localStorage.setItem('lifting_orders', JSON.stringify(orders)); syncToSupabase(orders); }
-    function getUsers() { return Array.isArray(JSON.parse(localStorage.getItem('lifting_users'))) ? JSON.parse(localStorage.getItem('lifting_users')) : []; }
+    function getUsers() { 
+        let data = JSON.parse(localStorage.getItem('lifting_users'));
+        return Array.isArray(data) && data.length > 0 ? data : defaultUsers; 
+    }
     function saveUsers(users) { localStorage.setItem('lifting_users', JSON.stringify(users)); syncUsersToSupabase(users); }
     function getMasterData() { 
         let data = JSON.parse(localStorage.getItem('lifting_master_data'));
@@ -258,7 +261,7 @@
 
     function showToast(message, type = 'success') {
         const toast = document.createElement('div');
-        toast.className = `fixed top-2 right-2 z-[100] px-3 py-1.5 rounded shadow-md text-white text-[10px] font-medium transition-opacity duration-300 ${type === 'success' ? 'bg-emerald-500' : 'bg-red-500'}`;
+        toast.className = `fixed top-2 right-2 z-[200] px-3 py-1.5 rounded shadow-md text-white text-[10px] font-medium transition-opacity duration-300 ${type === 'success' ? 'bg-emerald-500' : 'bg-red-500'}`;
         toast.innerHTML = `<i class="fa-solid ${type === 'success' ? 'fa-check-circle' : 'fa-circle-exclamation'} mr-1"></i>${message}`;
         document.body.appendChild(toast);
         setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3000);
@@ -279,7 +282,7 @@
         document.body.removeChild(el);
     }
 
-    // SMART COPY KE WA
+    // SMART COPY KE WA DENGAN EMOJI & PERSISTENSI USER FORMAT
     function copyJobToWA(wo) {
         let job = getOrders().find(j => j.no_wo === wo);
         if(!job) return;
@@ -287,19 +290,15 @@
         let currentUser = JSON.parse(localStorage.getItem('lifting_user'));
         let waText = '';
         
-        // Emoticon cerdas berdasarkan status
         let statusEmoji = job.status;
         if (job.status === 'COMPLETED') statusEmoji += ' ✅';
         else if (job.status === 'PENDING') statusEmoji += ' ⏸️';
         else if (job.status === 'CANCELED') statusEmoji += ' ❌';
         
-        // Format Pesanan (User / Detail Utuh)
         let userFormat = `*DETAIL PEKERJAAN LIFTING*\n*NO WO:* ${job.no_wo}\n*Order Unit:* ${job.kategori} ${job.unit ? '('+job.unit+')' : ''}\n*Status:* ${statusEmoji}\n*Pemohon:* ${job.nama_pemohon}\n*Perusahaan:* ${job.perusahaan}\n*Departemen:* ${job.departemen}\n*Section:* ${job.section}\n*Kontak WA:* ${job.no_wa}\n*Tanggal:* ${job.tgl_pelaksanaan} ${job.jam_pelaksanaan ? '| Jam: '+job.jam_pelaksanaan : ''}\n*Lokasi:* ${job.lokasi_angkat || '-'} ➔ ${job.lokasi_tujuan || '-'}\n*Deskripsi:* ${job.deskripsi}`;
 
-        // Format Pelaporan (Manpower)
         let mpFormat = `*PELAPORAN PROGRES JOB LIFTING*\n*Status:* ${statusEmoji}\n\n*Nama Job:* ${job.deskripsi}\n*Jam Start:* ${job.jam_start_aktual || '-'}\n*Jam Finish:* ${job.jam_end_aktual || '-'}\n*No. Unit:* ${job.unit || '-'}\n*Nama Operator:* ${job.operator || '-'}\n*Nama Rigger:* ${job.rigger || '-'}${job.rigger2 ? ', ' + job.rigger2 : ''}\n\n*Final Inspeksi:* ${job.final_inspeksi || '-'}\n*Kendala:* ${job.alasan_telat ? 'Telat: ' + job.alasan_telat + ' ' : ''}${job.alasan_overtime ? 'Over: ' + job.alasan_overtime : ''}${(!job.alasan_telat && !job.alasan_overtime) ? '-' : ''}`;
 
-        // Cek Role siapa yang menyalin
         if (currentUser && currentUser.role === 'USER') {
             waText = userFormat; // User selalu dapat format detail
         } else {
@@ -324,7 +323,7 @@
             if (job.no_wo && job.no_wo.startsWith(datePrefix)) {
                 const parts = job.no_wo.split('-');
                 if (parts.length >= 3) {
-                    const num = parseInt(parts[2].split('-L')[0], 10);
+                    const num = parseInt(parts[2].split('-P')[0], 10);
                     if (!isNaN(num) && num > maxNumber) maxNumber = num;
                 }
             }
@@ -367,11 +366,11 @@
                 <div class="flex-1 flex flex-col h-screen overflow-hidden relative">
                     ${isMobile ? `
                     <div class="bg-white shadow-sm px-4 py-3 flex items-center justify-between shrink-0 z-10 border-b border-slate-200">
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-2 text-cyan-700 font-bold text-base sm:text-lg uppercase tracking-tight">
                             ${logoHtmlMobile}
-                            <div class="flex flex-col justify-center leading-none">
-                                <h1 class="text-cyan-700 font-bold text-sm sm:text-base uppercase tracking-tight">${user.role === 'MANPOWER' ? 'PANEL LAPANGAN' : 'SUPPORT EQUIPMENT'}</h1>
-                                <span class="text-[9px] sm:text-[10px] text-cyan-500 font-semibold tracking-wide mt-0.5">PT Putra Perkasa Abadi</span>
+                            <div class="flex flex-col leading-none">
+                                <span>${user.role === 'MANPOWER' ? 'PANEL LAPANGAN' : 'SUPPORT EQUIPMENT'}</span>
+                                <span class="text-[9px] text-cyan-500 mt-0.5 font-semibold">PT Putra Perkasa Abadi</span>
                             </div>
                         </div>
                         ${user.role === 'MANPOWER' ? `<div class="flex items-center gap-2"><span class="text-[10px] sm:text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200 px-2 py-1 rounded-md">${user.nama_lengkap}</span></div>` : ''}
@@ -389,6 +388,11 @@
             </div>
 
             <!-- ALL GLOBAL MODALS -->
+            <div id="imageViewerModal" class="fixed inset-0 bg-black/95 z-[150] hidden flex items-center justify-center p-2" onclick="this.classList.add('hidden')">
+                <img id="viewerImage" src="" class="max-w-full max-h-[90vh] object-contain cursor-zoom-out rounded-sm shadow-2xl transition-transform duration-300" onclick="event.stopPropagation()">
+                <button class="absolute top-4 right-4 text-white text-3xl opacity-70 hover:opacity-100 transition-opacity"><i class="fa-solid fa-times"></i></button>
+            </div>
+
             <div id="globalConfirmModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[100] hidden p-3">
                 <div class="bg-white rounded-md shadow-xl w-full max-w-[280px] overflow-hidden flex flex-col">
                     <div class="p-4 text-center border-b border-slate-100 shrink-0">
@@ -406,7 +410,7 @@
                         <h3 class="font-bold text-slate-800 text-xs"><i class="fa-solid fa-pen-to-square mr-1.5 text-cyan-600"></i>Edit / Validasi Job</h3>
                         <button onclick="document.getElementById('editJobModal').classList.add('hidden')" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-sm"></i></button>
                     </div>
-                    <div class="p-3 overflow-y-auto" id="editJobContent"></div>
+                    <div class="p-3 overflow-y-auto hide-scrollbar" id="editJobContent"></div>
                 </div>
             </div>
 
@@ -416,17 +420,17 @@
                         <h3 class="font-bold text-slate-800 text-xs">Detail Pekerjaan</h3>
                         <button onclick="document.getElementById('detailJobModal').classList.add('hidden'); event.stopPropagation();" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-sm"></i></button>
                     </div>
-                    <div class="p-3 overflow-y-auto" id="detailJobContent"></div>
+                    <div class="p-3 overflow-y-auto hide-scrollbar" id="detailJobContent"></div>
                 </div>
             </div>
 
             <div id="mpActionModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[80] hidden p-3">
                 <div class="bg-white rounded-md shadow-xl w-full max-w-[280px] overflow-hidden flex flex-col max-h-[90vh]">
-                    <div class="p-3 text-center border-b border-slate-100 shrink-0 relative">
+                    <div class="p-3 text-center border-b border-slate-100 shrink-0 relative bg-slate-50">
                         <button onclick="document.getElementById('mpActionModal').classList.add('hidden')" class="absolute top-3 right-3 text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-sm"></i></button>
-                        <h2 id="mpActionTitle" class="text-sm font-bold text-slate-700 tracking-tight mt-1">Konfirmasi Job</h2>
+                        <h2 class="text-sm font-bold text-slate-800 tracking-tight mt-1" id="mpActionTitle">Selesaikan Pekerjaan</h2>
                     </div>
-                    <div class="p-3 overflow-y-auto" id="mpActionContent"></div>
+                    <div class="p-3 overflow-y-auto hide-scrollbar" id="mpActionContent"></div>
                 </div>
             </div>
 
@@ -436,7 +440,7 @@
                         <div class="w-10 h-10 rounded-full border-[3px] border-orange-200 text-orange-400 flex items-center justify-center mx-auto mb-2 text-xl font-bold">!</div>
                         <h2 class="text-xs font-bold text-slate-700">Kendala Waktu Terdeteksi!</h2>
                     </div>
-                    <div class="px-4 pb-4 overflow-y-auto" id="kendalaContent"></div>
+                    <div class="px-4 pb-4 overflow-y-auto hide-scrollbar" id="kendalaContent"></div>
                 </div>
             </div>
 
@@ -450,7 +454,7 @@
                         <textarea id="cancelReasonInput" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-[10px] focus:outline-none focus:border-red-500 h-16" placeholder="Alasan..."></textarea>
                         <div class="flex gap-1.5 mt-2">
                             <button onclick="document.getElementById('cancelPromptModal').classList.add('hidden')" class="flex-1 bg-slate-100 text-slate-600 font-bold py-1.5 rounded-sm text-[10px]">Tutup</button>
-                            <button id="btnSubmitCancelJob" class="flex-1 bg-red-500 text-white font-bold py-1.5 rounded-sm text-[10px]">Konfirmasi Batal</button>
+                            <button onclick="confirmCancelJob()" class="flex-1 bg-red-500 text-white font-bold py-1.5 rounded-sm text-[10px]">Konfirmasi Batal</button>
                         </div>
                     </div>
                 </div>
@@ -481,7 +485,7 @@
                         <h3 class="font-bold text-slate-800 text-sm"><i class="fa-solid fa-id-card mr-2 text-green-600"></i>Identitas Saya</h3>
                         <button onclick="document.getElementById('profileBiodataModal').classList.add('hidden')" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-base"></i></button>
                     </div>
-                    <div class="p-4 overflow-y-auto">
+                    <div class="p-4 overflow-y-auto hide-scrollbar">
                         <form onsubmit="saveProfile(event)" class="space-y-3">
                             <div class="grid grid-cols-2 gap-2">
                                 <div><label class="block text-[10px] font-bold text-slate-500 mb-1">NRP</label><input type="text" value="${user.nrp}" class="w-full border border-slate-200 bg-slate-50 rounded-md px-3 py-2 text-[10px] text-slate-500 cursor-not-allowed" readonly></div>
@@ -560,15 +564,15 @@
 
     function getDesktopSidebar(user, settings) {
         const isAdmin = user.role === 'ADMIN'; const isGL = user.role === 'GL'; const isUSER = user.role === 'USER'; const isMP = user.role === 'MANPOWER';
-        const logoHtmlDesktop = settings.logo_url ? `<img src="${settings.logo_url}" alt="Logo" class="w-8 h-8 object-contain rounded-sm shadow-sm">` : `<div class="bg-cyan-600 text-white w-8 h-8 rounded shadow-sm flex items-center justify-center shrink-0"><i class="fa-solid fa-truck-moving text-[12px]"></i></div>`;
+        const logoHtmlDesktop = settings.logo_url ? `<img src="${settings.logo_url}" alt="Logo" class="w-6 h-6 object-contain rounded-sm shadow-sm">` : `<div class="bg-cyan-600 text-white p-1.5 rounded shadow-sm flex items-center justify-center"><i class="fa-solid fa-truck-moving text-[10px]"></i></div>`;
 
         return `
-        <div class="w-44 bg-white border-r border-slate-200 flex flex-col h-full shrink-0 z-20 relative">
-            <div class="p-3 border-b border-slate-100 flex items-center gap-2 shrink-0">
+        <div class="w-48 bg-white border-r border-slate-200 flex flex-col h-full shrink-0 z-20 relative shadow-[2px_0_10px_rgba(0,0,0,0.02)]">
+            <div class="p-3 border-b border-slate-100 flex items-center gap-2 shrink-0 bg-slate-50/50">
                 ${logoHtmlDesktop} 
-                <div class="flex flex-col justify-center leading-none">
-                    <h1 class="font-bold text-slate-800 tracking-tight text-[11px] uppercase">Support Equipment</h1>
-                    <span class="text-[8px] font-bold text-cyan-600 mt-1">PT Putra Perkasa Abadi</span>
+                <div class="flex flex-col">
+                    <h1 class="font-bold text-slate-800 tracking-tight text-[11px] leading-tight uppercase">Support Equipment</h1>
+                    <span class="text-[9px] text-cyan-500 font-bold mt-0.5">PT Putra Perkasa Abadi</span>
                 </div>
             </div>
             
@@ -633,8 +637,8 @@
         const settings = getSettings();
         const m = getMasterData();
         const bgStyle = settings.bg_url ? `background-image: url('${settings.bg_url}'); background-size: cover; background-position: center;` : 'background-color: #1e293b;';
-        const logoHtml = settings.logo_url ? `<img src="${settings.logo_url}" alt="Logo" class="w-12 h-12 object-contain mx-auto mb-2 relative z-10">` : `<div class="w-10 h-10 bg-red-500 flex items-center justify-center mx-auto mb-2 relative z-10 rounded-full border-2 border-white"><i class="fa-solid fa-truck-moving text-lg text-white"></i></div>`;
-        const overlay = settings.bg_url ? `<div class="absolute inset-0 bg-slate-900/70"></div>` : '';
+        const logoHtml = settings.logo_url ? `<img src="${settings.logo_url}" alt="Logo" class="w-14 h-14 object-contain mx-auto mb-2 relative z-10 drop-shadow-md">` : `<div class="w-12 h-12 bg-cyan-500 flex items-center justify-center mx-auto mb-2 relative z-10 rounded-full shadow-md"><i class="fa-solid fa-truck-moving text-2xl text-white"></i></div>`;
+        const overlay = settings.bg_url ? `<div class="absolute inset-0 bg-slate-900/70 backdrop-blur-[2px]"></div>` : '';
 
         const optPerusahaan = `<option value="" disabled selected>-- Pilih Perusahaan --</option>` + (m.perusahaan || []).map(p=>`<option value="${p}">${p}</option>`).join('');
         const optDepartemen = `<option value="" disabled selected>-- Pilih Departemen --</option>` + (m.departemen || []).map(d=>`<option value="${d}">${d}</option>`).join('');
@@ -642,117 +646,118 @@
 
         return `
         <div class="min-h-screen flex items-center justify-center p-4 bg-slate-100 relative page-flip-anim">
-            <!-- 1. LOGIN FORM -->
-            <div id="authForm" class="bg-white w-full max-w-[320px] overflow-hidden rounded-2xl shadow-2xl z-10 border border-slate-100">
-                <div class="relative p-6 text-center border-b border-slate-200" style="${bgStyle}">
+            <div id="authForm" class="bg-white border border-slate-200 w-full max-w-[320px] overflow-hidden rounded-xl shadow-2xl z-10">
+                <div class="relative p-6 text-center border-b border-slate-200/50" style="${bgStyle}">
                     ${overlay}
                     <div class="relative z-10">
                         ${logoHtml}
-                        <h1 class="text-lg font-black text-white tracking-tight uppercase drop-shadow-md">Order Lifting</h1>
-                        <p class="text-cyan-400 text-[10px] mt-0.5 font-bold tracking-wide drop-shadow-md">Support Equipment PPA</p>
+                        <h1 class="text-xl font-extrabold text-white tracking-tight uppercase drop-shadow-md">ORDER LIFTING</h1>
+                        <p class="text-cyan-400 text-[11px] mt-1 font-bold tracking-wide drop-shadow-sm">Support Equipment PPA</p>
                     </div>
                 </div>
-                <div class="p-6">
+                <div class="p-5">
                     <form onsubmit="handleLogin(event)" class="space-y-4">
                         <div>
-                            <label class="block text-[11px] font-bold text-slate-500 mb-1.5">NRP / ID Pengguna</label>
-                            <input type="text" id="loginNrp" oninput="this.value = this.value.toUpperCase()" placeholder="Masukan NRP" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all" required>
+                            <label class="block text-[11px] font-bold text-slate-600 mb-1.5">NRP / ID Pengguna</label>
+                            <input type="text" id="loginNrp" oninput="this.value = this.value.toUpperCase()" placeholder="Masukan NRP" class="w-full border border-slate-300 rounded-md px-3 py-2 text-xs focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all shadow-sm" required>
                         </div>
                         <div>
-                            <label class="block text-[11px] font-bold text-slate-500 mb-1.5">Password</label>
+                            <label class="block text-[11px] font-bold text-slate-600 mb-1.5">Password</label>
                             <div class="relative">
-                                <input type="password" id="loginPwd" placeholder="Masukan Password" class="w-full border border-slate-300 rounded-lg px-3 py-2 pr-8 text-xs focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all" required>
-                                <i id="toggleLoginPwd" class="fa-regular fa-eye absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer pwd-toggle text-xs" onclick="togglePassword('loginPwd', 'toggleLoginPwd')"></i>
+                                <input type="password" id="loginPwd" placeholder="Masukan Password" class="w-full border border-slate-300 rounded-md px-3 py-2 pr-8 text-xs focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all shadow-sm" required>
+                                <i id="toggleLoginPwd" class="fa-regular fa-eye absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer pwd-toggle text-[11px]" onclick="togglePassword('loginPwd', 'toggleLoginPwd')"></i>
                             </div>
                             <p id="loginErrorMsg" class="text-red-500 font-bold text-[10px] mt-1.5 hidden"></p>
                         </div>
-                        <button type="submit" class="w-full bg-[#0092b3] hover:bg-cyan-700 text-white font-bold py-2.5 rounded-lg text-xs transition-colors mt-2 shadow-md">Masuk</button>
+                        <button type="submit" class="w-full bg-[#0891b2] hover:bg-cyan-700 text-white font-bold py-2.5 rounded-md text-sm transition-colors mt-2 shadow-md">Masuk</button>
                     </form>
-                    <div class="mt-5 text-center text-[10px] text-slate-500 flex flex-col gap-2">
-                        <div>Belum punya akun? <span class="text-[#0092b3] font-bold cursor-pointer hover:underline" onclick="toggleAuthMode('signupForm')">Daftar (User)</span></div>
+                    <div class="mt-5 text-center text-[11px] text-slate-500 flex flex-col gap-2">
+                        <div>Belum punya akun? <span class="text-[#0891b2] font-bold cursor-pointer hover:underline" onclick="toggleAuthMode('signupForm')">Daftar (User)</span></div>
                         <div>Lupa password? <span class="text-red-500 font-bold cursor-pointer hover:underline" onclick="toggleAuthMode('forgotPwdForm')">Reset Disini</span></div>
                     </div>
                 </div>
             </div>
             
-            <!-- 2. SIGNUP FORM -->
-            <div id="signupForm" class="bg-white w-full max-w-[320px] overflow-hidden rounded-2xl shadow-2xl hidden z-10 border border-slate-100">
-                <div class="p-4 text-center relative border-b border-slate-200" style="${bgStyle}">
+            <div id="signupForm" class="bg-white border border-slate-200 shadow-2xl w-full max-w-[320px] overflow-hidden rounded-xl hidden z-10">
+                <div class="p-4 text-center relative border-b border-slate-200/50" style="${bgStyle}">
                     ${overlay}
-                    <h2 class="text-sm font-bold text-white relative z-10 drop-shadow-md">Buat Akun User</h2>
+                    <h2 class="text-base font-bold text-white relative z-10 drop-shadow-md">Buat Akun User</h2>
                 </div>
-                <div class="p-5">
+                <div class="p-4">
                     <form onsubmit="handleSignup(event)" class="space-y-3">
-                        <div><label class="block text-[10px] font-bold text-slate-500 mb-1">NRP</label><input type="text" id="regNrp" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500" required></div>
-                        <div><label class="block text-[10px] font-bold text-slate-500 mb-1">Nama Lengkap</label><input type="text" id="regName" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500" required></div>
+                        <div><label class="block text-[10px] font-bold text-slate-600 mb-1">NRP</label><input type="text" id="regNrp" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500 shadow-sm" required></div>
+                        <div><label class="block text-[10px] font-bold text-slate-600 mb-1">Nama Lengkap</label><input type="text" id="regName" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500 shadow-sm" required></div>
 
                         <div class="grid grid-cols-2 gap-2">
-                            <div><label class="block text-[10px] font-bold text-slate-500 mb-1">Perusahaan</label><select id="regPerusahaan" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 cursor-pointer bg-white" required>${optPerusahaan}</select></div>
-                            <div><label class="block text-[10px] font-bold text-slate-500 mb-1">Departemen</label><select id="regDepartemen" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 cursor-pointer bg-white" required>${optDepartemen}</select></div>
+                            <div><label class="block text-[10px] font-bold text-slate-600 mb-1">Perusahaan</label><select id="regPerusahaan" class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500 cursor-pointer bg-white shadow-sm" required>${optPerusahaan}</select></div>
+                            <div><label class="block text-[10px] font-bold text-slate-600 mb-1">Departemen</label><select id="regDepartemen" class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500 cursor-pointer bg-white shadow-sm" required>${optDepartemen}</select></div>
                         </div>
                         <div class="grid grid-cols-2 gap-2">
-                            <div><label class="block text-[10px] font-bold text-slate-500 mb-1">Section</label><select id="regSection" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 cursor-pointer bg-white" required>${optSection}</select></div>
-                            <div><label class="block text-[10px] font-bold text-slate-500 mb-1">Jabatan</label><input type="text" id="regJabatan" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500" required></div>
+                            <div><label class="block text-[10px] font-bold text-slate-600 mb-1">Section</label><select id="regSection" class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500 cursor-pointer bg-white shadow-sm" required>${optSection}</select></div>
+                            <div><label class="block text-[10px] font-bold text-slate-600 mb-1">Jabatan</label><input type="text" id="regJabatan" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500 shadow-sm" required></div>
                         </div>
 
-                        <div><label class="block text-[10px] font-bold text-slate-500 mb-1">No WhatsApp</label><input type="number" id="regWa" class="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500" required></div>
+                        <div><label class="block text-[10px] font-bold text-slate-600 mb-1">No WhatsApp</label><input type="number" id="regWa" class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500 shadow-sm" required></div>
                         <div>
-                            <label class="block text-[10px] font-bold text-slate-500 mb-1">Password</label>
+                            <label class="block text-[10px] font-bold text-slate-600 mb-1">Password</label>
                             <div class="relative">
-                                <input type="password" id="regPwd" class="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 pr-8 text-xs focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500" required>
-                                <i id="toggleRegPwd" class="fa-regular fa-eye absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer pwd-toggle text-[10px]" onclick="togglePassword('regPwd', 'toggleRegPwd')"></i>
+                                <input type="password" id="regPwd" class="w-full border border-slate-300 rounded-md px-2 py-1.5 pr-8 text-xs focus:outline-none focus:border-cyan-500 shadow-sm" required>
+                                <i id="toggleRegPwd" class="fa-regular fa-eye absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer pwd-toggle text-[11px]" onclick="togglePassword('regPwd', 'toggleRegPwd')"></i>
                             </div>
                         </div>
-                        <button type="submit" class="w-full bg-[#0092b3] hover:bg-cyan-700 text-white font-bold py-2 rounded-lg text-xs mt-3 shadow-md transition-colors">Daftar Akun</button>
+                        <button type="submit" class="w-full bg-[#0891b2] hover:bg-cyan-700 text-white font-bold py-2 rounded-md text-sm mt-3 transition-colors shadow-md">Daftar Akun</button>
                     </form>
-                    <div class="mt-4 text-center text-[10px] text-slate-500">
-                        Sudah punya akun? <span class="text-[#0092b3] font-bold cursor-pointer hover:underline" onclick="toggleAuthMode('authForm')">Masuk</span>
+                    <div class="mt-4 text-center text-[11px] text-slate-500">
+                        Sudah punya akun? <span class="text-[#0891b2] font-bold cursor-pointer hover:underline" onclick="toggleAuthMode('authForm')">Masuk</span>
                     </div>
                 </div>
             </div>
 
-            <!-- 3. FORGOT PASSWORD FORM -->
-            <div id="forgotPwdForm" class="bg-white w-full max-w-[320px] overflow-hidden rounded-2xl shadow-2xl hidden z-10 border border-slate-100">
-                <div class="p-4 text-center relative border-b border-slate-200" style="${bgStyle}">
+            <!-- FORGOT PASSWORD FORM -->
+            <div id="forgotPwdForm" class="bg-white border border-slate-200 shadow-2xl w-full max-w-[320px] overflow-hidden rounded-xl hidden z-10">
+                <div class="p-4 text-center relative border-b border-slate-200/50" style="${bgStyle}">
                     ${overlay}
-                    <h2 class="text-sm font-bold text-white relative z-10 drop-shadow-md">Reset Password</h2>
+                    <h2 class="text-base font-bold text-white relative z-10 drop-shadow-md">Reset Password</h2>
                 </div>
                 <div class="p-5">
                     <div id="step1Forgot">
                         <form onsubmit="checkForgotNrp(event)" class="space-y-4">
-                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1.5">Masukkan NRP Anda</label><input type="text" id="forgotNrp" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500" placeholder="NRP..." required></div>
-                            <button type="submit" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 rounded-lg text-xs transition-colors mt-2 shadow-md">Cek NRP</button>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-600 mb-1.5">Masukkan NRP Anda</label>
+                                <input type="text" id="forgotNrp" oninput="this.value = this.value.toUpperCase()" placeholder="Ketik NRP" class="w-full border border-slate-300 rounded-md px-3 py-2 text-xs focus:outline-none focus:border-red-500 shadow-sm" required>
+                            </div>
+                            <button type="submit" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 rounded-md text-sm transition-colors mt-2 shadow-md">Cek NRP</button>
                         </form>
                     </div>
                     <div id="step2Forgot" class="hidden">
                         <form onsubmit="submitNewPassword(event)" class="space-y-4">
                             <input type="hidden" id="forgotTargetNrp">
                             <div>
-                                <label class="block text-[11px] font-bold text-slate-500 mb-1.5">Password Baru</label>
+                                <label class="block text-[11px] font-bold text-slate-600 mb-1.5">Password Baru</label>
                                 <div class="relative">
-                                    <input type="password" id="forgotPwd1" class="w-full border border-slate-300 rounded-lg px-3 py-2 pr-8 text-xs focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500" placeholder="Password Baru..." required>
-                                    <i id="toggleFPwd1" class="fa-regular fa-eye absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer pwd-toggle text-[10px]" onclick="togglePassword('forgotPwd1', 'toggleFPwd1')"></i>
+                                    <input type="password" id="forgotPwd1" class="w-full border border-slate-300 rounded-md px-3 py-2 pr-8 text-xs focus:outline-none focus:border-red-500 shadow-sm" required>
+                                    <i id="toggleFPwd1" class="fa-regular fa-eye absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer pwd-toggle text-[11px]" onclick="togglePassword('forgotPwd1', 'toggleFPwd1')"></i>
                                 </div>
                             </div>
                             <div>
-                                <label class="block text-[11px] font-bold text-slate-500 mb-1.5">Konfirmasi Password Baru</label>
+                                <label class="block text-[11px] font-bold text-slate-600 mb-1.5">Konfirmasi Password Baru</label>
                                 <div class="relative">
-                                    <input type="password" id="forgotPwd2" class="w-full border border-slate-300 rounded-lg px-3 py-2 pr-8 text-xs focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500" placeholder="Ulangi Password..." required>
-                                    <i id="toggleFPwd2" class="fa-regular fa-eye absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer pwd-toggle text-[10px]" onclick="togglePassword('forgotPwd2', 'toggleFPwd2')"></i>
+                                    <input type="password" id="forgotPwd2" class="w-full border border-slate-300 rounded-md px-3 py-2 pr-8 text-xs focus:outline-none focus:border-red-500 shadow-sm" required>
+                                    <i id="toggleFPwd2" class="fa-regular fa-eye absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer pwd-toggle text-[11px]" onclick="togglePassword('forgotPwd2', 'toggleFPwd2')"></i>
                                 </div>
                             </div>
-                            <button type="submit" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 rounded-lg text-xs transition-colors mt-2 shadow-md">Simpan Password Baru</button>
+                            <button type="submit" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 rounded-md text-sm transition-colors mt-2 shadow-md">Simpan Password Baru</button>
                         </form>
                     </div>
-                    <div class="mt-5 text-center text-[10px] text-slate-500">
-                        Kembali ke <span class="text-[#0092b3] font-bold cursor-pointer hover:underline" onclick="toggleAuthMode('authForm')">Login</span>
+                    <div class="mt-5 text-center text-[11px] text-slate-500">
+                        Kembali ke <span class="text-[#0891b2] font-bold cursor-pointer hover:underline" onclick="toggleAuthMode('authForm')">Login</span>
                     </div>
                 </div>
             </div>
 
             <!-- MODAL ANIMASI SUKSES UNTUK DAFTAR -->
             <div id="successRegModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex justify-center items-center z-[110] hidden">
-                <div class="bg-white rounded-2xl shadow-2xl w-full max-w-[250px] p-6 text-center animate-pop-in flex flex-col items-center">
+                <div class="bg-white rounded-xl shadow-2xl w-full max-w-[250px] p-6 text-center animate-pop-in flex flex-col items-center">
                     <div class="w-16 h-16 rounded-full flex items-center justify-center text-3xl mb-3 text-white bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]">
                         <i class="fa-solid fa-check"></i>
                     </div>
@@ -858,7 +863,6 @@
             users[idx].password_hash = p1;
             saveUsers(users); 
             
-            // PATCH Eksklusif ke Supabase untuk keamanan Data Single User
             if (SUPABASE_KEY && !SUPABASE_KEY.includes('PASTE_KUNCI')) {
                 fetch(`${SUPABASE_URL}/rest/v1/users?nrp=eq.${nrp}`, {
                     method: 'PATCH',
@@ -911,35 +915,16 @@
         let pctCT = Math.round((cntCT / totalUnits) * 100) || 0; let pctBC = Math.round((cntBC / totalUnits) * 100) || 0; let pctLB = Math.round((cntLB / totalUnits) * 100) || 0;
         let degCT = (pctCT / 100) * 360; let degBC = degCT + ((pctBC / 100) * 360);
         
-        // Warna disinkronkan dengan Rigger Chart: Merah (#ef4444), Orange (#f97316), Coklat (#92400e)
+        // Matching pie colors with Rigger bar colors (Merah, Oranye, Coklat)
         let pieStyle = `background: conic-gradient(#ef4444 0deg ${degCT}deg, #f97316 ${degCT}deg ${degBC}deg, #92400e ${degBC}deg 360deg);`;
-
-        function getTopData(field) { 
-            let counts = {}; 
-            filteredJobs.forEach(j => { 
-                let val = j[field];
-                if(val && val !== '-' && val !== 'N/A') counts[val] = (counts[val] || 0) + 1; 
-            }); 
-            return Object.entries(counts).sort((a,b) => b[1] - a[1]).slice(0, 5); 
-        }
-        
-        let topDept = getTopData('departemen'); let topSection = getTopData('section');
-
-        function renderBarList(data, colorClass) {
-            if(data.length === 0) return `<div class="text-[9px] text-slate-400 italic mt-2">Data kosong</div>`;
-            let maxVal = Math.max(...data.map(d=>d[1])) || 1;
-            return data.map(d => `
-                <div class="mb-1.5 mt-2">
-                    <div class="flex justify-between text-[9px] mb-0.5"><span class="font-semibold text-slate-700 truncate mr-2">${d[0]}</span><span class="font-bold text-slate-500">${d[1]}</span></div>
-                    <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden"><div class="${colorClass} h-1.5 rounded-full chart-bar w-0" data-width="${(d[1]/maxVal)*100}%"></div></div>
-                </div>
-            `).join('');
-        }
 
         return `
         <div class="max-w-6xl mx-auto space-y-3 relative z-10">
             <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-2">
-                <h2 class="text-sm font-bold text-slate-800 shrink-0"><i class="fa-solid fa-chart-pie mr-1.5 text-cyan-600"></i>Dashboard Analytics</h2>
+                <div class="flex items-center gap-2">
+                    <h2 class="text-sm font-bold text-slate-800 shrink-0"><i class="fa-solid fa-chart-pie mr-1.5 text-cyan-600"></i>Dashboard Analytics</h2>
+                    <button onclick="fetchFromSupabase(true)" class="bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-600 font-bold px-2 py-0.5 rounded-sm shadow-sm text-[9px] flex items-center gap-1 transition-colors"><i class="fa-solid fa-rotate"></i> Refresh Sync</button>
+                </div>
                 
                 <div class="flex items-center text-[10px] w-full lg:w-auto bg-white border border-slate-200 rounded-md p-1 shadow-sm flex-wrap gap-y-1 relative z-20">
                     <div class="flex items-center shrink-0 pr-1">
@@ -982,18 +967,7 @@
                 <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm flex items-center justify-between"><div class="flex items-center gap-2 text-slate-500"><i class="fa-solid fa-trailer text-base"></i><span class="text-[11px] font-bold">Lowboy</span></div><div class="text-lg font-bold text-slate-800">${cntLB}</div></div>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 mt-3">
-                <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm flex flex-col">
-                    <h3 class="text-[10px] font-bold text-slate-600 mb-2">Weekly Trend Order (vs Minggu Lalu)</h3>
-                    <div class="relative h-48 w-full"><canvas id="lineChart"></canvas></div>
-                </div>
-                <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm flex flex-col">
-                    <h3 class="text-[10px] font-bold text-slate-600 mb-2 uppercase">Departement order</h3>
-                    <div class="relative h-48 w-full"><canvas id="deptOrderChart"></canvas></div>
-                </div>
-            </div>
-
-            <!-- Bagian Data Perusahaan Order & Dept Plant DITAIKKAN -->
+            <!-- Bagian Data Perusahaan Order & Dept Plant dipindah ke atas -->
             <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm mt-3 flex flex-col lg:flex-row gap-6 items-start">
                 <div class="w-full lg:w-1/4 flex flex-col items-center justify-center">
                     <h3 class="text-[10px] font-bold text-slate-600 mb-2 w-full text-left">Data Perusahaan</h3>
@@ -1030,16 +1004,27 @@
                 </div>
             </div>
 
-            <!-- Distribusi Unit & Performa Rigger DITURUNKAN -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 mt-3">
+                <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm flex flex-col">
+                    <h3 class="text-[10px] font-bold text-slate-600 mb-2">Weekly Trend Order (vs Minggu Lalu)</h3>
+                    <div class="relative h-48 w-full"><canvas id="lineChart"></canvas></div>
+                </div>
+                <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm flex flex-col">
+                    <h3 class="text-[10px] font-bold text-slate-600 mb-2 uppercase">Departement order</h3>
+                    <div class="relative h-48 w-full"><canvas id="deptOrderChart"></canvas></div>
+                </div>
+            </div>
+
+            <!-- Distribusi Unit & Performa Rigger dipindah ke bawah -->
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-3">
                 <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm flex flex-col items-center justify-center lg:col-span-1 order-last lg:order-none">
                     <h3 class="text-[10px] font-bold text-slate-600 mb-3 w-full text-left">Distribusi Unit</h3>
                     ${totalUnits > 1 ? `
                     <div class="w-24 h-24 rounded-full mb-4 shadow-inner" style="${pieStyle}"></div>
                     <div class="w-full space-y-1.5 text-[9px] font-semibold text-slate-600">
-                        <div class="flex justify-between items-center"><div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 rounded-sm" style="background-color: #ef4444;"></div>Crane Truck</div><span>${pctCT}%</span></div>
-                        <div class="flex justify-between items-center"><div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 rounded-sm" style="background-color: #f97316;"></div>Big Crane</div><span>${pctBC}%</span></div>
-                        <div class="flex justify-between items-center"><div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 rounded-sm" style="background-color: #92400e;"></div>Lowboy</div><span>${pctLB}%</span></div>
+                        <div class="flex justify-between items-center"><div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 rounded-sm bg-red-500"></div>Crane Truck</div><span>${pctCT}%</span></div>
+                        <div class="flex justify-between items-center"><div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 rounded-sm bg-orange-500"></div>Big Crane</div><span>${pctBC}%</span></div>
+                        <div class="flex justify-between items-center"><div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 rounded-sm bg-yellow-900"></div>Lowboy</div><span>${pctLB}%</span></div>
                     </div>
                     ` : `<div class="text-[9px] text-slate-400 italic my-auto">Data kosong</div>`}
                 </div>
@@ -1049,7 +1034,6 @@
                     <div class="relative h-60 w-full"><canvas id="riggerChart"></canvas></div>
                 </div>
             </div>
-            
         </div>`;
     }
 
@@ -1063,13 +1047,11 @@
         let dashShift = document.getElementById('dash_shift').value;
         let dashUnit = document.getElementById('dash_unit').value;
 
-        // Apply Shift & Unit for charts globally
         if (dashShift !== 'ALL') allJobs = allJobs.filter(j => j.shift === dashShift);
         if (dashUnit !== 'ALL') allJobs = allJobs.filter(j => j.kategori === dashUnit);
 
         let filteredJobsRange = allJobs.filter(j => j.tgl_pelaksanaan >= dashTglMulai && j.tgl_pelaksanaan <= dashTglSelesai);
 
-        // --- DEPARTEMENT ORDER (HORIZONTAL STACKED BAR) ---
         let refDate = new Date(dashTglMulai);
         let mtdStartStr = refDate.getFullYear() + '-' + String(refDate.getMonth()+1).padStart(2,'0') + '-01';
         let mtdJobs = allJobs.filter(j => j.tgl_pelaksanaan >= mtdStartStr && j.tgl_pelaksanaan <= dashTglSelesai);
@@ -1116,7 +1098,6 @@
             }
         });
 
-        // --- LINE CHART LOGIC (Minggu -> Sabtu) ---
         let dataThisWeek = [];
         let dataLastWeek = [];
         let labels = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
@@ -1140,32 +1121,17 @@
                 labels: labels,
                 datasets: [
                     {
-                        label: 'Minggu Ini',
-                        data: dataThisWeek,
-                        borderColor: '#0891b2',
-                        backgroundColor: 'rgba(8, 145, 178, 0.1)',
-                        tension: 0.4,
-                        fill: true,
-                        borderWidth: 2,
-                        pointBackgroundColor: '#fff',
-                        pointBorderColor: '#0891b2',
-                        pointBorderWidth: 2
+                        label: 'Minggu Ini', data: dataThisWeek, borderColor: '#0891b2', backgroundColor: 'rgba(8, 145, 178, 0.1)',
+                        tension: 0.4, fill: true, borderWidth: 2, pointBackgroundColor: '#fff', pointBorderColor: '#0891b2', pointBorderWidth: 2
                     },
                     {
-                        label: 'Minggu Lalu',
-                        data: dataLastWeek,
-                        borderColor: '#94a3b8',
-                        borderDash: [5, 5],
-                        tension: 0.4,
-                        fill: false,
-                        borderWidth: 2,
-                        pointRadius: 0
+                        label: 'Minggu Lalu', data: dataLastWeek, borderColor: '#94a3b8', borderDash: [5, 5],
+                        tension: 0.4, fill: false, borderWidth: 2, pointRadius: 0
                     }
                 ]
             },
             options: {
-                responsive: true, maintainAspectRatio: false,
-                interaction: { mode: 'index', intersect: false },
+                responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
                 plugins: { legend: { labels: { font: { size: 10, family: "'Inter', sans-serif" }, usePointStyle: true, boxWidth: 8 } } },
                 scales: { 
                     y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 9 } }, grid: { color: '#f1f5f9' } },
@@ -1174,7 +1140,6 @@
             }
         });
 
-        // --- RIGGER VERTICAL STACKED BAR CHART ---
         if(document.getElementById('riggerChart')) {
             let riggerStats = {};
             filteredJobsRange.forEach(j => {
@@ -1216,7 +1181,6 @@
             });
         }
 
-        // --- DATA PERUSAHAAN (DONUT CHART & LEGEND) ---
         if(document.getElementById('companyDonutChart')) {
             let companyStats = {};
             filteredJobsRange.forEach(j => { 
@@ -1301,10 +1265,13 @@
             <div class="bg-white rounded-md shadow-sm border border-slate-200">
                 <div class="p-2 border-b border-slate-200 flex flex-col sm:flex-row gap-2 justify-between bg-slate-50/50 rounded-t-md relative z-20">
                     <div class="flex items-center justify-between sm:justify-start gap-2 w-full sm:w-auto">
-                        <h2 class="text-sm font-bold text-slate-800 shrink-0"><i class="fa-solid fa-database mr-1.5 text-cyan-600"></i>Data Order</h2>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <h2 class="text-sm font-bold text-slate-800"><i class="fa-solid fa-database mr-1 text-cyan-600"></i>Data Order</h2>
+                            <button onclick="fetchFromSupabase(true)" class="bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-600 font-bold px-1.5 py-0.5 rounded-sm shadow-sm text-[9px] flex items-center gap-1 transition-colors"><i class="fa-solid fa-rotate"></i> Sync</button>
+                        </div>
                         <div class="flex items-center gap-1.5 shrink-0">
                             <div class="bg-red-50 text-red-600 border border-red-200 px-1.5 py-0.5 rounded-sm font-semibold text-[10px]" title="Butuh Validasi/Penugasan">Validasi: ${pendingCount}</div>
-                            <button onclick="downloadCSV()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-0.5 rounded-sm transition-colors flex items-center gap-1 shadow-sm text-[10px]"><i class="fa-solid fa-file-excel"></i> Export</button>
+                            <button onclick="downloadCSVBlob()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-0.5 rounded-sm transition-colors flex items-center gap-1 shadow-sm text-[10px]"><i class="fa-solid fa-file-excel"></i> Export</button>
                         </div>
                     </div>
                     <div class="flex items-center gap-1 text-[10px] w-full sm:w-auto overflow-x-auto hide-scrollbar pb-0.5 sm:pb-0">
@@ -1356,8 +1323,8 @@
 
                                 let kendalaHtml = '';
                                 if(job.final_inspeksi) kendalaHtml += `<div class="text-[9px] bg-green-50 text-green-700 border border-green-200 rounded-sm px-1 py-0.5 mb-0.5 w-full"><i class="fa-solid fa-check-circle mr-0.5"></i>Insp: ${job.final_inspeksi}</div>`;
-                                if(job.alasan_telat) kendalaHtml += `<div class="text-[9px] bg-red-50 text-red-600 border border-red-200 rounded-sm px-1 py-0.5 mb-0.5 whitespace-normal leading-tight w-full"><i class="fa-solid fa-circle-exclamation mr-0.5"></i>Telat: ${job.alasan_telat}</div>`;
-                                if(job.alasan_overtime) kendalaHtml += `<div class="text-[9px] bg-red-50 text-red-600 border border-red-200 rounded-sm px-1 py-0.5 mb-0.5 whitespace-normal leading-tight w-full"><i class="fa-solid fa-circle-exclamation mr-0.5"></i>Over: ${job.alasan_overtime}</div>`;
+                                if(job.alasan_telat) kendalaHtml += `<div class="text-[9px] bg-red-50 text-red-600 border border-red-200 rounded-sm px-1 py-0.5 mb-0.5 whitespace-normal leading-tight w-full"><i class="fa-solid fa-circle-exclamation mr-0.5"></i>${job.alasan_telat}</div>`;
+                                if(job.alasan_overtime) kendalaHtml += `<div class="text-[9px] bg-red-50 text-red-600 border border-red-200 rounded-sm px-1 py-0.5 mb-0.5 whitespace-normal leading-tight w-full"><i class="fa-solid fa-circle-exclamation mr-0.5"></i>${job.alasan_overtime}</div>`;
                                 if(!job.final_inspeksi && !job.alasan_telat && !job.alasan_overtime) kendalaHtml = '<span class="text-slate-400">-</span>';
 
                                 return `
@@ -1458,6 +1425,11 @@
         return html;
     }
 
+    function openImageViewer(url) {
+        document.getElementById('viewerImage').src = url;
+        document.getElementById('imageViewerModal').classList.remove('hidden');
+    }
+
     function viewJobDetail(wo) {
         let job = getOrders().find(j => j.no_wo === wo);
         if(!job) return;
@@ -1468,52 +1440,66 @@
                 fotoHtml = `
                 <div class="mb-3">
                     <div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">LAMPIRAN FOTO</div>
-                    <div class="bg-slate-50 border border-slate-200 rounded-sm p-1">
-                        <img src="${job.foto_evidence}" class="w-full max-h-48 object-contain rounded-sm shadow-sm" alt="Lampiran Foto">
+                    <div class="bg-slate-50 border border-slate-200 rounded-sm p-1 text-center cursor-pointer hover:bg-slate-100 transition-colors group" onclick="openImageViewer('${job.foto_evidence}')">
+                        <img src="${job.foto_evidence}" class="w-full max-h-48 object-contain rounded-sm shadow-sm group-hover:opacity-90 transition-opacity" alt="Lampiran Foto">
+                        <div class="text-[9px] font-bold text-slate-500 mt-1.5 mb-0.5"><i class="fa-solid fa-magnifying-glass-plus text-cyan-600"></i> Klik untuk Perbesar</div>
                     </div>
                 </div>`;
             } else {
                 fotoHtml = `
                 <div class="mb-3">
                     <div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">LAMPIRAN FOTO</div>
-                    <div class="bg-blue-50 border border-blue-100 p-1.5 rounded-sm text-[9px] text-blue-700 flex items-center gap-1 font-medium"><i class="fa-solid fa-image text-xs"></i> <a href="${job.foto_evidence}" target="_blank" class="underline">Buka Foto Bukti Drive</a></div>
+                    <div class="bg-blue-50 border border-blue-100 p-1.5 rounded-sm text-[9px] text-blue-700 flex items-center gap-1 font-medium"><i class="fa-solid fa-image text-xs"></i> <a href="${job.foto_evidence}" target="_blank" class="underline hover:text-blue-800">Buka Foto Bukti Drive</a></div>
                 </div>`;
             }
         }
 
         document.getElementById('detailJobContent').innerHTML = `
             <div class="bg-cyan-50 border border-cyan-100 rounded-sm p-2 mb-3 relative">
-                <div class="text-[8px] font-bold text-cyan-600 mb-0.5">PEMOHON</div>
-                <div class="font-bold text-cyan-900 text-[11px] mb-0.5">${job.nama_pemohon}</div>
+                <div class="text-[8px] font-bold text-cyan-600 mb-0.5 uppercase">PEMOHON</div>
+                <div class="font-bold text-cyan-900 text-[11px] mb-0.5 uppercase">${job.nama_pemohon}</div>
                 <div class="text-[10px] text-cyan-800 flex items-center gap-1 mb-0.5">
                     <i class="fa-brands fa-whatsapp w-3 text-center"></i> ${job.no_wa} 
                     <span onclick="copyText('${job.no_wa}', 'Nomor WA')" class="cursor-pointer ml-1 bg-white border border-cyan-200 rounded-sm px-1 py-0.5 hover:bg-cyan-100 shadow-sm"><i class="fa-regular fa-copy text-[8px]"></i></span>
                 </div>
-                <div class="text-[9px] text-cyan-700 flex items-center gap-1"><i class="fa-regular fa-building w-3 text-center"></i> ${job.departemen} | <span class="font-semibold">${job.section || 'N/A'}</span> | ${job.perusahaan}</div>
+                <div class="text-[9px] text-cyan-700 flex items-center gap-1 uppercase"><i class="fa-regular fa-building w-3 text-center"></i> ${job.departemen} | <span class="font-semibold">${job.section || 'N/A'}</span> | ${job.perusahaan}</div>
             </div>
+            
             <div class="grid grid-cols-2 gap-y-2 gap-x-2 text-[10px] mb-3">
-                <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">NO. WO</div><div class="font-mono text-[9px] font-semibold text-slate-700">${job.no_wo}</div></div>
-                <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">STATUS</div><div class="font-bold text-cyan-600 text-[9px]">${job.status}</div></div>
-                <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">GROUP LEADER</div><div class="font-bold text-slate-700">${job.gl || '-'}</div></div>
-                <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">UNIT</div><div class="font-bold text-slate-700">${job.unit || '-'}</div></div>
-                <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">TGL & JAM</div><div class="font-bold text-slate-700">${job.tgl_pelaksanaan} ${job.jam_pelaksanaan||''}</div></div>
-                <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">DURASI REQ</div><div class="font-bold text-slate-700">${job.durasi_request}</div></div>
-                <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">OPERATOR</div><div class="font-bold text-slate-700">${job.operator || '-'}</div></div>
-                <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">RIGGER</div><div class="font-bold text-slate-700">${job.rigger || '-'}${job.rigger2 ? ', ' + job.rigger2 : ''}</div></div>
+                <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">NO. WO</div><div class="font-mono text-[9px] font-bold text-slate-700">${job.no_wo}</div></div>
+                <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">STATUS</div><div class="font-bold text-cyan-600 text-[9px] uppercase">${job.status}</div></div>
+                <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">GROUP LEADER</div><div class="font-bold text-slate-700 uppercase">${job.gl || '-'}</div></div>
+                <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">UNIT</div><div class="font-bold text-slate-700 uppercase">${job.unit || '-'}</div></div>
+                <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">TGL & JAM</div><div class="font-bold text-slate-700 uppercase">${job.tgl_pelaksanaan} ${job.jam_pelaksanaan||''}</div></div>
+                <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">DURASI REQ</div><div class="font-bold text-slate-700 uppercase">${job.durasi_request}</div></div>
+                <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">OPERATOR</div><div class="font-bold text-slate-700 uppercase">${job.operator || '-'}</div></div>
+                <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">RIGGER</div><div class="font-bold text-slate-700 uppercase">${job.rigger || '-'}${job.rigger2 ? ', ' + job.rigger2 : ''}</div></div>
             </div>
+            
+            <div class="grid grid-cols-1 gap-2 text-[10px] mb-3 mt-3 border-t border-slate-100 pt-3 bg-slate-50 p-2 rounded-sm">
+                <div class="font-bold text-slate-500 mb-1 tracking-wider uppercase text-[9px]"><i class="fa-solid fa-clock mr-1"></i>Data Waktu Lapangan Aktual</div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">WAKTU KERJA</div><div class="font-bold text-slate-700 font-mono tracking-tighter">${job.jam_start_aktual || '--:--'} s/d ${job.jam_end_aktual || '--:--'}</div></div>
+                    <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">DURASI AKTUAL</div><div class="font-bold text-slate-700">${job.durasi_aktual ? job.durasi_aktual + ' Jam' : '-'}</div></div>
+                </div>
+                <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">KENDALA LAPANGAN</div><div class="font-bold text-red-600">${job.alasan_telat || job.alasan_overtime ? (job.alasan_telat || '') + ' ' + (job.alasan_overtime || '') : '-'}</div></div>
+            </div>
+
             ${job.kategori !== 'Big Crane' ? `
             <div class="mb-2">
                 <div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">RUTE / LOKASI</div>
-                <div class="bg-slate-50 border border-slate-100 p-1.5 rounded-sm text-[10px] font-semibold text-slate-600">${job.lokasi_angkat||'-'} <i class="fa-solid fa-arrow-right mx-1 text-[8px] text-slate-400"></i> ${job.lokasi_tujuan||'-'}</div>
+                <div class="bg-slate-50 border border-slate-100 p-1.5 rounded-sm text-[10px] font-semibold text-slate-600 uppercase">${job.lokasi_angkat||'-'} <i class="fa-solid fa-arrow-right mx-1 text-[8px] text-slate-400"></i> ${job.lokasi_tujuan||'-'}</div>
             </div>` : ''}
             <div class="mb-3">
                 <div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">DESKRIPSI</div>
                 <div class="bg-slate-50 border border-slate-100 p-1.5 rounded-sm text-[10px] text-slate-600">${job.deskripsi}</div>
             </div>
+            
             ${fotoHtml}
+            
             <div class="flex gap-2 mt-2">
-                <button onclick="copyJobToWA('${job.no_wo}')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1.5 rounded-sm text-[10px] flex items-center justify-center gap-1 shadow-sm"><i class="fa-regular fa-copy"></i> Salin Job</button>
-                <button onclick="document.getElementById('detailJobModal').classList.add('hidden')" class="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-bold py-1.5 rounded-sm text-[10px] shadow-sm">Tutup Detail</button>
+                <button onclick="copyJobToWA('${job.no_wo}')" class="flex-1 bg-[#0891b2] hover:bg-cyan-700 text-white font-bold py-2 rounded-md text-[11px] flex items-center justify-center gap-1.5 shadow-sm transition-colors"><i class="fa-regular fa-copy"></i> Salin Job</button>
+                <button onclick="document.getElementById('detailJobModal').classList.add('hidden')" class="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-bold py-2 rounded-md text-[11px] shadow-sm transition-colors">Tutup Detail</button>
             </div>
         `;
         document.getElementById('detailJobModal').classList.remove('hidden');
@@ -1538,12 +1524,12 @@
         let riggerHTML = '';
         if (job.kategori === 'Big Crane') {
             riggerHTML = `
-                <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Rigger 1 *</label><select id="edit_rig" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500 bg-white" required><option value="">-- Pilih --</option>${rigOptions1}</select></div>
-                <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Rigger 2 *</label><select id="edit_rig2" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500 bg-white" required><option value="">-- Pilih --</option>${rigOptions2}</select></div>
+                <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Rigger 1 (Opsional)</label><select id="edit_rig" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500 bg-white"><option value="">-- Pilih --</option>${rigOptions1}</select></div>
+                <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Rigger 2 (Opsional)</label><select id="edit_rig2" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500 bg-white"><option value="">-- Pilih --</option>${rigOptions2}</select></div>
             `;
         } else {
              riggerHTML = `
-                <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Rigger ${job.kategori === 'Lowboy' ? '*' : '(Opsional)'}</label><select id="edit_rig" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500 bg-white" ${job.kategori === 'Lowboy' ? 'required' : ''}><option value="">-- Pilih --</option>${rigOptions1}</select></div>
+                <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Rigger (Opsional)</label><select id="edit_rig" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500 bg-white"><option value="">-- Pilih --</option>${rigOptions1}</select></div>
             `;
         }
 
@@ -1596,17 +1582,17 @@
                 </div>
                 <div class="grid grid-cols-2 gap-2 mt-2">
                     <div>
-                        <label class="block text-[10px] font-bold text-slate-500 mb-0.5">Operator ${job.kategori !== 'Crane Truck' ? '*' : '(Opsional)'}</label>
-                        <select id="edit_op" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500 bg-white" ${job.kategori !== 'Crane Truck' ? 'required' : ''}><option value="">-- Pilih --</option>${opOptions}</select>
+                        <label class="block text-[10px] font-bold text-slate-500 mb-0.5">Operator (Opsional)</label>
+                        <select id="edit_op" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500 bg-white"><option value="">-- Pilih --</option>${opOptions}</select>
                     </div>
                     ${riggerHTML}
                 </div>
                 
                 ${aktualHtml}
                 
-                <div class="flex gap-2 mt-3 pt-2 border-t border-slate-200">
-                    ${currentUser.role === 'ADMIN' ? `<button type="button" onclick="confirmHapusOrder('${job.no_wo}')" class="bg-red-50 hover:bg-red-100 text-red-600 border-2 border-slate-900 font-bold px-4 py-1.5 rounded-sm text-[11px] transition-colors shadow-sm flex items-center justify-center gap-1.5" title="Hapus Order"><i class="fa-solid fa-trash"></i> Hapus</button>` : ''}
-                    <button type="submit" class="flex-1 bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-1.5 rounded-sm text-[11px] transition-colors shadow-sm">${job.status === 'COMPLETED' ? 'Simpan Revisi' : 'Simpan & Validasi'}</button>
+                <div class="flex gap-1.5 mt-3 pt-2 border-t border-slate-200">
+                    ${currentUser.role === 'ADMIN' ? `<button type="button" onclick="confirmHapusOrder('${job.no_wo}')" class="bg-red-50 text-red-600 font-bold px-3 py-1.5 rounded-sm text-[11px] transition-colors border-0" title="Hapus Order"><i class="fa-solid fa-trash"></i> Hapus</button>` : ''}
+                    <button type="submit" class="flex-1 bg-[#0891b2] hover:bg-cyan-700 text-white font-bold py-1.5 rounded-sm text-[11px] transition-colors shadow-sm">${job.status === 'COMPLETED' ? 'Simpan Revisi' : 'Simpan & Validasi'}</button>
                 </div>
             </form>
         `;
@@ -1653,11 +1639,12 @@
             jobs[idx].alasan_overtime = document.getElementById('edit_alasan_overtime').value;
         }
 
+        // Cukup Group Leader & Unit saja untuk Validasi sukses ke Progress
         let isValidated = (selectedGL && selectedUnit);
 
         if (isValidated && (jobs[idx].status === 'SCHEDULED' || jobs[idx].status === 'UNSCHEDULED' || jobs[idx].status === 'PENDING')) {
             jobs[idx].status = 'ON PROGRESS';
-            showToast('Job divalidasi!');
+            showToast('Job divalidasi ke Manpower!');
         } else {
             showToast('Perubahan Disimpan!');
         }
@@ -1679,6 +1666,248 @@
             showToast('Data dihapus!'); 
             document.getElementById('editJobModal').classList.add('hidden'); 
             renderApp(true);
+        });
+    }
+
+    function downloadCSVBlob() {
+        const jobs = getOrders();
+        if(jobs.length === 0) return showToast("Tidak ada data", "error");
+        
+        let csvContent = "No WO,Status,Pemohon,Dept,Kategori,Tgl Pelaksanaan,Jam Req,Shift,Durasi Req,Lokasi Angkat,Lokasi Tujuan,Deskripsi,GL,Unit,Operator,Rigger,Jam Start,Jam End,Durasi Aktual,Final Inspeksi,Alasan Telat,Alasan Overtime\n";
+        
+        jobs.forEach(j => {
+            let riggerCombined = j.rigger || '';
+            if (j.rigger2) riggerCombined += ' & ' + j.rigger2;
+            let row = [
+                j.no_wo, j.status, j.nama_pemohon, j.departemen, j.kategori,
+                j.tgl_pelaksanaan, j.jam_pelaksanaan||'', j.shift, j.durasi_request,
+                `"${(j.lokasi_angkat||'').replace(/"/g, '""')}"`, `"${(j.lokasi_tujuan||'').replace(/"/g, '""')}"`, `"${(j.deskripsi||'').replace(/"/g, '""')}"`,
+                j.gl||'', j.unit||'', j.operator||'', `"${riggerCombined}"`,
+                j.jam_start_aktual||'', j.jam_end_aktual||'', j.durasi_aktual||'',
+                j.final_inspeksi||'', `"${(j.alasan_telat||'').replace(/"/g, '""')}"`, `"${(j.alasan_overtime||'').replace(/"/g, '""')}"`
+            ].join(",");
+            csvContent += row + "\n";
+        });
+        
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `Data_Lifting_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    }
+
+    function getManpowerWorkflow() {
+        const settings = getSettings() || {};
+        
+        const getUnitCard = (type, modeVar, iconUrl, iconClass, label) => {
+            const bgStyle = iconUrl ? `style="background-image: url('${iconUrl}'); background-size: cover; background-position: center;"` : '';
+            const content = iconUrl 
+                ? `<div class="absolute inset-0 bg-slate-900/40 group-hover:bg-slate-900/20 transition-colors"></div><span class="font-bold text-white text-sm sm:text-base uppercase relative z-10 tracking-widest drop-shadow-lg text-center leading-tight px-2">${label}</span>`
+                : `<div class="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-slate-50 group-hover:bg-cyan-50 flex items-center justify-center transition-colors"><i class="fa-solid ${iconClass} text-2xl sm:text-3xl text-slate-400 group-hover:text-cyan-600"></i></div><span class="font-bold text-slate-700 text-[11px] sm:text-xs uppercase tracking-wide text-center leading-tight mt-2 px-2">${label}</span>`;
+            return `<button onclick="${modeVar}='${type}'; renderApp(false);" class="relative bg-white border border-slate-200 hover:border-cyan-500 hover:shadow-md rounded-xl flex flex-col items-center justify-center shadow-sm transition-all group aspect-square sm:aspect-[4/3] w-full sm:w-44 overflow-hidden" ${bgStyle}>${content}</button>`;
+        };
+
+        const btnCT = getUnitCard('Crane Truck', 'mpFleetMode', settings.icon_ct_url, 'fa-truck-moving', 'Crane Truck');
+        const btnBC = getUnitCard('Big Crane', 'mpFleetMode', settings.icon_bc_url, 'fa-truck-ramp-box', 'Big Crane');
+        const btnLB = getUnitCard('Lowboy', 'mpFleetMode', settings.icon_lb_url, 'fa-trailer', 'Lowboy');
+
+        if (!mpFleetMode) return `<div class="min-h-[70vh] flex flex-col items-center justify-center max-w-[900px] mx-auto w-full px-4 py-8"><h2 class="text-sm sm:text-base font-bold text-slate-800 mb-6 text-center"><i class="fa-solid fa-list-check mr-1.5 text-cyan-600"></i>Pilih Unit Armada</h2><div class="grid grid-cols-2 sm:flex sm:flex-row sm:justify-center gap-4 sm:gap-6 w-full max-w-2xl mx-auto">${btnCT}${btnBC}${btnLB}</div></div>`;
+
+        const m = getMasterData(); let unitOptions = [];
+        if (mpFleetMode === 'Crane Truck') unitOptions = m.unit_ct || []; 
+        let filterUnit = document.getElementById('mp_filter_unit') ? document.getElementById('mp_filter_unit').value : 'ALL';
+        
+        let tglMulai = document.getElementById('mp_filter_mulai') ? document.getElementById('mp_filter_mulai').value : getLocalDateString();
+        let tglSelesai = document.getElementById('mp_filter_selesai') ? document.getElementById('mp_filter_selesai').value : getLocalDateString();
+
+        let jobs = getOrders().filter(j => j.kategori === mpFleetMode);
+        jobs = jobs.filter(j => j.tgl_pelaksanaan >= tglMulai && j.tgl_pelaksanaan <= tglSelesai);
+        
+        if (currentMpPanel === 'PENDING') jobs = jobs.filter(j => j.status === 'PENDING'); else jobs = jobs.filter(j => j.status === currentMpPanel);
+        if (mpFleetMode === 'Crane Truck' && filterUnit !== 'ALL') jobs = jobs.filter(j => j.unit === filterUnit);
+
+        let unitFilterHtml = mpFleetMode === 'Crane Truck' ? `<select id="mp_filter_unit" onchange="renderApp(true)" class="text-[9px] font-bold bg-white border border-slate-300 text-slate-700 rounded-full px-2 py-1 outline-none shadow-sm focus:border-cyan-500 cursor-pointer ml-auto"><option value="ALL">Semua Unit</option>${unitOptions.map(u => `<option value="${u}" ${filterUnit === u ? 'selected' : ''}>${u}</option>`).join('')}</select>` : '';
+
+        let html = `
+        <div class="flex items-center gap-2 mb-2 mt-2"><button onclick="mpFleetMode=null; renderApp(false);" class="w-6 h-6 rounded-sm border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 bg-white shadow-sm"><i class="fa-solid fa-arrow-left text-[10px]"></i></button><h2 class="text-xs font-bold text-slate-800">Tugas: <span class="text-cyan-600">${mpFleetMode}</span></h2></div>
+        
+        <div class="flex items-center border border-slate-200 bg-white rounded-md p-1 shadow-sm mb-2 w-full sm:w-auto mx-auto justify-center text-[10px] text-slate-600">
+            <i class="fa-regular fa-calendar ml-1 mr-2 text-slate-400"></i>
+            <input type="date" id="mp_filter_mulai" class="bg-transparent focus:outline-none" value="${tglMulai}" onchange="renderApp(true)">
+            <span class="mx-1 font-semibold text-slate-400">s/d</span>
+            <input type="date" id="mp_filter_selesai" class="bg-transparent focus:outline-none" value="${tglSelesai}" onchange="renderApp(true)">
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <div class="flex gap-1 overflow-x-auto hide-scrollbar bg-white p-0.5 rounded-full shadow-sm border border-slate-200">${['ON PROGRESS', 'PENDING', 'COMPLETED', 'CANCELED'].map(panel => `<button onclick="currentMpPanel='${panel}'; renderApp(true)" class="px-2.5 py-1 rounded-full text-[9px] font-bold whitespace-nowrap transition-colors ${currentMpPanel === panel ? 'bg-[#0891b2] text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}">${panel}</button>`).join('')}</div>
+            ${unitFilterHtml}
+        </div>
+        <div class="space-y-2 pb-4">`;
+
+        if (jobs.length === 0) html += `<div class="bg-white rounded-md p-4 text-center border shadow-sm"><p class="text-slate-400 text-[11px]">Kosong.</p></div>`;
+
+        jobs.forEach(job => {
+            html += `
+            <div class="bg-white rounded-md p-3 border border-slate-200 shadow-sm relative text-[11px]">
+                <div class="flex justify-between items-start mb-2"><div class="text-[10px] font-mono font-bold text-cyan-600 cursor-pointer hover:underline" onclick="viewJobDetail('${job.no_wo}')" title="Buka Detail">${job.no_wo}</div><div class="text-[14px] bg-cyan-50 text-cyan-700 border border-cyan-200 px-2 py-1 rounded-md font-bold shadow-sm">Unit: ${job.unit || '-'}</div></div>
+                <div class="font-bold text-slate-800 text-xs mb-1">Req: ${job.tgl_pelaksanaan} ${job.jam_pelaksanaan || ''}</div>
+                ${job.kategori !== 'Big Crane' ? `<div class="text-[11px] text-slate-500 mb-3 truncate">Lokasi: ${job.lokasi_angkat||'-'} ➔ ${job.lokasi_tujuan||'-'}</div>` : `<div class="text-[11px] text-slate-500 mb-3 truncate border-l-2 border-slate-300 pl-1">${job.deskripsi}</div>`}
+                <div class="flex gap-1.5">
+                    ${job.status === 'ON PROGRESS' ? `
+                        <button onclick="openManpowerAction('${job.no_wo}', 'COMPLETED')" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-1.5 rounded-sm text-[11px] shadow-sm"><i class="fa-solid fa-check"></i> Close Job</button>
+                        <button onclick="openManpowerAction('${job.no_wo}', 'PENDING')" class="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-bold py-1.5 rounded-sm text-[11px] shadow-sm"><i class="fa-solid fa-pause"></i> Pending</button>
+                        <button onclick="initiateCancelJob('${job.no_wo}')" class="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-1.5 rounded-sm text-[11px] shadow-sm"><i class="fa-solid fa-xmark"></i> Cancel</button>
+                    ` : ''}
+                    ${job.status === 'PENDING' ? `<button onclick="promptLanjutPending('${job.no_wo}')" class="flex-1 bg-[#0891b2] hover:bg-cyan-700 text-white font-bold py-2 rounded-sm text-[11px] transition-colors shadow-md"><i class="fa-solid fa-forward mr-1"></i> Lanjut Job (Validasi Ulang)</button>` : ''}
+                </div>
+            </div>`;
+        });
+
+        html += `</div>`;
+        return html;
+    }
+
+    let tempMpData = null;
+
+    function openManpowerAction(wo, targetStatus) {
+        const job = getOrders().find(j => j.no_wo === wo); const m = getMasterData();
+        let opOptions = (m.operator || []).map(o => `<option value="${o}">${o}</option>`).join(''); let rigOptions = (m.rigger || []).map(r => `<option value="${r}">${r}</option>`).join('');
+        let mpRiggerHtml = `<div><label class="block text-[9px] text-slate-500 mb-0.5">Rigger 1</label><select id="mp_rig" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] bg-white"><option value="">-- Pilih --</option>${rigOptions}</select></div>`;
+        if (job.kategori === 'Big Crane') mpRiggerHtml += `<div><label class="block text-[9px] text-slate-500 mb-0.5">Rigger 2</label><select id="mp_rig2" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] bg-white"><option value="">-- Pilih --</option>${rigOptions}</select></div>`;
+
+        let extraPendingHtml = targetStatus === 'PENDING' ? `<div class="mt-2"><label class="block text-[9px] font-bold text-orange-600 mb-0.5"><i class="fa-solid fa-clock-rotate-left mr-0.5"></i>Alasan Pending</label><textarea id="mp_alasan_pending" class="w-full border border-orange-300 bg-orange-50 rounded-sm px-1.5 py-1 text-[10px] focus:border-orange-500 h-10 outline-none" required></textarea></div>` : '';
+
+        document.getElementById('mpActionTitle').innerText = targetStatus === 'COMPLETED' ? "Selesaikan Pekerjaan (Close Job)" : "Tunda Pekerjaan (Pending)";
+        
+        document.getElementById('mpActionContent').innerHTML = `
+            <div class="bg-blue-50 border border-blue-100 text-blue-700 p-1.5 text-[9px] rounded-sm mb-2"><strong>Target:</strong> Jam ${job.jam_pelaksanaan || '-'} | Durasi ${job.durasi_request}</div>
+            <div id="mpFormError" class="bg-red-50 border border-red-200 text-red-600 font-bold p-1.5 text-[9px] rounded-sm mb-2 hidden"></div>
+            <form onsubmit="processMpAction(event, '${wo}', '${targetStatus}')" class="space-y-2">
+                <div><label class="block text-[9px] text-slate-500 mb-0.5">Operator</label><select id="mp_op" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] bg-white"><option value="">-- Pilih --</option>${opOptions}</select></div>
+                <div class="grid grid-cols-${job.kategori === 'Big Crane' ? '2' : '1'} gap-2">${mpRiggerHtml}</div>
+                <div class="grid grid-cols-2 gap-2"><div><label class="block text-[9px] text-slate-500 mb-0.5">Mulai Aktual</label><input type="time" id="mp_start" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px]"></div><div><label class="block text-[9px] text-slate-500 mb-0.5">Selesai Aktual</label><input type="time" id="mp_end" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px]"></div></div>
+                ${extraPendingHtml}
+                <button type="submit" class="w-full mt-3 ${targetStatus === 'COMPLETED' ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-orange-500 hover:bg-orange-600'} text-white font-bold py-2 rounded-sm text-[11px] shadow-sm transition-colors uppercase tracking-wider">${targetStatus === 'COMPLETED' ? '<i class="fa-solid fa-check mr-1"></i> Proses Close Job' : '<i class="fa-solid fa-pause mr-1"></i> Simpan Pending'}</button>
+            </form>`;
+        document.getElementById('mpActionModal').classList.remove('hidden');
+    }
+
+    function processMpAction(e, wo, targetStatus) {
+        e.preventDefault(); const job = getOrders().find(j => j.no_wo === wo); if(!job) return;
+        const elStart = document.getElementById('mp_start'); const elEnd = document.getElementById('mp_end'); const elOp = document.getElementById('mp_op'); const elRig = document.getElementById('mp_rig'); const elRig2 = document.getElementById('mp_rig2'); const errorBox = document.getElementById('mpFormError');
+        let isMissing = false; const markError = (el) => { if(!el) return false; if(!el.value) { el.classList.add('border-red-500', 'bg-red-50', 'text-red-600'); el.classList.remove('border-slate-300'); return true; } else { el.classList.remove('border-red-500', 'bg-red-50', 'text-red-600'); el.classList.add('border-slate-300'); return false; } };
+        
+        if (markError(elStart)) isMissing = true; if (markError(elEnd)) isMissing = true; if (markError(elOp)) isMissing = true; if (markError(elRig)) isMissing = true; if (job.kategori === 'Big Crane' && markError(elRig2)) isMissing = true;
+        if (isMissing) { errorBox.innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-1"></i> Lengkapi seluruh form waktu dan personal!'; errorBox.classList.remove('hidden'); return; } else { errorBox.classList.add('hidden'); }
+        
+        const start = elStart.value; const end = elEnd.value; const op = elOp.value; const rig = elRig.value; const rig2 = elRig2 ? elRig2.value : '';
+        let dStart = new Date(`2000-01-01T${start}:00`); let dEnd = new Date(`2000-01-01T${end}:00`); if(dEnd < dStart) dEnd = new Date(`2000-01-02T${end}:00`); let actualMins = (dEnd - dStart) / (1000 * 60);
+        let reqMins = 0; if(job.durasi_request.includes('JAM')) reqMins = parseFloat(job.durasi_request) * 60; else if(job.durasi_request.includes('HARI')) reqMins = parseFloat(job.durasi_request) * 24 * 60;
+        let diffStartMins = 0; if(job.jam_pelaksanaan) { let reqStart = new Date(`2000-01-01T${job.jam_pelaksanaan}:00`); diffStartMins = (dStart - reqStart) / (1000 * 60); }
+        
+        // TOLERANSI 30 MENIT (TELAT DAN OVERTIME)
+        let isLate = diffStartMins > 30; let isOvertime = actualMins > (reqMins + 30);
+        
+        let pendingReason = targetStatus === 'PENDING' ? document.getElementById('mp_alasan_pending').value : null;
+
+        tempMpData = { wo, start, end, op, rig, rig2, actualMins, isLate, isOvertime, diffStartMins, diffOvertime: actualMins - reqMins, status: targetStatus, pendingReason };
+        
+        if(isLate || isOvertime) showKendalaModal(); else saveMpFinal(null, null); 
+    }
+
+    function showKendalaModal() {
+        document.getElementById('mpActionModal').classList.add('hidden'); 
+        
+        const formatMins = (mins) => {
+            let h = Math.floor(mins / 60); let m = Math.round(mins % 60);
+            return (h > 0 ? `${h} Jam ` : '') + `${m} Menit`;
+        };
+
+        let html = `<div class="bg-red-50 border border-red-200 text-red-600 p-1.5 text-[9px] rounded-sm mb-2"><strong>Wajib Diisi:</strong> Waktu aktual > toleransi 30 mnt.</div><form onsubmit="submitKendala(event)" class="space-y-2">`;
+        if(tempMpData.isLate) html += `<div><label class="block text-[9px] font-bold text-red-600 mb-0.5"><i class="fa-regular fa-clock mr-1"></i>Alasan Telat (${formatMins(tempMpData.diffStartMins)}):</label><textarea id="alasan_telat" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px]" required></textarea></div>`;
+        if(tempMpData.isOvertime) html += `<div><label class="block text-[9px] font-bold text-red-600 mb-0.5"><i class="fa-solid fa-stopwatch mr-1"></i>Alasan Over (${formatMins(tempMpData.diffOvertime)}):</label><textarea id="alasan_over" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px]" required></textarea></div>`;
+        html += `<div class="flex gap-1.5 pt-1 mt-1 border-t border-slate-100"><button type="button" onclick="document.getElementById('kendalaModal').classList.add('hidden'); document.getElementById('mpActionModal').classList.remove('hidden');" class="flex-1 bg-slate-100 text-slate-600 font-bold py-1.5 rounded-sm text-[10px]">Cancel</button><button type="submit" class="flex-1 bg-red-500 text-white font-bold py-1.5 rounded-sm text-[10px]">Simpan Kendala</button></div></form>`;
+        
+        document.getElementById('kendalaContent').innerHTML = html; document.getElementById('kendalaModal').classList.remove('hidden');
+    }
+
+    function submitKendala(e) { e.preventDefault(); let aTelat = tempMpData.isLate ? document.getElementById('alasan_telat').value : null; let aOver = tempMpData.isOvertime ? document.getElementById('alasan_over').value : null; saveMpFinal(aTelat, aOver); document.getElementById('kendalaModal').classList.add('hidden'); }
+
+    function saveMpFinal(alasanTelat, alasanOvertime) {
+        let jobs = getOrders(); let idx = jobs.findIndex(j => j.no_wo === tempMpData.wo);
+        jobs[idx].operator = tempMpData.op; jobs[idx].rigger = tempMpData.rig; if (tempMpData.rig2) jobs[idx].rigger2 = tempMpData.rig2;
+        jobs[idx].jam_start_aktual = tempMpData.start; jobs[idx].jam_end_aktual = tempMpData.end; jobs[idx].durasi_aktual = (tempMpData.actualMins / 60).toFixed(2); jobs[idx].status = tempMpData.status;
+        
+        let prefixReason = tempMpData.status === 'PENDING' ? `PENDING (${tempMpData.pendingReason}) - ` : '';
+
+        if(alasanTelat) jobs[idx].alasan_telat = prefixReason + alasanTelat; 
+        else if (tempMpData.status === 'PENDING') jobs[idx].alasan_telat = prefixReason + "Laporan Tertunda";
+        
+        if(alasanOvertime) jobs[idx].alasan_overtime = alasanOvertime;
+        
+        saveOrders(jobs); 
+        document.getElementById('mpActionModal').classList.add('hidden'); 
+        renderApp(true);
+        
+        if (tempMpData.status === 'COMPLETED') { showSuccessAnim('thumb', 'Kerja Bagus!', 'Pekerjaan telah diselesaikan dan laporan siap.'); } else { showToast('Tersimpan di Tab Pending!'); }
+    }
+
+    let activeCancelWo = null;
+    function initiateCancelJob(wo) { 
+        activeCancelWo = wo; 
+        document.getElementById('cancelReasonInput').value = ''; 
+        document.getElementById('cancelPromptModal').classList.remove('hidden'); 
+    }
+    
+    function confirmCancelJob() {
+        let alasan = document.getElementById('cancelReasonInput').value.trim(); 
+        if(!alasan) return showToast('Alasan wajib diisi!', 'error'); 
+        let jobs = getOrders(); let idx = jobs.findIndex(j => j.no_wo === activeCancelWo); 
+        if(idx !== -1) {
+            jobs[idx].status = 'CANCELED'; 
+            jobs[idx].alasan_telat = "Dibatalkan: " + alasan; 
+            saveOrders(jobs); 
+            showToast('Dibatalkan!'); 
+            document.getElementById('cancelPromptModal').classList.add('hidden'); 
+            renderApp(true); 
+        }
+    }
+
+    function promptLanjutPending(wo) {
+        openCustomConfirm('Lanjut Pekerjaan', 'Terbitkan tiket PENDING ini untuk dikerjakan ulang di shift selanjutnya? (Status akan kembali "Butuh Validasi" Admin)', () => {
+            let jobs = getOrders();
+            let idx = jobs.findIndex(j => j.no_wo === wo);
+            if(idx !== -1) {
+                let oldJob = jobs[idx];
+                let baseWo = oldJob.no_wo.split('-P')[0];
+                let pCount = 1;
+                if(oldJob.no_wo.includes('-P')) {
+                    pCount = parseInt(oldJob.no_wo.split('-P')[1]) + 1;
+                }
+                let newWo = `${baseWo}-P${pCount}`;
+
+                let newJob = { ...oldJob };
+                newJob.no_wo = newWo;
+                
+                // Hapus penugasan kru shift sebelumnya agar Admin memvalidasi ulang kru baru
+                newJob.gl = ''; newJob.unit = ''; newJob.operator = ''; newJob.rigger = ''; newJob.rigger2 = '';
+                newJob.jam_start_aktual = ''; newJob.jam_end_aktual = ''; newJob.durasi_aktual = '';
+                newJob.final_inspeksi = ''; newJob.alasan_telat = ''; newJob.alasan_overtime = '';
+                newJob.status = 'PENDING'; 
+
+                jobs.splice(idx, 1); 
+                jobs.unshift(newJob);
+                saveOrders(jobs);
+
+                // Explicitly DELETE old WO from Supabase
+                if (SUPABASE_KEY && !SUPABASE_KEY.includes('PASTE_KUNCI')) {
+                    fetch(`${SUPABASE_URL}/rest/v1/orders?no_wo=eq.${wo}`, { method: 'DELETE', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }).catch(()=>{});
+                }
+
+                showToast('Tiket lanjutan dikirim ke Dashboard Admin!');
+                renderApp(true);
+            }
         });
     }
 
@@ -1774,12 +2003,11 @@
             </div>` : `
             <div class="bg-slate-50 border border-slate-200 rounded-sm p-2 mb-3 flex items-center justify-between">
                 <div>
-                    <p class="text-[9px] font-bold text-slate-400 mb-0.5 uppercase tracking-wider">Info Pemohon (Otomatis dari Profil)</p>
-                    <div class="grid grid-cols-2 gap-y-1 gap-x-2 text-[10px]">
-                        <div><p class="text-slate-500 text-[9px]">Nama:</p><p class="font-semibold text-slate-800">${user.nama_lengkap}</p></div><div><p class="text-slate-500 text-[9px]">Dept / Sect:</p><p class="font-semibold text-slate-800">${user.departemen} / ${user.section}</p></div>
-                        <div><p class="text-slate-500 text-[9px]">No. WA:</p><p class="font-semibold text-slate-800">${user.no_wa}</p></div><div><p class="text-slate-500 text-[9px]">Vendor:</p><p class="font-semibold text-slate-800">${user.perusahaan}</p></div>
-                    </div>
+                    <p class="text-[9px] font-bold text-slate-400 mb-0.5 uppercase tracking-wider">Pemohon (Dari Profil)</p>
+                    <p class="font-bold text-slate-800 text-[11px]">${user.nama_lengkap}</p>
+                    <p class="text-[9px] text-slate-500">${user.departemen} | ${user.section} | ${user.perusahaan}</p>
                 </div>
+                <div class="text-3xl text-slate-200"><i class="fa-solid fa-address-card"></i></div>
             </div>`;
 
         return `
@@ -1789,7 +2017,7 @@
                 ${requesterHtml}
                 <form onsubmit="submitOrder(event)" class="space-y-2">
                     ${formFields}
-                    <div class="pt-2 mt-3 border-t border-slate-100"><button id="btnSubmitOrder" type="submit" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-1.5 rounded-sm transition-colors text-xs shadow-sm"><i class="fa-solid fa-paper-plane mr-1"></i> Submit Order</button></div>
+                    <div class="pt-2 mt-3 border-t border-slate-100"><button id="btnSubmitOrder" type="submit" class="w-full bg-[#0891b2] hover:bg-cyan-700 text-white font-bold py-1.5 rounded-sm transition-colors text-xs shadow-sm"><i class="fa-solid fa-paper-plane mr-1"></i> Submit Order</button></div>
                 </form>
             </div>
         </div>`;
@@ -1839,7 +2067,7 @@
             nama_pemohon: isAdminGL ? document.getElementById('del_nama').value : user.nama_lengkap, 
             perusahaan: isAdminGL ? document.getElementById('del_vendor').value : user.perusahaan, 
             departemen: isAdminGL ? document.getElementById('del_dept').value : user.departemen, 
-            section: isAdminGL ? (document.getElementById('del_sect')?.value || user.section) : user.section,
+            section: isAdminGL ? document.getElementById('del_sect').value : user.section,
             no_wa: isAdminGL ? document.getElementById('del_wa').value : user.no_wa,
             tgl_pelaksanaan: tgl, 
             jam_pelaksanaan: jam, 
@@ -1894,263 +2122,6 @@
         }
     }
 
-    function getManpowerWorkflow() {
-        const settings = getSettings() || {};
-        
-        const getUnitCard = (type, modeVar, iconUrl, iconClass, label) => {
-            const bgStyle = iconUrl ? `style="background-image: url('${iconUrl}'); background-size: cover; background-position: center;"` : '';
-            const content = iconUrl 
-                ? `<div class="absolute inset-0 bg-slate-900/40 group-hover:bg-slate-900/20 transition-colors"></div><span class="font-bold text-white text-sm sm:text-base uppercase relative z-10 tracking-widest drop-shadow-lg text-center leading-tight px-2">${label}</span>`
-                : `<div class="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-slate-50 group-hover:bg-cyan-50 flex items-center justify-center transition-colors"><i class="fa-solid ${iconClass} text-2xl sm:text-3xl text-slate-400 group-hover:text-cyan-600"></i></div><span class="font-bold text-slate-700 text-[11px] sm:text-xs uppercase tracking-wide text-center leading-tight mt-2 px-2">${label}</span>`;
-            return `<button onclick="${modeVar}='${type}'; renderApp(false);" class="relative bg-white border border-slate-200 hover:border-cyan-500 hover:shadow-md rounded-xl flex flex-col items-center justify-center shadow-sm transition-all group aspect-square sm:aspect-[4/3] w-full sm:w-44 overflow-hidden" ${bgStyle}>${content}</button>`;
-        };
-
-        const btnCT = getUnitCard('Crane Truck', 'mpFleetMode', settings.icon_ct_url, 'fa-truck-moving', 'Crane Truck');
-        const btnBC = getUnitCard('Big Crane', 'mpFleetMode', settings.icon_bc_url, 'fa-truck-ramp-box', 'Big Crane');
-        const btnLB = getUnitCard('Lowboy', 'mpFleetMode', settings.icon_lb_url, 'fa-trailer', 'Lowboy');
-
-        if (!mpFleetMode) return `<div class="min-h-[70vh] flex flex-col items-center justify-center max-w-[900px] mx-auto w-full px-4 py-8"><h2 class="text-sm sm:text-base font-bold text-slate-800 mb-6 text-center"><i class="fa-solid fa-list-check mr-1.5 text-cyan-600"></i>Pilih Unit Armada</h2><div class="grid grid-cols-2 sm:flex sm:flex-row sm:justify-center gap-4 sm:gap-6 w-full max-w-2xl mx-auto">${btnCT}${btnBC}${btnLB}</div></div>`;
-
-        const m = getMasterData(); let unitOptions = [];
-        if (mpFleetMode === 'Crane Truck') unitOptions = m.unit_ct || []; else if (mpFleetMode === 'Big Crane') unitOptions = m.unit_big_crane || []; else if (mpFleetMode === 'Lowboy') unitOptions = m.unit_lowboy || [];
-        let filterUnit = document.getElementById('mp_filter_unit') ? document.getElementById('mp_filter_unit').value : 'ALL';
-        
-        let today = getLocalDateString();
-        let mpTglMulai = document.getElementById('mp_filter_tgl_mulai') ? document.getElementById('mp_filter_tgl_mulai').value : today;
-        let mpTglSelesai = document.getElementById('mp_filter_tgl_selesai') ? document.getElementById('mp_filter_tgl_selesai').value : today;
-
-        let jobs = getOrders().filter(j => j.kategori === mpFleetMode);
-        
-        // Filter By Date
-        jobs = jobs.filter(j => j.tgl_pelaksanaan >= mpTglMulai && j.tgl_pelaksanaan <= mpTglSelesai);
-        
-        if (currentMpPanel === 'PENDING') jobs = jobs.filter(j => j.status === 'PENDING' && j.operator); else jobs = jobs.filter(j => j.status === currentMpPanel);
-        
-        let unitFilterHtml = '';
-        if (mpFleetMode === 'Crane Truck') {
-            if (filterUnit !== 'ALL') jobs = jobs.filter(j => j.unit === filterUnit);
-            unitFilterHtml = `<select id="mp_filter_unit" onchange="renderApp(true)" class="text-[9px] font-bold bg-white border border-slate-300 text-slate-700 rounded-full px-2 py-1 outline-none shadow-sm focus:border-cyan-500 cursor-pointer"><option value="ALL">Semua Unit</option>${unitOptions.map(u => `<option value="${u}" ${filterUnit === u ? 'selected' : ''}>${u}</option>`).join('')}</select>`;
-        }
-
-        let html = `
-        <div class="flex items-center gap-2 mb-2 mt-2"><button onclick="mpFleetMode=null; renderApp(false);" class="w-6 h-6 rounded-sm border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 bg-white shadow-sm"><i class="fa-solid fa-arrow-left text-[10px]"></i></button><h2 class="text-xs font-bold text-slate-800">Tugas: <span class="text-cyan-600">${mpFleetMode}</span></h2></div>
-        
-        <div class="inline-flex items-center gap-1 mb-2 bg-white px-2 py-1.5 rounded-md shadow-sm border border-slate-200 text-[10px] w-auto">
-            <i class="fa-regular fa-calendar text-slate-400"></i>
-            <input type="date" id="mp_filter_tgl_mulai" class="bg-transparent border-none outline-none text-slate-700 w-auto cursor-pointer" value="${mpTglMulai}" onchange="renderApp(true)">
-            <span class="text-slate-400 font-bold mx-0.5">s/d</span>
-            <input type="date" id="mp_filter_tgl_selesai" class="bg-transparent border-none outline-none text-slate-700 w-auto cursor-pointer" value="${mpTglSelesai}" onchange="renderApp(true)">
-        </div>
-
-        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
-            <div class="flex gap-1 overflow-x-auto hide-scrollbar bg-white p-0.5 rounded-full shadow-sm border border-slate-200">${['ON PROGRESS', 'PENDING', 'COMPLETED', 'CANCELED'].map(panel => `<button onclick="currentMpPanel='${panel}'; renderApp(true)" class="px-2.5 py-1 rounded-full text-[9px] font-bold whitespace-nowrap transition-colors ${currentMpPanel === panel ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}">${panel}</button>`).join('')}</div>
-            ${unitFilterHtml}
-        </div>
-        <div class="space-y-2 pb-4">`;
-
-        if (jobs.length === 0) html += `<div class="bg-white rounded-md p-4 text-center border shadow-sm"><p class="text-slate-400 text-[11px]">Kosong.</p></div>`;
-
-        jobs.forEach(job => {
-            html += `
-            <div class="bg-white rounded-md p-3 border border-slate-200 shadow-sm relative text-[11px]">
-                <div class="flex justify-between items-start mb-2"><div class="text-[10px] font-mono font-bold text-cyan-600 cursor-pointer hover:underline" onclick="viewJobDetail('${job.no_wo}')" title="Buka Detail">${job.no_wo}</div><div class="text-[14px] bg-cyan-50 text-cyan-700 border border-cyan-200 px-2 py-1 rounded-md font-bold shadow-sm">Unit: ${job.unit || '-'}</div></div>
-                <div class="font-bold text-slate-800 text-xs mb-1">Req: ${job.tgl_pelaksanaan} ${job.jam_pelaksanaan || ''}</div>
-                ${job.kategori !== 'Big Crane' ? `<div class="text-[11px] text-slate-500 mb-3 truncate">Lokasi: ${job.lokasi_angkat||'-'} ➔ ${job.lokasi_tujuan||'-'}</div>` : `<div class="text-[11px] text-slate-500 mb-3 truncate border-l-2 border-slate-300 pl-1">${job.deskripsi}</div>`}
-                <div class="flex gap-1.5">
-                    ${job.status === 'ON PROGRESS' ? `
-                        <button onclick="openMpAction('${job.no_wo}', 'COMPLETED')" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-1.5 rounded-sm text-[9px] transition-colors shadow-sm flex items-center justify-center gap-1"><i class="fa-solid fa-check"></i> Close Job</button>
-                        <button onclick="openMpAction('${job.no_wo}', 'PENDING')" class="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-bold py-1.5 rounded-sm text-[9px] transition-colors shadow-sm flex items-center justify-center gap-1"><i class="fa-solid fa-pause"></i> Pending</button>
-                        <button onclick="initiateCancelJob('${job.no_wo}')" class="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-1.5 rounded-sm text-[9px] transition-colors shadow-sm flex items-center justify-center gap-1"><i class="fa-solid fa-xmark"></i> Cancel</button>
-                    ` : ''}
-                    ${job.status === 'PENDING' ? `<button onclick="promptLanjutPending('${job.no_wo}')" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-1.5 rounded-sm text-[11px] transition-colors shadow-sm flex justify-center items-center gap-1"><i class="fa-solid fa-play"></i> Lanjut Job</button>` : ''}
-                </div>
-            </div>`;
-        });
-
-        html += `</div>`;
-        return html;
-    }
-
-    function openMpAction(wo, mode) {
-        const job = getOrders().find(j => j.no_wo === wo); const m = getMasterData();
-        let opOptions = (m.operator || []).map(o => `<option value="${o}" ${job.operator===o?'selected':''}>${o}</option>`).join(''); 
-        let rigOptions1 = (m.rigger || []).map(r => `<option value="${r}" ${job.rigger===r?'selected':''}>${r}</option>`).join('');
-        let rigOptions2 = (m.rigger || []).map(r => `<option value="${r}" ${job.rigger2===r?'selected':''}>${r}</option>`).join('');
-
-        let mpRiggerHtml = `<div><label class="block text-[9px] text-slate-500 mb-0.5">Rigger 1</label><select id="mp_rig" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] bg-white"><option value="">-- Pilih --</option>${rigOptions1}</select></div>`;
-        if (job.kategori === 'Big Crane') mpRiggerHtml += `<div><label class="block text-[9px] text-slate-500 mb-0.5">Rigger 2</label><select id="mp_rig2" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] bg-white"><option value="">-- Pilih --</option>${rigOptions2}</select></div>`;
-
-        let titleHtml = mode === 'COMPLETED' 
-            ? `<div class="text-center mb-2"><div class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 mb-1"><i class="fa-solid fa-check-double text-lg"></i></div><h2 class="text-sm font-bold text-slate-800">Close Job</h2></div>`
-            : `<div class="text-center mb-2"><div class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-orange-100 text-orange-600 mb-1"><i class="fa-solid fa-pause text-lg"></i></div><h2 class="text-sm font-bold text-slate-800">Pending Job</h2></div>`;
-
-        let pendingField = mode === 'PENDING' ? `
-            <div class="mt-2"><label class="block text-[9px] font-bold text-orange-600 mb-0.5"><i class="fa-solid fa-pen mr-0.5"></i> Alasan Pending *</label><textarea id="mp_pending_reason" class="w-full border border-orange-300 bg-orange-50 rounded-sm px-1.5 py-1 text-[10px] focus:border-orange-500 outline-none h-12" placeholder="Ketikan alasan job dipending..." required></textarea></div>
-        ` : '';
-
-        let btnLabel = mode === 'COMPLETED' ? '<i class="fa-solid fa-check"></i> Simpan Selesai' : '<i class="fa-solid fa-pause"></i> Simpan Pending';
-        let btnClass = mode === 'COMPLETED' ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-orange-500 hover:bg-orange-600';
-
-        document.getElementById('mpActionContent').innerHTML = `
-            ${titleHtml}
-            <div class="bg-blue-50 border border-blue-100 text-blue-700 p-1.5 text-[9px] rounded-sm mb-2 text-center"><strong>Req:</strong> Jam ${job.jam_pelaksanaan || '-'} | Durasi ${job.durasi_request}</div>
-            <div id="mpFormError" class="bg-red-50 border border-red-200 text-red-600 font-bold p-1.5 text-[9px] rounded-sm mb-2 hidden"></div>
-            <form id="formMpAction" class="space-y-2">
-                <div><label class="block text-[9px] text-slate-500 mb-0.5">Operator</label><select id="mp_op" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] bg-white"><option value="">-- Pilih --</option>${opOptions}</select></div>
-                <div class="grid grid-cols-${job.kategori === 'Big Crane' ? '2' : '1'} gap-2">${mpRiggerHtml}</div>
-                <div class="grid grid-cols-2 gap-2">
-                    <div><label class="block text-[9px] text-slate-500 mb-0.5">Mulai Aktual</label><input type="time" id="mp_start" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px]" value="${job.jam_start_aktual||''}"></div>
-                    <div><label class="block text-[9px] text-slate-500 mb-0.5">Selesai Aktual</label><input type="time" id="mp_end" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px]" value="${job.jam_end_aktual||''}"></div>
-                </div>
-                <div class="mt-1 mb-2"><label class="block text-[9px] font-bold text-green-700 mb-0.5"><i class="fa-solid fa-clipboard-check mr-0.5"></i>Final Inspeksi</label><input type="time" id="mp_inspeksi" class="w-full border border-green-300 bg-green-50 rounded-sm px-1.5 py-1 text-[10px] focus:border-green-500 outline-none" value="${job.final_inspeksi||''}"></div>
-                ${pendingField}
-                <div class="flex gap-1.5 pt-2 mt-2 border-t border-slate-100">
-                    <button type="button" onclick="document.getElementById('mpActionModal').classList.add('hidden')" class="flex-1 bg-slate-100 text-slate-600 font-bold py-2 rounded-sm text-[10px] hover:bg-slate-200">Tutup</button>
-                    <button type="button" onclick="processMpAction(event, '${wo}', '${mode}')" class="flex-[2] ${btnClass} text-white font-bold py-2 rounded-sm text-[10px] shadow-sm">${btnLabel}</button>
-                </div>
-            </form>`;
-        
-        const defaultTitle = document.querySelector('#mpActionModal h2.text-sm.font-bold');
-        if (defaultTitle) defaultTitle.style.display = 'none';
-
-        document.getElementById('mpActionModal').classList.remove('hidden');
-    }
-
-    function processMpAction(e, wo, targetStatus) {
-        e.preventDefault(); const job = getOrders().find(j => j.no_wo === wo); if(!job) return;
-        
-        const elStart = document.getElementById('mp_start'); 
-        const elEnd = document.getElementById('mp_end'); 
-        const elOp = document.getElementById('mp_op'); 
-        const elRig = document.getElementById('mp_rig'); 
-        const elRig2 = document.getElementById('mp_rig2'); 
-        const elPending = document.getElementById('mp_pending_reason');
-        const errorBox = document.getElementById('mpFormError');
-        
-        let isMissing = false; 
-        const markError = (el) => { 
-            if(!el) return false; 
-            if(!el.value) { el.classList.add('border-red-500', 'bg-red-50', 'text-red-600'); el.classList.remove('border-slate-300'); return true; } 
-            else { el.classList.remove('border-red-500', 'bg-red-50', 'text-red-600'); el.classList.add('border-slate-300'); return false; } 
-        };
-        
-        if (markError(elStart)) isMissing = true; 
-        if (markError(elEnd)) isMissing = true; 
-        if (markError(elOp)) isMissing = true; 
-        if (markError(elRig)) isMissing = true; 
-        if (job.kategori === 'Big Crane' && markError(elRig2)) isMissing = true;
-        if (targetStatus === 'PENDING' && markError(elPending)) isMissing = true;
-
-        if (isMissing) { 
-            errorBox.innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-1"></i> Lengkapi seluruh form wajib!'; 
-            errorBox.classList.remove('hidden'); 
-            return; 
-        } else { 
-            errorBox.classList.add('hidden'); 
-        }
-
-        const start = elStart.value; const end = elEnd.value; const op = elOp.value; const rig = elRig.value; const rig2 = elRig2 ? elRig2.value : ''; const inspeksi = document.getElementById('mp_inspeksi').value;
-        
-        let dStart = new Date(`2000-01-01T${start}:00`); 
-        let dEnd = new Date(`2000-01-01T${end}:00`); 
-        if(dEnd < dStart) dEnd = new Date(`2000-01-02T${end}:00`); 
-        let actualMins = (dEnd - dStart) / (1000 * 60);
-        let reqMins = 0; 
-        if(job.durasi_request.includes('JAM')) reqMins = parseFloat(job.durasi_request) * 60; 
-        else if(job.durasi_request.includes('HARI')) reqMins = parseFloat(job.durasi_request) * 24 * 60;
-        
-        let diffStartMins = 0; 
-        if(job.jam_pelaksanaan) { 
-            let reqStart = new Date(`2000-01-01T${job.jam_pelaksanaan}:00`); 
-            diffStartMins = (dStart - reqStart) / (1000 * 60); 
-        }
-        
-        if (targetStatus === 'PENDING') {
-            let jobs = getOrders(); let idx = jobs.findIndex(j => j.no_wo === wo);
-            jobs[idx].operator = op; jobs[idx].rigger = rig; if(rig2) jobs[idx].rigger2 = rig2;
-            jobs[idx].jam_start_aktual = start; jobs[idx].jam_end_aktual = end; jobs[idx].final_inspeksi = inspeksi;
-            jobs[idx].durasi_aktual = (actualMins / 60).toFixed(2);
-            jobs[idx].status = 'PENDING';
-            jobs[idx].alasan_telat = "PENDING: " + elPending.value.trim();
-            saveOrders(jobs);
-            document.getElementById('mpActionModal').classList.add('hidden');
-            showToast('Job dipending!');
-            renderApp(true);
-            return;
-        }
-
-        let isLate = diffStartMins > 15; let isOvertime = actualMins > (reqMins + 15);
-        tempMpData = { wo, start, end, op, rig, rig2, inspeksi, actualMins, isLate, isOvertime, diffStartMins, diffOvertime: actualMins - reqMins, status: targetStatus };
-        if(isLate || isOvertime) showKendalaModal(); else saveMpFinal(null, null); 
-    }
-
-    function showKendalaModal() {
-        document.getElementById('mpActionModal').classList.add('hidden'); 
-        let html = `<div class="bg-red-50 border border-red-200 text-red-600 p-1.5 text-[9px] rounded-sm mb-2"><strong>Wajib Diisi:</strong> Jam aktual > toleransi.</div><form onsubmit="submitKendala(event)" class="space-y-2">`;
-        
-        const formatTime = (totalMins) => {
-            let mins = Math.round(totalMins);
-            let h = Math.floor(mins / 60);
-            let m = mins % 60;
-            return h > 0 ? `${h} Jam ${m} Menit` : `${m} Menit`;
-        };
-
-        if(tempMpData.isLate) html += `<div><label class="block text-[9px] font-bold text-red-600 mb-0.5"><i class="fa-regular fa-clock mr-1"></i>Alasan Telat (${formatTime(tempMpData.diffStartMins)}):</label><textarea id="alasan_telat" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px]" required></textarea></div>`;
-        if(tempMpData.isOvertime) html += `<div><label class="block text-[9px] font-bold text-red-600 mb-0.5"><i class="fa-solid fa-stopwatch mr-1"></i>Alasan Over (${formatTime(tempMpData.diffOvertime)}):</label><textarea id="alasan_over" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px]" required></textarea></div>`;
-        
-        html += `<div class="flex gap-1.5 pt-1 mt-1 border-t border-slate-100"><button type="button" onclick="document.getElementById('kendalaModal').classList.add('hidden'); document.getElementById('mpActionModal').classList.remove('hidden');" class="flex-1 bg-slate-100 text-slate-600 font-bold py-1.5 rounded-sm text-[10px]">Cancel</button><button type="submit" class="flex-1 bg-red-500 text-white font-bold py-1.5 rounded-sm text-[10px]">Simpan Kendala</button></div></form>`;
-        
-        document.getElementById('kendalaContent').innerHTML = html; 
-        document.getElementById('kendalaModal').classList.remove('hidden');
-    }
-
-    function submitKendala(e) { e.preventDefault(); let aTelat = tempMpData.isLate ? document.getElementById('alasan_telat').value : null; let aOver = tempMpData.isOvertime ? document.getElementById('alasan_over').value : null; saveMpFinal(aTelat, aOver); document.getElementById('kendalaModal').classList.add('hidden'); }
-
-    function saveMpFinal(alasanTelat, alasanOvertime) {
-        let jobs = getOrders(); let idx = jobs.findIndex(j => j.no_wo === tempMpData.wo);
-        jobs[idx].operator = tempMpData.op; jobs[idx].rigger = tempMpData.rig; if (tempMpData.rig2) jobs[idx].rigger2 = tempMpData.rig2;
-        jobs[idx].jam_start_aktual = tempMpData.start; jobs[idx].jam_end_aktual = tempMpData.end; jobs[idx].final_inspeksi = tempMpData.inspeksi; jobs[idx].durasi_aktual = (tempMpData.actualMins / 60).toFixed(2); jobs[idx].status = tempMpData.status;
-        if(alasanTelat) jobs[idx].alasan_telat = alasanTelat; if(alasanOvertime) jobs[idx].alasan_overtime = alasanOvertime;
-        
-        saveOrders(jobs); 
-        document.getElementById('mpActionModal').classList.add('hidden'); 
-        renderApp(true);
-        
-        if (tempMpData.status === 'COMPLETED') { showSuccessAnim('thumb', 'Kerja Bagus!', 'Pekerjaan telah diselesaikan dan laporan siap.'); } else { showToast('Tersimpan!'); }
-    }
-
-    let tempMpDataCancelPending = null; let activeCancelWo = null;
-    
-    function initiateCancelJob(wo) { 
-        activeCancelWo = wo; 
-        document.getElementById('cancelReasonInput').value = ''; 
-        document.getElementById('cancelPromptModal').classList.remove('hidden'); 
-    }
-    
-    function confirmCancelJob() {
-        let alasan = document.getElementById('cancelReasonInput').value.trim(); 
-        if(!alasan) return showToast('Alasan wajib diisi!', 'error'); 
-        let jobs = getOrders(); let idx = jobs.findIndex(j => j.no_wo === activeCancelWo); 
-        if(idx !== -1) {
-            jobs[idx].status = 'CANCELED'; 
-            jobs[idx].alasan_telat = "Dibatalkan: " + alasan; 
-            saveOrders(jobs); 
-            showToast('Dibatalkan!'); 
-            document.getElementById('cancelPromptModal').classList.add('hidden'); 
-            renderApp(true); 
-        }
-    }
-
-    function promptLanjutPending(wo) {
-        openCustomConfirm('Lanjut Job', 'Lanjutkan pekerjaan pending ini?', () => {
-            let jobs = getOrders(); let idx = jobs.findIndex(j => j.no_wo === wo);
-            if(idx !== -1) {
-                jobs[idx].status = 'ON PROGRESS';
-                saveOrders(jobs); showToast('Job dilanjutkan!'); renderApp(true);
-            }
-        });
-    }
-
     function finishSubmitOrder(newOrder, user) {
         const orders = getOrders();
         orders.unshift(newOrder);
@@ -2165,49 +2136,6 @@
     }
 
     let currentMasterTab = 'branding';
-
-    function renderUserTableOnly() {
-        const tbody = document.getElementById('userTableBody');
-        if(!tbody) return;
-        
-        let users = getUsers();
-        let filteredUsers = users;
-        
-        if(userSearchQuery) {
-            let q = userSearchQuery.toLowerCase();
-            filteredUsers = filteredUsers.filter(u => u.nama_lengkap.toLowerCase().includes(q) || u.nrp.toLowerCase().includes(q));
-        }
-        if(userRoleFilter !== 'ALL') {
-            filteredUsers = filteredUsers.filter(u => u.role === userRoleFilter);
-        }
-        filteredUsers.sort((a,b) => {
-            let valA = (a[userSortCol] || '').toString().toLowerCase();
-            let valB = (b[userSortCol] || '').toString().toLowerCase();
-            if(valA < valB) return userSortDir === 'asc' ? -1 : 1;
-            if(valA > valB) return userSortDir === 'asc' ? 1 : -1;
-            return 0;
-        });
-
-        tbody.innerHTML = filteredUsers.map(u => `
-            <tr class="hover:bg-slate-50">
-                <td class="p-2 font-mono text-slate-600">${u.nrp}</td>
-                <td class="p-2 font-semibold text-slate-800">${u.nama_lengkap}</td>
-                <td class="p-2"><span class="text-[8px] font-bold px-1.5 py-0.5 rounded-sm ${u.role === 'ADMIN' ? 'bg-purple-100 text-purple-700' : (u.role === 'GL' ? 'bg-teal-100 text-teal-700' : (u.role === 'MANPOWER' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-700'))}">${u.role}</span></td>
-                <td class="p-2">
-                    <div class="flex justify-center gap-1">
-                        <button onclick="openResetPwd('${u.nrp}')" class="bg-cyan-50 hover:bg-cyan-100 text-cyan-600 text-[9px] font-bold px-1.5 py-1 rounded-sm" title="Reset Password"><i class="fa-solid fa-key"></i></button>
-                        <button onclick="confirmDeleteUser('${u.nrp}')" class="bg-red-50 hover:bg-red-100 text-red-500 text-[9px] font-bold px-1.5 py-1 rounded-sm" title="Hapus User"><i class="fa-solid fa-trash-can"></i></button>
-                    </div>
-                </td>
-            </tr>`).join('');
-            
-        const iconNrp = document.getElementById('iconSortNrp');
-        if(iconNrp) iconNrp.innerHTML = getUserSortIcon('nrp');
-        const iconNama = document.getElementById('iconSortNama');
-        if(iconNama) iconNama.innerHTML = getUserSortIcon('nama_lengkap');
-        const iconRole = document.getElementById('iconSortRole');
-        if(iconRole) iconRole.innerHTML = getUserSortIcon('role');
-    }
 
     function getMasterDataView() {
         const m = getMasterData(); const users = getUsers();
@@ -2229,9 +2157,25 @@
                     <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Foto Big Crane</label><input type="url" id="setting_icon_bc" value="${settings.icon_bc_url || ''}" placeholder="https://..." class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] focus:outline-none focus:border-cyan-500"></div>
                     <div><label class="block text-[9px] font-bold text-slate-500 mb-0.5">Foto Lowboy</label><input type="url" id="setting_icon_lb" value="${settings.icon_lb_url || ''}" placeholder="https://..." class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] focus:outline-none focus:border-cyan-500"></div>
                 </div>
-                <button type="submit" class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold px-4 py-1.5 rounded-sm text-[10px] shadow-sm mt-3 w-full sm:w-auto"><i class="fa-solid fa-cloud-arrow-up mr-1"></i> Simpan ke Cloud</button>
+                <button type="submit" class="bg-[#0891b2] hover:bg-cyan-700 text-white font-bold px-4 py-1.5 rounded-sm text-[10px] shadow-sm mt-3 w-full sm:w-auto"><i class="fa-solid fa-cloud-arrow-up mr-1"></i> Simpan ke Cloud</button>
             </form>`;
         } else if (currentMasterTab === 'users') {
+            let filteredUsers = users || defaultUsers;
+            if(userSearchQuery) {
+                let q = userSearchQuery.toLowerCase();
+                filteredUsers = filteredUsers.filter(u => (u.nama_lengkap || '').toLowerCase().includes(q) || (u.nrp || '').toLowerCase().includes(q));
+            }
+            if(userRoleFilter !== 'ALL') {
+                filteredUsers = filteredUsers.filter(u => u.role === userRoleFilter);
+            }
+            filteredUsers.sort((a,b) => {
+                let valA = (a[userSortCol] || '').toString().toLowerCase();
+                let valB = (b[userSortCol] || '').toString().toLowerCase();
+                if(valA < valB) return userSortDir === 'asc' ? -1 : 1;
+                if(valA > valB) return userSortDir === 'asc' ? 1 : -1;
+                return 0;
+            });
+
             let addUserFormHtml = `
             <form onsubmit="addAccountManual(event)" class="flex flex-col sm:flex-row gap-1.5 bg-slate-50 p-2 rounded-sm border border-slate-100 shadow-sm mt-2">
                 <input type="text" id="new_user_nrp" oninput="this.value = this.value.toUpperCase()" placeholder="NRP..." class="flex-1 border border-slate-300 rounded-sm px-2 py-1.5 text-[10px] focus:outline-none focus:border-cyan-500" required>
@@ -2247,7 +2191,7 @@
                     <input type="password" id="new_user_pwd" placeholder="Password..." class="w-full border border-slate-300 rounded-sm px-2 py-1.5 pr-6 text-[10px] focus:outline-none focus:border-cyan-500" required>
                     <i id="toggleUserPwd" class="fa-regular fa-eye absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer pwd-toggle text-[9px]" onclick="togglePassword('new_user_pwd', 'toggleUserPwd')"></i>
                 </div>
-                <button type="submit" class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold px-3 py-1.5 rounded-sm text-[10px] whitespace-nowrap shadow-sm"><i class="fa-solid fa-plus mr-1"></i> Tambah</button>
+                <button type="submit" class="bg-[#0891b2] hover:bg-cyan-700 text-white font-bold px-3 py-1.5 rounded-sm text-[10px] whitespace-nowrap shadow-sm"><i class="fa-solid fa-plus mr-1"></i> Tambah</button>
             </form>`;
 
             contentHtml = `
@@ -2255,9 +2199,9 @@
             <div class="flex flex-col sm:flex-row gap-2 mb-3 mt-3">
                 <div class="flex-1 relative">
                     <i class="fa-solid fa-search absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[11px]"></i>
-                    <input type="text" id="userSearchInput" value="${userSearchQuery}" oninput="userSearchQuery=this.value; renderUserTableOnly();" placeholder="Cari NRP / Nama..." class="w-full border border-slate-300 rounded-sm pl-7 pr-2 py-1.5 text-[10px] focus:outline-none focus:border-cyan-500 shadow-sm">
+                    <input type="text" id="userSearchInput" value="${userSearchQuery}" oninput="userSearchQuery=this.value; renderApp(true);" placeholder="Cari NRP / Nama..." class="w-full border border-slate-300 rounded-sm pl-7 pr-2 py-1.5 text-[10px] focus:outline-none focus:border-cyan-500 shadow-sm">
                 </div>
-                <select id="userRoleFilterInput" onchange="userRoleFilter=this.value; renderUserTableOnly();" class="w-full sm:w-32 border border-slate-300 rounded-sm px-2 py-1.5 text-[10px] focus:outline-none focus:border-cyan-500 bg-white shadow-sm cursor-pointer">
+                <select id="userRoleFilterInput" onchange="userRoleFilter=this.value; renderApp(true);" class="w-full sm:w-32 border border-slate-300 rounded-sm px-2 py-1.5 text-[10px] focus:outline-none focus:border-cyan-500 bg-white shadow-sm cursor-pointer">
                     <option value="ALL" ${userRoleFilter==='ALL'?'selected':''}>Semua Role</option>
                     <option value="USER" ${userRoleFilter==='USER'?'selected':''}>USER</option>
                     <option value="MANPOWER" ${userRoleFilter==='MANPOWER'?'selected':''}>MANPOWER</option>
@@ -2269,29 +2213,40 @@
                 <table class="w-full text-left">
                     <thead class="bg-slate-50 text-slate-500 text-[9px] border-b">
                         <tr>
-                            <th class="p-2 uppercase cursor-pointer hover:bg-slate-100 transition-colors" onclick="handleUserSort('nrp')">NRP <span id="iconSortNrp">${getUserSortIcon('nrp')}</span></th>
-                            <th class="p-2 uppercase cursor-pointer hover:bg-slate-100 transition-colors" onclick="handleUserSort('nama_lengkap')">Nama Lengkap <span id="iconSortNama">${getUserSortIcon('nama_lengkap')}</span></th>
-                            <th class="p-2 uppercase cursor-pointer hover:bg-slate-100 transition-colors" onclick="handleUserSort('role')">Role <span id="iconSortRole">${getUserSortIcon('role')}</span></th>
+                            <th class="p-2 uppercase cursor-pointer hover:bg-slate-100 transition-colors" onclick="handleUserSort('nrp')">NRP ${getUserSortIcon('nrp')}</th>
+                            <th class="p-2 uppercase cursor-pointer hover:bg-slate-100 transition-colors" onclick="handleUserSort('nama_lengkap')">Nama Lengkap ${getUserSortIcon('nama_lengkap')}</th>
+                            <th class="p-2 uppercase cursor-pointer hover:bg-slate-100 transition-colors" onclick="handleUserSort('role')">Role ${getUserSortIcon('role')}</th>
                             <th class="p-2 uppercase text-center">Aksi</th>
                         </tr>
                     </thead>
-                    <tbody id="userTableBody" class="divide-y divide-slate-100 text-[10px]">
-                        <!-- Populated by renderUserTableOnly() -->
+                    <tbody class="divide-y divide-slate-100 text-[10px]">
+                        ${filteredUsers.map(u => `
+                        <tr class="hover:bg-slate-50">
+                            <td class="p-2 font-mono text-slate-600">${u.nrp || '-'}</td>
+                            <td class="p-2 font-semibold text-slate-800">${u.nama_lengkap || '-'}</td>
+                            <td class="p-2"><span class="text-[8px] font-bold px-1.5 py-0.5 rounded-sm ${u.role === 'ADMIN' ? 'bg-purple-100 text-purple-700' : (u.role === 'GL' ? 'bg-teal-100 text-teal-700' : (u.role === 'MANPOWER' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-700'))}">${u.role || '-'}</span></td>
+                            <td class="p-2">
+                                <div class="flex justify-center gap-1">
+                                    <button onclick="openResetPwd('${u.nrp}')" class="bg-cyan-50 hover:bg-cyan-100 text-cyan-600 text-[9px] font-bold px-1.5 py-1 rounded-sm" title="Reset Password"><i class="fa-solid fa-key"></i></button>
+                                    <button onclick="confirmDeleteUser('${u.nrp}')" class="bg-red-50 hover:bg-red-100 text-red-500 text-[9px] font-bold px-1.5 py-1 rounded-sm border-0" title="Hapus User"><i class="fa-solid fa-trash-can"></i></button>
+                                </div>
+                            </td>
+                        </tr>`).join('')}
                     </tbody>
                 </table>
             </div>`;
         } else {
             let addFormHtml = '';
             if (['gl', 'operator', 'rigger'].includes(currentMasterTab)) {
-                addFormHtml = `<form onsubmit="addAccountMasterData(event, '${currentMasterTab}')" class="flex flex-col sm:flex-row gap-1.5 mb-2 bg-slate-50 p-2 rounded-sm border border-slate-100"><input type="text" id="new_master_name" oninput="this.value = this.value.toUpperCase()" placeholder="Nama..." class="flex-1 border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required><input type="text" id="new_master_nrp" oninput="this.value = this.value.toUpperCase()" placeholder="NRP..." class="flex-1 border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required><div class="relative flex-1"><input type="password" id="new_master_pwd" placeholder="Pwd..." class="w-full border border-slate-300 rounded-sm px-2 py-1 pr-6 text-[10px] focus:outline-none focus:border-cyan-500" required><i id="toggleMasterPwd" class="fa-regular fa-eye absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer pwd-toggle text-[9px]" onclick="togglePassword('new_master_pwd', 'toggleMasterPwd')"></i></div><button type="submit" class="bg-cyan-600 hover:bg-cyan-700 text-white font-semibold px-2.5 py-1 rounded-sm text-[10px] whitespace-nowrap"><i class="fa-solid fa-plus"></i></button></form>`;
+                addFormHtml = `<form onsubmit="addAccountMasterData(event, '${currentMasterTab}')" class="flex flex-col sm:flex-row gap-1.5 mb-2 bg-slate-50 p-2 rounded-sm border border-slate-100"><input type="text" id="new_master_name" oninput="this.value = this.value.toUpperCase()" placeholder="Nama..." class="flex-1 border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required><input type="text" id="new_master_nrp" oninput="this.value = this.value.toUpperCase()" placeholder="NRP..." class="flex-1 border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required><div class="relative flex-1"><input type="password" id="new_master_pwd" placeholder="Pwd..." class="w-full border border-slate-300 rounded-sm px-2 py-1 pr-6 text-[10px] focus:outline-none focus:border-cyan-500" required><i id="toggleMasterPwd" class="fa-regular fa-eye absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer pwd-toggle text-[9px]" onclick="togglePassword('new_master_pwd', 'toggleMasterPwd')"></i></div><button type="submit" class="bg-[#0891b2] hover:bg-cyan-700 text-white font-semibold px-2.5 py-1 rounded-sm text-[10px] whitespace-nowrap"><i class="fa-solid fa-plus"></i></button></form>`;
             } else {
-                addFormHtml = `<form onsubmit="addMasterData(event, '${currentMasterTab}')" class="flex gap-1.5 mb-2 bg-slate-50 p-2 rounded-sm border border-slate-100"><input type="text" id="new_master_val" oninput="this.value = this.value.toUpperCase()" placeholder="Data baru..." class="flex-1 border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required><button type="submit" class="bg-cyan-600 hover:bg-cyan-700 text-white font-semibold px-2.5 py-1 rounded-sm text-[10px] whitespace-nowrap"><i class="fa-solid fa-plus"></i> Tambah</button></form>`;
+                addFormHtml = `<form onsubmit="addMasterData(event, '${currentMasterTab}')" class="flex gap-1.5 mb-2 bg-slate-50 p-2 rounded-sm border border-slate-100"><input type="text" id="new_master_val" oninput="this.value = this.value.toUpperCase()" placeholder="Data baru..." class="flex-1 border border-slate-300 rounded-sm px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500" required><button type="submit" class="bg-[#0891b2] hover:bg-cyan-700 text-white font-semibold px-2.5 py-1 rounded-sm text-[10px] whitespace-nowrap"><i class="fa-solid fa-plus"></i> Tambah</button></form>`;
             }
-            contentHtml = `${addFormHtml}<div class="overflow-x-auto border border-slate-200 rounded-sm"><table class="w-full text-left"><thead class="bg-slate-50 text-slate-500 text-[9px] border-b"><tr><th class="p-2 uppercase">Nama Data</th><th class="p-2 uppercase text-right">Aksi</th></tr></thead><tbody class="divide-y divide-slate-100 text-[10px]">${(m[currentMasterTab] || []).map((val, idx) => `<tr class="hover:bg-slate-50"><td class="p-2 font-semibold text-slate-700">${val}</td><td class="p-2 text-right"><button onclick="confirmDeleteMasterData('${currentMasterTab}', ${idx})" class="text-red-400 hover:text-red-600 bg-red-50 hover:bg-red-100 p-1 rounded-sm"><i class="fa-solid fa-trash-can text-[9px]"></i></button></td></tr>`).join('')}</tbody></table></div>`;
+            contentHtml = `${addFormHtml}<div class="overflow-x-auto border border-slate-200 rounded-sm"><table class="w-full text-left"><thead class="bg-slate-50 text-slate-500 text-[9px] border-b"><tr><th class="p-2 uppercase">Nama Data</th><th class="p-2 uppercase text-right">Aksi</th></tr></thead><tbody class="divide-y divide-slate-100 text-[10px]">${(m[currentMasterTab] || []).map((val, idx) => `<tr class="hover:bg-slate-50"><td class="p-2 font-semibold text-slate-700">${val}</td><td class="p-2 text-right"><button onclick="confirmDeleteMasterData('${currentMasterTab}', ${idx})" class="text-red-400 hover:text-red-600 bg-red-50 hover:bg-red-100 p-1 rounded-sm border-0"><i class="fa-solid fa-trash-can text-[9px]"></i></button></td></tr>`).join('')}</tbody></table></div>`;
         }
 
         return `
-        <div class="bg-white rounded-md shadow-sm border border-slate-200 p-1 mb-2 flex flex-wrap gap-1">${tabs.map(t => `<button onclick="currentMasterTab='${t.id}'; renderApp(false);" class="px-2 py-1 text-[9px] font-semibold rounded-sm transition-colors ${currentMasterTab === t.id ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}">${t.label}</button>`).join('')}</div>
+        <div class="bg-white rounded-md shadow-sm border border-slate-200 p-1 mb-2 flex flex-wrap gap-1">${tabs.map(t => `<button onclick="currentMasterTab='${t.id}'; renderApp(false);" class="px-2 py-1 text-[9px] font-semibold rounded-sm transition-colors ${currentMasterTab === t.id ? 'bg-[#0891b2] text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}">${t.label}</button>`).join('')}</div>
         <div class="bg-white rounded-md shadow-sm border border-slate-200 p-3 min-h-[50vh]"><h3 class="text-xs font-bold text-slate-800 capitalize mb-2">Data: ${currentMasterTab.replace('_', ' ')}</h3>${contentHtml}</div>`;
     }
 
@@ -2447,34 +2402,55 @@
     function getProfileView() {
         const user = JSON.parse(localStorage.getItem('lifting_user'));
         const m = getMasterData();
+        
+        const optProfPerusahaan = `<option value="" disabled>-- Perusahaan --</option>` + (m.perusahaan || []).map(p=>`<option value="${p}" ${user.perusahaan===p?'selected':''}>${p}</option>`).join('');
+        const optProfDepartemen = `<option value="" disabled>-- Departemen --</option>` + (m.departemen || []).map(d=>`<option value="${d}" ${user.departemen===d?'selected':''}>${d}</option>`).join('');
+        const optProfSection = `<option value="" disabled>-- Section --</option>` + (m.section || []).map(s=>`<option value="${s}" ${user.section===s?'selected':''}>${s}</option>`).join('');
 
         return `
-        <div class="max-w-md mx-auto mt-4">
-            <!-- Profile Card -->
-            <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6 flex flex-col items-center mb-4 relative z-10">
-                <div class="w-16 h-16 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center text-3xl mb-3"><i class="fa-solid fa-user"></i></div>
-                <h2 class="font-bold text-slate-800 text-base">${user.nama_lengkap}</h2>
-                <p class="text-xs text-slate-500 uppercase tracking-widest mt-1">${user.role} ${user.departemen}</p>
-                <p class="text-[10px] text-slate-400 mt-1">NRP: ${user.nrp}</p>
+        <div class="max-w-md mx-auto relative pt-8 pb-4">
+            <div class="bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 overflow-hidden relative z-10">
+                <div class="h-24 bg-gradient-to-r from-cyan-600 to-blue-700 relative">
+                    <div class="absolute -bottom-8 left-1/2 -translate-x-1/2">
+                        <div class="w-20 h-20 rounded-full border-4 border-white bg-blue-100 flex items-center justify-center text-3xl text-blue-600 shadow-md">
+                            <i class="fa-solid fa-user-tie"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="pt-10 pb-6 px-6 text-center">
+                    <h2 class="text-lg font-bold text-slate-800 tracking-tight">${user.nama_lengkap}</h2>
+                    <p class="text-xs text-slate-500 font-medium mb-3 mt-1">${user.jabatan}</p>
+                    <div class="flex justify-center gap-2 mb-4">
+                        <span class="bg-cyan-50 text-cyan-700 border border-cyan-200 text-[10px] font-bold px-2 py-0.5 rounded-full">${user.role}</span>
+                        <span class="bg-slate-50 text-slate-600 border border-slate-200 text-[10px] font-bold px-2 py-0.5 rounded-full">${user.departemen}</span>
+                    </div>
+                    <div class="bg-slate-50 rounded-xl p-3 text-left border border-slate-100">
+                        <div class="grid grid-cols-2 gap-y-2 text-[10px]">
+                            <div><span class="text-slate-400 block mb-0.5">NRP</span><strong class="text-slate-700 font-mono">${user.nrp}</strong></div>
+                            <div><span class="text-slate-400 block mb-0.5">No WhatsApp</span><strong class="text-slate-700">${user.no_wa}</strong></div>
+                            <div><span class="text-slate-400 block mb-0.5">Perusahaan</span><strong class="text-slate-700">${user.perusahaan}</strong></div>
+                            <div><span class="text-slate-400 block mb-0.5">Section</span><strong class="text-slate-700">${user.section}</strong></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="px-4 pb-4 space-y-2">
+                    <button onclick="document.getElementById('profileBiodataModal').classList.remove('hidden')" class="w-full bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold py-2.5 rounded-xl text-[11px] flex justify-between items-center px-4 transition-colors">
+                        <span class="flex items-center gap-2"><i class="fa-solid fa-id-card text-emerald-500 w-4"></i> Identitas Saya</span><i class="fa-solid fa-chevron-right text-slate-400 text-[10px]"></i>
+                    </button>
+                    <button onclick="document.getElementById('profileSettingsModal').classList.remove('hidden')" class="w-full bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold py-2.5 rounded-xl text-[11px] flex justify-between items-center px-4 transition-colors">
+                        <span class="flex items-center gap-2"><i class="fa-solid fa-lock text-slate-500 w-4"></i> Keamanan / Password</span><i class="fa-solid fa-chevron-right text-slate-400 text-[10px]"></i>
+                    </button>
+                    <button onclick="openCustomConfirm('Keluar Akun', 'Apakah Anda yakin ingin keluar dari sistem?', handleLogout)" class="w-full bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 font-bold py-2.5 rounded-xl text-[11px] flex justify-center items-center gap-2 transition-colors mt-4 shadow-sm">
+                        <i class="fa-solid fa-sign-out-alt"></i> Keluar Akun
+                    </button>
+                </div>
             </div>
-
-            <!-- Menus -->
-            <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden flex flex-col mb-4 relative z-0">
-                <button onclick="document.getElementById('profileBiodataModal').classList.remove('hidden')" class="flex items-center justify-between p-4 hover:bg-slate-50 border-b border-slate-50 transition-colors w-full text-left">
-                    <div class="flex items-center gap-3"><div class="w-8 h-8 rounded-md bg-green-50 text-green-600 flex items-center justify-center shrink-0"><i class="fa-solid fa-id-card"></i></div><div class="text-left"><p class="text-xs font-bold text-slate-700">My Identity</p><p class="text-[9px] text-slate-400">Informasi detail personal</p></div></div>
-                    <i class="fa-solid fa-chevron-right text-slate-300 text-xs"></i>
-                </button>
-                <button onclick="document.getElementById('profileSettingsModal').classList.remove('hidden')" class="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors w-full text-left">
-                    <div class="flex items-center gap-3"><div class="w-8 h-8 rounded-md bg-slate-100 text-slate-600 flex items-center justify-center shrink-0"><i class="fa-solid fa-lock"></i></div><div class="text-left"><p class="text-xs font-bold text-slate-700">Security / Password</p><p class="text-[9px] text-slate-400">Ubah kata sandi Anda</p></div></div>
-                    <i class="fa-solid fa-chevron-right text-slate-300 text-xs"></i>
-                </button>
+            
+            <div class="text-center mt-6 mb-2 text-[10px] text-slate-300 font-medium italic relative z-0">
+                created by @fadillm
             </div>
-
-            <!-- Logout -->
-            <button onclick="openCustomConfirm('Keluar Akun', 'Apakah Anda yakin ingin keluar dari sistem?', handleLogout)" class="w-full bg-white rounded-xl shadow-sm border border-red-100 flex items-center justify-between p-4 hover:bg-red-50 transition-colors relative z-0">
-                <div class="flex items-center gap-3"><div class="w-8 h-8 rounded-md bg-red-50 text-red-500 flex items-center justify-center shrink-0"><i class="fa-solid fa-sign-out-alt"></i></div><p class="text-xs font-bold text-red-600">Logout</p></div>
-                <i class="fa-solid fa-chevron-right text-slate-300 text-xs"></i>
-            </button>
         </div>`;
     }
 
@@ -2511,8 +2487,8 @@
                 }).catch(err => console.warn(err));
             }
 
-            document.getElementById('profileBiodataModal').classList.add('hidden');
             showToast('Profil diupdate!'); 
+            document.getElementById('profileBiodataModal').classList.add('hidden');
             renderApp(true); 
         }
     }
@@ -2543,14 +2519,14 @@
             
             document.getElementById('profPwd1').value = ''; 
             document.getElementById('profPwd2').value = ''; 
-            document.getElementById('profileSettingsModal').classList.add('hidden');
             showToast('Password berhasil diubah!'); 
+            document.getElementById('profileSettingsModal').classList.add('hidden');
         } else {
             showToast('Gagal mereset, user tidak ditemukan', 'error');
         }
     }
 
-    // ================= MOBILE PWA NAVIGATION (HARDWARE BACK BUTTON) =================
+    // ================= MOBILE PWA NAVIGATION (HARDWARE BACK BUTTON / SWIPE BACK) =================
     window.addEventListener('load', () => { 
         fetchFromSupabase().then(() => { 
             const user = JSON.parse(localStorage.getItem('lifting_user'));
