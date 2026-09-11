@@ -14,8 +14,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     
-    <!-- Library Supabase & Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Library Chart.js (Untuk Grafik Dashboard) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
@@ -98,7 +97,7 @@
     
     function getSettings() { return JSON.parse(localStorage.getItem('lifting_settings')) || defaultSettings; }
 
-    // Logika Tanggal Berdasarkan Shift (05:00 s/d 04:59 = Tanggal Sama)
+    // Logika Shift Tambang: (05:00 s/d 04:59)
     function getShiftDateString(d = new Date()) {
         const shiftDate = new Date(d);
         if (shiftDate.getHours() < 5) {
@@ -138,43 +137,26 @@
     let userSortCol = 'nama_lengkap'; 
     let userSortDir = 'asc';
 
-    // 1. SUPABASE REALTIME WEBSOCKETS (Jalur Diam & Instan - Tanpa Polling Egress)
-    let supabaseClient;
-    if (typeof window.supabase !== 'undefined' && SUPABASE_KEY && !SUPABASE_KEY.includes('PASTE_KUNCI')) {
-        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        
-        supabaseClient.channel('custom-all-channel')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => { fetchFromSupabase(false, 'orders'); })
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, (payload) => { fetchFromSupabase(false, 'settings'); })
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, (payload) => { fetchFromSupabase(false, 'users'); })
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'master_data' }, (payload) => { fetchFromSupabase(false, 'master_data'); })
-            .subscribe();
-    }
-
-    async function fetchFromSupabase(isManual = false, table = 'all') {
+    // 1. Polling Cepat Khusus Tabel Orders (Setiap 3 Detik)
+    setInterval(async () => {
         if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
+        const user = localStorage.getItem('lifting_user');
+        if (!user) return;
+
         try {
             let shouldRender = false;
+            const resOrders = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=timestamp.desc`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
             
-            if (table === 'all' || table === 'orders') {
-                const resOrders = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=timestamp.desc`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
-                if (resOrders.ok) { const data = await resOrders.json(); const newData = JSON.stringify(data); if (localStorage.getItem('lifting_orders') !== newData) { localStorage.setItem('lifting_orders', newData); shouldRender = true; } }
+            if (resOrders.ok) {
+                const data = await resOrders.json();
+                const newData = JSON.stringify(data);
+                if (localStorage.getItem('lifting_orders') !== newData) {
+                    localStorage.setItem('lifting_orders', newData); 
+                    shouldRender = true; 
+                }
             }
-            if (table === 'all' || table === 'settings') {
-                const resSettings = await fetch(`${SUPABASE_URL}/rest/v1/settings?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
-                if (resSettings.ok) { const sData = await resSettings.json(); if(sData && sData.length > 0) { const newSettings = JSON.stringify(sData[0]); if (localStorage.getItem('lifting_settings') !== newSettings) { localStorage.setItem('lifting_settings', newSettings); shouldRender = true; } } }
-            }
-            if (table === 'all' || table === 'users') {
-                const resUsers = await fetch(`${SUPABASE_URL}/rest/v1/users?select=*`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
-                if (resUsers.ok) { const data = await resUsers.json(); if(Array.isArray(data) && data.length > 0) { const newData = JSON.stringify(data); if (localStorage.getItem('lifting_users') !== newData) { localStorage.setItem('lifting_users', newData); shouldRender = true; } } }
-            }
-            if (table === 'all' || table === 'master_data') {
-                const resMaster = await fetch(`${SUPABASE_URL}/rest/v1/master_data?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
-                if (resMaster.ok) { const data = await resMaster.json(); if(data && data.length > 0) { const newData = JSON.stringify(data[0]); if (localStorage.getItem('lifting_master_data') !== newData) { localStorage.setItem('lifting_master_data', newData); shouldRender = true; } } }
-            }
-            
-            if(isManual) { showToast("Data berhasil ditarik!", "success"); renderApp(false); }
-            else if(shouldRender) {
+
+            if (shouldRender) {
                 const isTyping = document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
                 const isModalOpen = ['editJobModal', 'detailJobModal', 'mpActionModal', 'kendalaModal', 'cancelPromptModal', 'globalConfirmModal', 'resetPwdModal', 'successModal', 'successRegModal', 'profileBiodataModal', 'profileSettingsModal', 'imageViewerModal'].some(id => {
                     const el = document.getElementById(id);
@@ -185,6 +167,79 @@
                     renderApp(true);
                 }
             }
+        } catch(e) {}
+    }, 3000);
+
+    // 2. Polling Lambat untuk Master Data, Users, Settings (Setiap 15 Detik)
+    setInterval(async () => {
+        if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
+        const user = localStorage.getItem('lifting_user');
+        if (!user) return;
+
+        const isTyping = document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
+        const isModalOpen = ['editJobModal', 'detailJobModal', 'mpActionModal', 'kendalaModal', 'cancelPromptModal', 'globalConfirmModal', 'resetPwdModal', 'successModal', 'successRegModal', 'profileBiodataModal', 'profileSettingsModal', 'imageViewerModal'].some(id => {
+            const el = document.getElementById(id);
+            return el && !el.classList.contains('hidden');
+        });
+
+        try {
+            let shouldRender = false;
+
+            const resSettings = await fetch(`${SUPABASE_URL}/rest/v1/settings?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
+            if (resSettings.ok) {
+                const sData = await resSettings.json();
+                if (sData && sData.length > 0) {
+                    const newSettings = JSON.stringify(sData[0]);
+                    if (localStorage.getItem('lifting_settings') !== newSettings) {
+                        localStorage.setItem('lifting_settings', newSettings); shouldRender = true;
+                    }
+                }
+            }
+
+            const resUsers = await fetch(`${SUPABASE_URL}/rest/v1/users?select=*`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
+            if (resUsers.ok) {
+                const data = await resUsers.json();
+                if (data && data.length > 0) {
+                    const newData = JSON.stringify(data);
+                    if (localStorage.getItem('lifting_users') !== newData) {
+                        localStorage.setItem('lifting_users', newData); shouldRender = true;
+                    }
+                }
+            }
+
+            const resMaster = await fetch(`${SUPABASE_URL}/rest/v1/master_data?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
+            if (resMaster.ok) {
+                const data = await resMaster.json();
+                if (data && data.length > 0) {
+                    const newData = JSON.stringify(data[0]);
+                    if (localStorage.getItem('lifting_master_data') !== newData) {
+                        localStorage.setItem('lifting_master_data', newData); shouldRender = true;
+                    }
+                }
+            }
+
+            if (shouldRender && !isTyping && !isModalOpen && currentTab !== 'order' && currentTab !== 'master' && currentTab !== 'profile') {
+                renderApp(true);
+            }
+        } catch(e) {}
+    }, 15000);
+
+    async function fetchFromSupabase(isManual = false) {
+        if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
+        try {
+            const [resOrders, resSettings, resUsers, resMaster] = await Promise.all([
+                fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=timestamp.desc`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }),
+                fetch(`${SUPABASE_URL}/rest/v1/settings?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }),
+                fetch(`${SUPABASE_URL}/rest/v1/users?select=*`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }),
+                fetch(`${SUPABASE_URL}/rest/v1/master_data?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } })
+            ]);
+
+            if (resOrders.ok) { const data = await resOrders.json(); if(Array.isArray(data)) localStorage.setItem('lifting_orders', JSON.stringify(data)); }
+            if (resSettings.ok) { const data = await resSettings.json(); if(data && data.length > 0) localStorage.setItem('lifting_settings', JSON.stringify(data[0])); }
+            if (resUsers.ok) { const data = await resUsers.json(); if(Array.isArray(data) && data.length > 0) localStorage.setItem('lifting_users', JSON.stringify(data)); }
+            if (resMaster.ok) { const data = await resMaster.json(); if(data && data.length > 0) localStorage.setItem('lifting_master_data', JSON.stringify(data[0])); }
+            
+            if(isManual) { showToast("Data berhasil ditarik!", "success"); renderApp(false); }
         } catch(e) { console.warn("Gagal mengambil data:", e); }
     }
 
@@ -227,6 +282,16 @@
         return safeData;
     }
     function saveMasterData(data) { localStorage.setItem('lifting_master_data', JSON.stringify(data)); syncMasterToSupabase(data); }
+
+    function updateShiftField() {
+        const jamEl = document.getElementById('req_jam');
+        const shiftEl = document.getElementById('req_shift');
+        if(jamEl && jamEl.value && shiftEl) {
+            let h = parseInt(jamEl.value.split(':')[0]);
+            shiftEl.value = (h >= 5 && h < 17) ? 'Shift 1' : 'Shift 2';
+        }
+    }
+    window.updateShiftField = updateShiftField;
 
     function handleSort(col) {
         if (sortColumn === col) { sortDirection = sortDirection === 'asc' ? 'desc' : 'asc'; } 
@@ -1866,7 +1931,7 @@
     }
 
     function promptLanjutPending(wo) {
-        openCustomConfirm('Lanjut Pekerjaan', 'Terbitkan tiket PENDING ini untuk dikerjakan ulang di shift selanjutnya? (Status akan kembali "Butuh Validasi" Admin)', () => {
+        openCustomConfirm('Lanjut Pekerjaan', 'Terbitkan tiket PENDING ini untuk dikerjakan ulang di shift selanjutnya? (Status tiket lama akan menjadi COMPLETED)', () => {
             let jobs = getOrders();
             let idx = jobs.findIndex(j => j.no_wo === wo);
             if(idx !== -1) {
@@ -1878,8 +1943,16 @@
                 }
                 let newWo = `${baseWo}-P${pCount}`;
 
+                // 1. Order Lama Tetap Dipertahankan (Menjadi COMPLETED)
+                oldJob.status = 'COMPLETED';
+                if (!oldJob.alasan_telat && !oldJob.alasan_overtime) {
+                    oldJob.alasan_telat = "Dilanjutkan ke shift berikutnya.";
+                }
+
+                // 2. Buat duplikat sebagai Orderan Baru
                 let newJob = { ...oldJob };
                 newJob.no_wo = newWo;
+                newJob.timestamp = new Date().toISOString(); 
                 
                 // Hapus penugasan kru shift sebelumnya agar Admin memvalidasi ulang kru baru
                 newJob.gl = ''; newJob.unit = ''; newJob.operator = ''; newJob.rigger = ''; newJob.rigger2 = '';
@@ -1887,14 +1960,9 @@
                 newJob.final_inspeksi = ''; newJob.alasan_telat = ''; newJob.alasan_overtime = '';
                 newJob.status = 'PENDING'; 
 
-                jobs.splice(idx, 1); 
+                // TIDAK di splice (TIDAK Dihapus), Melainkan dibiarkan dan menambah yang baru
                 jobs.unshift(newJob);
                 saveOrders(jobs);
-
-                // Explicitly DELETE old WO from Supabase
-                if (SUPABASE_KEY && !SUPABASE_KEY.includes('PASTE_KUNCI')) {
-                    fetch(`${SUPABASE_URL}/rest/v1/orders?no_wo=eq.${wo}`, { method: 'DELETE', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }).catch(()=>{});
-                }
 
                 showToast('Tiket lanjutan dikirim ke Dashboard Admin!');
                 renderApp(true);
@@ -1939,7 +2007,7 @@
             formFields = `
                 <div class="grid grid-cols-2 gap-2">
                     <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Tgl Pelaksanaan *</label><input type="date" id="req_tgl" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-[10px] focus:outline-none focus:border-cyan-500" required></div>
-                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Jam Req (HH:mm) *</label><input type="time" id="req_jam" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-[10px] focus:outline-none focus:border-cyan-500" required></div>
+                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Jam Req (HH:mm) *</label><input type="time" id="req_jam" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-[10px] focus:outline-none focus:border-cyan-500" required oninput="updateShiftField()"></div>
                 </div>
                 <div class="grid grid-cols-2 gap-2">
                     <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Durasi (Jam) *</label><input type="number" step="0.5" id="req_durasi" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-[10px] focus:outline-none focus:border-cyan-500" required></div>
