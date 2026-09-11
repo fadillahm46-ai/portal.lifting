@@ -14,7 +14,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     
-    <!-- Library Chart.js (Untuk Grafik Dashboard) -->
+    <!-- Library Supabase & Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
@@ -97,9 +98,31 @@
     
     function getSettings() { return JSON.parse(localStorage.getItem('lifting_settings')) || defaultSettings; }
 
-    function getLocalDateString() {
-        const d = new Date();
-        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    // Logika Tanggal Berdasarkan Shift (05:00 s/d 04:59 = Tanggal Sama)
+    function getShiftDateString(d = new Date()) {
+        const shiftDate = new Date(d);
+        if (shiftDate.getHours() < 5) {
+            shiftDate.setDate(shiftDate.getDate() - 1);
+        }
+        return shiftDate.getFullYear() + '-' + String(shiftDate.getMonth() + 1).padStart(2, '0') + '-' + String(shiftDate.getDate()).padStart(2, '0');
+    }
+
+    // Konversi UTC Timestamp Supabase ke Waktu Lokal Pengguna (WIB/WITA/WIT)
+    function formatLocalTimestamp(ts) {
+        if (!ts) return '-';
+        try {
+            let safeTs = ts;
+            if(!safeTs.includes('Z') && !safeTs.includes('+')) safeTs += 'Z'; 
+            const d = new Date(safeTs);
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            const hh = String(d.getHours()).padStart(2, '0');
+            const mm = String(d.getMinutes()).padStart(2, '0');
+            return `${y}-${m}-${day} ${hh}:${mm}`;
+        } catch(e) { 
+            return ts.split('T')[0] + ' ' + (ts.split('T')[1]||'').substring(0,5); 
+        }
     }
 
     let currentTab = 'monitoring'; 
@@ -115,85 +138,53 @@
     let userSortCol = 'nama_lengkap'; 
     let userSortDir = 'asc';
 
-    setInterval(async () => {
+    // 1. SUPABASE REALTIME WEBSOCKETS (Jalur Diam & Instan - Tanpa Polling Egress)
+    let supabaseClient;
+    if (typeof window.supabase !== 'undefined' && SUPABASE_KEY && !SUPABASE_KEY.includes('PASTE_KUNCI')) {
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        
+        supabaseClient.channel('custom-all-channel')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => { fetchFromSupabase(false, 'orders'); })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, (payload) => { fetchFromSupabase(false, 'settings'); })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, (payload) => { fetchFromSupabase(false, 'users'); })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'master_data' }, (payload) => { fetchFromSupabase(false, 'master_data'); })
+            .subscribe();
+    }
+
+    async function fetchFromSupabase(isManual = false, table = 'all') {
         if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
-        const user = localStorage.getItem('lifting_user');
-        if (!user) return;
-
-        const isTyping = document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
-        const isModalOpen = ['editJobModal', 'detailJobModal', 'mpActionModal', 'kendalaModal', 'cancelPromptModal', 'globalConfirmModal', 'resetPwdModal', 'successModal', 'successRegModal', 'profileBiodataModal', 'profileSettingsModal', 'imageViewerModal'].some(id => {
-            const el = document.getElementById(id);
-            return el && !el.classList.contains('hidden');
-        });
-
         try {
             let shouldRender = false;
-
-            const resOrders = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=timestamp.desc`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
-            if (resOrders.ok) {
-                const data = await resOrders.json();
-                const newData = JSON.stringify(data);
-                if (localStorage.getItem('lifting_orders') !== newData) {
-                    localStorage.setItem('lifting_orders', newData); shouldRender = true; 
-                }
+            
+            if (table === 'all' || table === 'orders') {
+                const resOrders = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=timestamp.desc`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
+                if (resOrders.ok) { const data = await resOrders.json(); const newData = JSON.stringify(data); if (localStorage.getItem('lifting_orders') !== newData) { localStorage.setItem('lifting_orders', newData); shouldRender = true; } }
             }
-
-            const resSettings = await fetch(`${SUPABASE_URL}/rest/v1/settings?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
-            if (resSettings.ok) {
-                const sData = await resSettings.json();
-                if (sData && sData.length > 0) {
-                    const newSettings = JSON.stringify(sData[0]);
-                    if (localStorage.getItem('lifting_settings') !== newSettings) {
-                        localStorage.setItem('lifting_settings', newSettings); shouldRender = true;
-                    }
-                }
+            if (table === 'all' || table === 'settings') {
+                const resSettings = await fetch(`${SUPABASE_URL}/rest/v1/settings?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
+                if (resSettings.ok) { const sData = await resSettings.json(); if(sData && sData.length > 0) { const newSettings = JSON.stringify(sData[0]); if (localStorage.getItem('lifting_settings') !== newSettings) { localStorage.setItem('lifting_settings', newSettings); shouldRender = true; } } }
             }
-
-            const resUsers = await fetch(`${SUPABASE_URL}/rest/v1/users?select=*`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
-            if (resUsers.ok) {
-                const data = await resUsers.json();
-                if (data && data.length > 0) {
-                    const newData = JSON.stringify(data);
-                    if (localStorage.getItem('lifting_users') !== newData) {
-                        localStorage.setItem('lifting_users', newData); shouldRender = true;
-                    }
-                }
+            if (table === 'all' || table === 'users') {
+                const resUsers = await fetch(`${SUPABASE_URL}/rest/v1/users?select=*`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
+                if (resUsers.ok) { const data = await resUsers.json(); if(Array.isArray(data) && data.length > 0) { const newData = JSON.stringify(data); if (localStorage.getItem('lifting_users') !== newData) { localStorage.setItem('lifting_users', newData); shouldRender = true; } } }
             }
-
-            const resMaster = await fetch(`${SUPABASE_URL}/rest/v1/master_data?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
-            if (resMaster.ok) {
-                const data = await resMaster.json();
-                if (data && data.length > 0) {
-                    const newData = JSON.stringify(data[0]);
-                    if (localStorage.getItem('lifting_master_data') !== newData) {
-                        localStorage.setItem('lifting_master_data', newData); shouldRender = true;
-                    }
-                }
+            if (table === 'all' || table === 'master_data') {
+                const resMaster = await fetch(`${SUPABASE_URL}/rest/v1/master_data?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
+                if (resMaster.ok) { const data = await resMaster.json(); if(data && data.length > 0) { const newData = JSON.stringify(data[0]); if (localStorage.getItem('lifting_master_data') !== newData) { localStorage.setItem('lifting_master_data', newData); shouldRender = true; } } }
             }
-
-            // SMART SYNC BLOCKER
-            if (shouldRender && !isTyping && !isModalOpen && currentTab !== 'order' && currentTab !== 'master' && currentTab !== 'profile') {
-                renderApp(true);
-            }
-        } catch(e) {}
-    }, 15000);
-
-    async function fetchFromSupabase(isManual = false) {
-        if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
-        try {
-            const [resOrders, resSettings, resUsers, resMaster] = await Promise.all([
-                fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=timestamp.desc`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }),
-                fetch(`${SUPABASE_URL}/rest/v1/settings?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }),
-                fetch(`${SUPABASE_URL}/rest/v1/users?select=*`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }),
-                fetch(`${SUPABASE_URL}/rest/v1/master_data?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } })
-            ]);
-
-            if (resOrders.ok) { const data = await resOrders.json(); if(Array.isArray(data)) localStorage.setItem('lifting_orders', JSON.stringify(data)); }
-            if (resSettings.ok) { const data = await resSettings.json(); if(data && data.length > 0) localStorage.setItem('lifting_settings', JSON.stringify(data[0])); }
-            if (resUsers.ok) { const data = await resUsers.json(); if(Array.isArray(data) && data.length > 0) localStorage.setItem('lifting_users', JSON.stringify(data)); }
-            if (resMaster.ok) { const data = await resMaster.json(); if(data && data.length > 0) localStorage.setItem('lifting_master_data', JSON.stringify(data[0])); }
             
             if(isManual) { showToast("Data berhasil ditarik!", "success"); renderApp(false); }
+            else if(shouldRender) {
+                const isTyping = document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
+                const isModalOpen = ['editJobModal', 'detailJobModal', 'mpActionModal', 'kendalaModal', 'cancelPromptModal', 'globalConfirmModal', 'resetPwdModal', 'successModal', 'successRegModal', 'profileBiodataModal', 'profileSettingsModal', 'imageViewerModal'].some(id => {
+                    const el = document.getElementById(id);
+                    return el && !el.classList.contains('hidden');
+                });
+
+                if (!isTyping && !isModalOpen && currentTab !== 'order' && currentTab !== 'master' && currentTab !== 'profile') {
+                    renderApp(true);
+                }
+            }
         } catch(e) { console.warn("Gagal mengambil data:", e); }
     }
 
@@ -892,7 +883,7 @@
     function getDashboardView() {
         let jobs = getOrders();
         
-        let today = getLocalDateString();
+        let today = getShiftDateString();
         let tglMulai = document.getElementById('dash_tgl_mulai') ? document.getElementById('dash_tgl_mulai').value : today;
         let tglSelesai = document.getElementById('dash_tgl_selesai') ? document.getElementById('dash_tgl_selesai').value : today;
         
@@ -1042,8 +1033,8 @@
         
         let allJobs = getOrders();
         
-        let dashTglMulai = document.getElementById('dash_tgl_mulai').value || getLocalDateString();
-        let dashTglSelesai = document.getElementById('dash_tgl_selesai').value || getLocalDateString();
+        let dashTglMulai = document.getElementById('dash_tgl_mulai').value || getShiftDateString();
+        let dashTglSelesai = document.getElementById('dash_tgl_selesai').value || getShiftDateString();
         let dashShift = document.getElementById('dash_shift').value;
         let dashUnit = document.getElementById('dash_unit').value;
 
@@ -1336,7 +1327,7 @@
                                     </td>
                                     <td class="px-2 py-1.5 align-top relative z-10">
                                         <div class="font-bold text-cyan-600 text-[9px] md:text-[10px] cursor-pointer hover:underline leading-tight inline-block" onclick="viewJobDetail('${job.no_wo}')">${job.no_wo}</div>
-                                        <div class="text-[8px] md:text-[9px] text-slate-500 mb-1 leading-tight">${job.timestamp.split('T')[0]} ${job.timestamp.split('T')[1].substring(0,5)}</div>
+                                        <div class="text-[8px] md:text-[9px] text-slate-500 mb-1 leading-tight">${formatLocalTimestamp(job.timestamp)}</div>
                                         <div class="md:hidden"><span class="${statusColor} border text-[7px] px-1 py-0.5 rounded-sm font-bold leading-none whitespace-nowrap inline-block">${job.status}</span></div>
                                     </td>
                                     <td class="px-2 py-1.5 align-top">
@@ -1718,8 +1709,8 @@
         if (mpFleetMode === 'Crane Truck') unitOptions = m.unit_ct || []; 
         let filterUnit = document.getElementById('mp_filter_unit') ? document.getElementById('mp_filter_unit').value : 'ALL';
         
-        let tglMulai = document.getElementById('mp_filter_mulai') ? document.getElementById('mp_filter_mulai').value : getLocalDateString();
-        let tglSelesai = document.getElementById('mp_filter_selesai') ? document.getElementById('mp_filter_selesai').value : getLocalDateString();
+        let tglMulai = document.getElementById('mp_filter_mulai') ? document.getElementById('mp_filter_mulai').value : getShiftDateString();
+        let tglSelesai = document.getElementById('mp_filter_selesai') ? document.getElementById('mp_filter_selesai').value : getShiftDateString();
 
         let jobs = getOrders().filter(j => j.kategori === mpFleetMode);
         jobs = jobs.filter(j => j.tgl_pelaksanaan >= tglMulai && j.tgl_pelaksanaan <= tglSelesai);
