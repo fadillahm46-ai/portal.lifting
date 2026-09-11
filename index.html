@@ -914,11 +914,13 @@
         let cntCancel = filteredJobs.filter(j => j.status === 'CANCELED').length;
 
         let cntCT = filteredJobs.filter(j => j.kategori === 'Crane Truck').length; let cntBC = filteredJobs.filter(j => j.kategori === 'Big Crane').length; let cntLB = filteredJobs.filter(j => j.kategori === 'Lowboy').length;
-        let totalUnits = cntCT + cntBC + cntLB || 1; 
+        let realTotalUnits = cntCT + cntBC + cntLB;
+        let totalUnits = realTotalUnits || 1; 
 
         let pctCT = Math.round((cntCT / totalUnits) * 100) || 0; let pctBC = Math.round((cntBC / totalUnits) * 100) || 0; let pctLB = Math.round((cntLB / totalUnits) * 100) || 0;
         let degCT = (pctCT / 100) * 360; let degBC = degCT + ((pctBC / 100) * 360);
         
+        // Matching pie colors with Rigger bar colors (Merah, Oranye, Coklat)
         let pieStyle = `background: conic-gradient(#ef4444 0deg ${degCT}deg, #f97316 ${degCT}deg ${degBC}deg, #92400e ${degBC}deg 360deg);`;
 
         return `
@@ -964,12 +966,7 @@
                 <div class="bg-red-50 border border-red-200 rounded-md p-3 text-center shadow-sm flex flex-col justify-center col-span-2 sm:col-span-1"><div class="text-[9px] font-bold text-red-500 uppercase tracking-wider mb-1">Batal</div><div class="text-xl font-bold text-red-600">${cntCancel}</div></div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm flex items-center justify-between"><div class="flex items-center gap-2 text-slate-500"><i class="fa-solid fa-truck-moving text-base"></i><span class="text-[11px] font-bold">Crane Truck</span></div><div class="text-lg font-bold text-slate-800">${cntCT}</div></div>
-                <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm flex items-center justify-between"><div class="flex items-center gap-2 text-slate-500"><i class="fa-solid fa-truck-ramp-box text-base"></i><span class="text-[11px] font-bold">Big Crane</span></div><div class="text-lg font-bold text-slate-800">${cntBC}</div></div>
-                <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm flex items-center justify-between"><div class="flex items-center gap-2 text-slate-500"><i class="fa-solid fa-trailer text-base"></i><span class="text-[11px] font-bold">Lowboy</span></div><div class="text-lg font-bold text-slate-800">${cntLB}</div></div>
-            </div>
-
+            <!-- Bagian Data Perusahaan Order & Dept Plant dipindah ke atas -->
             <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm mt-3 flex flex-col lg:flex-row gap-6 items-start">
                 <div class="w-full lg:w-1/4 flex flex-col items-center justify-center">
                     <h3 class="text-[10px] font-bold text-slate-600 mb-2 w-full text-left">Data Perusahaan</h3>
@@ -1017,23 +1014,33 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-3">
-                <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm flex flex-col items-center justify-center lg:col-span-1 order-last lg:order-none">
-                    <h3 class="text-[10px] font-bold text-slate-600 mb-3 w-full text-left">Distribusi Unit</h3>
-                    ${totalUnits > 1 ? `
-                    <div class="w-24 h-24 rounded-full mb-4 shadow-inner" style="${pieStyle}"></div>
-                    <div class="w-full space-y-1.5 text-[9px] font-semibold text-slate-600">
-                        <div class="flex justify-between items-center"><div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 rounded-sm bg-red-500"></div>Crane Truck</div><span>${pctCT}%</span></div>
-                        <div class="flex justify-between items-center"><div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 rounded-sm bg-orange-500"></div>Big Crane</div><span>${pctBC}%</span></div>
-                        <div class="flex justify-between items-center"><div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 rounded-sm bg-yellow-900"></div>Lowboy</div><span>${pctLB}%</span></div>
+            <!-- Distribusi Unit & Scheduled vs Unscheduled -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm flex flex-col items-center justify-center">
+                    <h3 class="text-[10px] font-bold text-slate-600 mb-4 w-full text-left uppercase">Distribusi & Total Unit</h3>
+                    ${realTotalUnits > 0 ? `
+                    <div class="flex flex-col sm:flex-row items-center gap-6 w-full justify-center">
+                        <div class="w-24 h-24 rounded-full shadow-inner shrink-0" style="${pieStyle}"></div>
+                        <div class="w-full sm:w-1/2 space-y-2 text-[10px] font-semibold text-slate-600">
+                            <div class="flex justify-between items-center"><div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 rounded-sm bg-red-500"></div>Crane Truck</div><span class="text-right">${pctCT}% <span class="text-slate-400 font-normal ml-1">(${cntCT} Job)</span></span></div>
+                            <div class="flex justify-between items-center"><div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 rounded-sm bg-orange-500"></div>Big Crane</div><span class="text-right">${pctBC}% <span class="text-slate-400 font-normal ml-1">(${cntBC} Job)</span></span></div>
+                            <div class="flex justify-between items-center"><div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 rounded-sm bg-yellow-900"></div>Lowboy</div><span class="text-right">${pctLB}% <span class="text-slate-400 font-normal ml-1">(${cntLB} Job)</span></span></div>
+                            <div class="pt-2 mt-2 border-t border-slate-100 flex justify-between items-center font-bold text-slate-800"><span>Total Order</span><span>${realTotalUnits} Job</span></div>
+                        </div>
                     </div>
                     ` : `<div class="text-[9px] text-slate-400 italic my-auto">Data kosong</div>`}
                 </div>
                 
-                <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm mt-3 lg:mt-0 flex flex-col lg:col-span-3">
-                    <h3 class="text-[10px] font-bold text-slate-600 mb-2">Performa Rigger (Total Jam Kerja)</h3>
-                    <div class="relative h-60 w-full"><canvas id="riggerChart"></canvas></div>
+                <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm flex flex-col">
+                    <h3 class="text-[10px] font-bold text-slate-600 mb-2 uppercase">Scheduled vs Unscheduled</h3>
+                    <div class="relative flex-1 min-h-[120px] w-full"><canvas id="scheduleChart"></canvas></div>
                 </div>
+            </div>
+
+            <!-- Performa Rigger (Full Width Bawah) -->
+            <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm mt-3 flex flex-col">
+                <h3 class="text-[10px] font-bold text-slate-600 mb-2 uppercase">Performa Rigger (Total Jam Kerja)</h3>
+                <div class="relative h-60 w-full"><canvas id="riggerChart"></canvas></div>
             </div>
         </div>`;
     }
@@ -1079,6 +1086,46 @@
 
         let mtdData = calcDeptCats(mtdJobs);
         let lwData = calcDeptCats(lwJobs);
+
+        if(document.getElementById('scheduleChart')) {
+            let countSched = 0; let countUnsched = 0;
+            filteredJobsRange.forEach(j => {
+                let isUnsched = false;
+                let createdAt = new Date(j.timestamp);
+                let reqDate = new Date(`${j.tgl_pelaksanaan}T00:00:00`);
+                if (j.kategori === 'Big Crane') {
+                    let createdZero = new Date(createdAt); createdZero.setHours(0,0,0,0);
+                    if ((reqDate - createdZero) / (1000*60*60*24) < 3) isUnsched = true;
+                } else if (j.kategori === 'Crane Truck' && j.jam_pelaksanaan) {
+                    let reqTime = new Date(`${j.tgl_pelaksanaan}T${j.jam_pelaksanaan}:00`);
+                    if ((reqTime - createdAt) / (1000*60*60) < 6) isUnsched = true;
+                }
+                if(isUnsched) countUnsched++; else countSched++;
+            });
+
+            if(window.dashScheduleChart) window.dashScheduleChart.destroy();
+            const ctxSched = document.getElementById('scheduleChart').getContext('2d');
+            window.dashScheduleChart = new Chart(ctxSched, {
+                type: 'bar',
+                data: {
+                    labels: ['Scheduled', 'Unscheduled'],
+                    datasets: [{
+                        label: 'Total Order',
+                        data: [countSched, countUnsched],
+                        backgroundColor: ['#10b981', '#f43f5e'],
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { font: { size: 10, weight: 'bold' } }, grid: { display: false } },
+                        y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 10 } }, grid: { color: '#f1f5f9' } }
+                    }
+                }
+            });
+        }
 
         if(window.dashDeptChart) window.dashDeptChart.destroy();
         const ctxDept = document.getElementById('deptOrderChart').getContext('2d');
