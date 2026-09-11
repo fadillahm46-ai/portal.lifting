@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Sistem Pemesanan Alat Berat PPA</title>
     
-    <!-- Favicon / Logo Tab Web -->
     <link rel="icon" href="https://lh3.googleusercontent.com/d/1hQZopiZU-_bQC9aRmyZndlmEF--k4h5U">
     <link rel="apple-touch-icon" href="https://lh3.googleusercontent.com/d/1hQZopiZU-_bQC9aRmyZndlmEF--k4h5U">
     
@@ -14,8 +13,9 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     
-    <!-- Library Chart.js (Untuk Grafik Dashboard) -->
+    <!-- Library Eksternal: Chart.js & Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -25,7 +25,6 @@
         .pwd-toggle:hover { color: #0891b2; }
         .chart-bar { transition: width 0.8s ease-out; }
         
-        /* Animasi Transisi Halaman Utama (Flip In) */
         @keyframes flipPage {
             0% { opacity: 0; transform: perspective(1000px) rotateX(-10deg) scale(0.98); }
             100% { opacity: 1; transform: perspective(1000px) rotateX(0deg) scale(1); }
@@ -35,7 +34,6 @@
             transform-origin: top;
         }
 
-        /* Animasi Ikon Menu Aktif (Flip Bar Navigasi) */
         @keyframes navIconFlip {
             0% { transform: perspective(400px) rotateY(90deg); opacity: 0.5; }
             100% { transform: perspective(400px) rotateY(0deg); opacity: 1; }
@@ -48,7 +46,6 @@
             animation: navIconFlip 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
         }
 
-        /* Animasi Pop-up Sukses */
         @keyframes popIn {
             0% { transform: scale(0.5); opacity: 0; }
             80% { transform: scale(1.1); opacity: 1; }
@@ -65,18 +62,18 @@
     <div id="app" class="min-h-screen"></div>
 
 <script>
-    const SUPABASE_URL = 'https://ustlhxarxxslcmjezqyu.supabase.co';
-    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVzdGxoeGFyeHhzbGNtamV6cXl1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg4NzMwMjEsImV4cCI6MjEwNDQ0OTAyMX0.sY19qVqNnDG-ttSG316CtcPZ79FvPTBpqCn37YP7nag';
-    const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwioh3MCzAz6QIxsrfUKruiqq2STeONkkO5o0dcYLu0_JcsdTp2yiHxWrqQi8nUJdrI3Q/exec'; 
+    var SUPABASE_URL = 'https://ustlhxarxxslcmjezqyu.supabase.co';
+    var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVzdGxoeGFyeHhzbGNtamV6cXl1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg4NzMwMjEsImV4cCI6MjEwNDQ0OTAyMX0.sY19qVqNnDG-ttSG316CtcPZ79FvPTBpqCn37YP7nag';
+    var GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwioh3MCzAz6QIxsrfUKruiqq2STeONkkO5o0dcYLu0_JcsdTp2yiHxWrqQi8nUJdrI3Q/exec'; 
 
-    const defaultUsers = [
+    var defaultUsers = [
         { nrp: 'ADMIN', nama_lengkap: 'BUDI ADMIN', jabatan: 'DISPATCHER', perusahaan: 'PPA', departemen: 'OPERATION', section: 'CONTROL', no_wa: '081111111', password_hash: 'admin', role: 'ADMIN', status_akun: 'ACTIVE' },
         { nrp: 'GL', nama_lengkap: 'ACHMAD HARIYANTO', jabatan: 'GROUP LEADER', perusahaan: 'PPA', departemen: 'OPERATION', section: 'LIFTING', no_wa: '082222222', password_hash: 'gl', role: 'GL', status_akun: 'ACTIVE' },
         { nrp: 'USER', nama_lengkap: 'ANDI REQUESTER', jabatan: 'FOREMAN', perusahaan: 'SUBKON A', departemen: 'PLANT', section: 'MAINTENANCE', no_wa: '08987654321', password_hash: 'user', role: 'USER', status_akun: 'ACTIVE' },
         { nrp: 'MP', nama_lengkap: 'JOKO OPERATOR', jabatan: 'OPERATOR', perusahaan: 'PPA', departemen: 'OPERATION', section: 'LIFTING', no_wa: '084444444', password_hash: 'mp', role: 'MANPOWER', status_akun: 'ACTIVE' }
     ];
 
-    const defaultMasterData = {
+    var defaultMasterData = {
         perusahaan: ['PPA', 'SUBKON A', 'SUBKON B', 'PT. BIB'],
         departemen: ['MINING', 'PLANT', 'SAFETY', 'HR'],
         section: ['OPERATION', 'MAINTENANCE', 'HSE', 'RECRUITMENT'],
@@ -92,137 +89,99 @@
     if (!localStorage.getItem('lifting_master_data')) localStorage.setItem('lifting_master_data', JSON.stringify(defaultMasterData));
     if (!localStorage.getItem('lifting_orders')) localStorage.setItem('lifting_orders', JSON.stringify([]));
 
-    const defaultSettings = { id: 1, bg_url: '', logo_url: '', icon_ct_url: '', icon_bc_url: '', icon_lb_url: '' };
+    var defaultSettings = { id: 1, bg_url: '', logo_url: '', icon_ct_url: '', icon_bc_url: '', icon_lb_url: '' };
     if (!localStorage.getItem('lifting_settings')) localStorage.setItem('lifting_settings', JSON.stringify(defaultSettings));
     
     function getSettings() { return JSON.parse(localStorage.getItem('lifting_settings')) || defaultSettings; }
 
-    // Logika Shift Tambang: (05:00 s/d 04:59)
-    function getShiftDateString(d = new Date()) {
-        const shiftDate = new Date(d);
-        if (shiftDate.getHours() < 5) {
-            shiftDate.setDate(shiftDate.getDate() - 1);
+    // MENDAPATKAN TANGGAL BERDASARKAN SHIFT (Batas Jam 05:00 Pagi)
+    function getShiftDateString() {
+        const d = new Date();
+        // Jika masih di bawah jam 05:00 pagi (00:00 - 04:59), maka masuk hitungan tanggal kemarin
+        if (d.getHours() < 5) {
+            d.setDate(d.getDate() - 1);
         }
-        return shiftDate.getFullYear() + '-' + String(shiftDate.getMonth() + 1).padStart(2, '0') + '-' + String(shiftDate.getDate()).padStart(2, '0');
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     }
 
-    // Konversi UTC Timestamp Supabase ke Waktu Lokal Pengguna (WIB/WITA/WIT)
-    function formatLocalTimestamp(ts) {
-        if (!ts) return '-';
-        try {
-            let safeTs = ts;
-            if(!safeTs.includes('Z') && !safeTs.includes('+')) safeTs += 'Z'; 
-            const d = new Date(safeTs);
-            const y = d.getFullYear();
-            const m = String(d.getMonth() + 1).padStart(2, '0');
-            const day = String(d.getDate()).padStart(2, '0');
-            const hh = String(d.getHours()).padStart(2, '0');
-            const mm = String(d.getMinutes()).padStart(2, '0');
-            return `${y}-${m}-${day} ${hh}:${mm}`;
-        } catch(e) { 
-            return ts.split('T')[0] + ' ' + (ts.split('T')[1]||'').substring(0,5); 
-        }
+    // KONVERSI UTC SUPABASE KE WAKTU LOKAL (WITA/WIB)
+    function formatLocalTimestamp(utcString) {
+        if (!utcString) return '-';
+        const d = new Date(utcString);
+        return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0') + ' ' +
+               String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
     }
 
-    let currentTab = 'monitoring'; 
-    let currentMpPanel = 'ON PROGRESS';
-    let userOrderFleetMode = null; 
-    let mpFleetMode = null; 
+    var currentTab = 'monitoring'; 
+    var currentMpPanel = 'ON PROGRESS';
+    var userOrderFleetMode = null; 
+    var mpFleetMode = null; 
+    var tempMpData = null;
+    var activeCancelWo = null;
+    var currentMasterTab = 'branding';
     
-    // Sortir & Filter Data
-    let sortColumn = 'timestamp';
-    let sortDirection = 'desc';
-    let userSearchQuery = ''; 
-    let userRoleFilter = 'ALL'; 
-    let userSortCol = 'nama_lengkap'; 
-    let userSortDir = 'asc';
+    var sortColumn = 'timestamp';
+    var sortDirection = 'desc';
+    var userSearchQuery = ''; 
+    var userRoleFilter = 'ALL'; 
+    var userSortCol = 'nama_lengkap'; 
+    var userSortDir = 'asc';
 
-    // 1. Polling Cepat Khusus Tabel Orders (Setiap 3 Detik)
-    setInterval(async () => {
-        if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
-        const user = localStorage.getItem('lifting_user');
-        if (!user) return;
+    // MENDETEKSI MODE PREVIEW CANVAS UNTUK MENCEGAH ERROR WEBSOCKET
+    var isPreviewCanvas = window.self !== window.top || window.location.hostname.includes('usercontent.goog');
 
+    if (!window.supabaseClient) {
+        window.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    }
+    var supabase = window.supabaseClient;
+
+    if (!window.realtimeOrdersSubscription && !isPreviewCanvas) {
         try {
-            let shouldRender = false;
-            const resOrders = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=timestamp.desc`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
-            
-            if (resOrders.ok) {
-                const data = await resOrders.json();
-                const newData = JSON.stringify(data);
-                if (localStorage.getItem('lifting_orders') !== newData) {
-                    localStorage.setItem('lifting_orders', newData); 
-                    shouldRender = true; 
-                }
-            }
-
-            if (shouldRender) {
-                const isTyping = document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
-                const isModalOpen = ['editJobModal', 'detailJobModal', 'mpActionModal', 'kendalaModal', 'cancelPromptModal', 'globalConfirmModal', 'resetPwdModal', 'successModal', 'successRegModal', 'profileBiodataModal', 'profileSettingsModal', 'imageViewerModal'].some(id => {
-                    const el = document.getElementById(id);
-                    return el && !el.classList.contains('hidden');
+            window.realtimeOrdersSubscription = supabase.channel('realtime-orders-channel')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, payload => {
+                    let currentOrders = Array.isArray(JSON.parse(localStorage.getItem('lifting_orders'))) ? JSON.parse(localStorage.getItem('lifting_orders')) : [];
+                    
+                    if (payload.eventType === 'INSERT') {
+                        if (!currentOrders.find(o => o.no_wo === payload.new.no_wo)) currentOrders.unshift(payload.new);
+                    } else if (payload.eventType === 'UPDATE') {
+                        let idx = currentOrders.findIndex(o => o.no_wo === payload.new.no_wo);
+                        if (idx !== -1) currentOrders[idx] = payload.new;
+                        else currentOrders.unshift(payload.new);
+                    } else if (payload.eventType === 'DELETE') {
+                        currentOrders = currentOrders.filter(o => o.no_wo !== payload.old.no_wo);
+                    }
+                    
+                    localStorage.setItem('lifting_orders', JSON.stringify(currentOrders));
+                    
+                    // Mencegah gangguan rendering saat user mengetik form atau buka modal
+                    const isTyping = document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
+                    const isModalOpen = ['editJobModal', 'detailJobModal', 'mpActionModal', 'kendalaModal', 'cancelPromptModal', 'globalConfirmModal', 'resetPwdModal', 'successModal', 'successRegModal', 'profileBiodataModal', 'profileSettingsModal', 'imageViewerModal'].some(id => {
+                        const el = document.getElementById(id);
+                        return el && !el.classList.contains('hidden');
+                    });
+                    
+                    if (!isTyping && !isModalOpen && currentTab !== 'order' && currentTab !== 'master' && currentTab !== 'profile') {
+                        renderApp(true); // Silent render
+                    }
+                })
+                .subscribe((status, err) => {
+                    if (err) console.warn("Supabase Realtime Error:", err);
                 });
-
-                if (!isTyping && !isModalOpen && currentTab !== 'order' && currentTab !== 'master' && currentTab !== 'profile') {
-                    renderApp(true);
+        } catch (e) {
+            console.warn("WebSocket gagal diinisiasi:", e);
+        }
+    } else if (isPreviewCanvas) {
+        console.warn("WebSockets diblokir di mode Preview. Menggunakan Smart Polling Lambat (30 Detik) untuk hemat Egress.");
+        if (!window.fallbackPolling) {
+            window.fallbackPolling = setInterval(() => {
+                const user = localStorage.getItem('lifting_user');
+                // Tarik data tiap 30 dtk hanya jika pengguna login dan halaman aktif
+                if (user && document.visibilityState === 'visible') {
+                    fetchFromSupabase(false);
                 }
-            }
-        } catch(e) {}
-    }, 3000);
-
-    // 2. Polling Lambat untuk Master Data, Users, Settings (Setiap 15 Detik)
-    setInterval(async () => {
-        if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
-        const user = localStorage.getItem('lifting_user');
-        if (!user) return;
-
-        const isTyping = document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
-        const isModalOpen = ['editJobModal', 'detailJobModal', 'mpActionModal', 'kendalaModal', 'cancelPromptModal', 'globalConfirmModal', 'resetPwdModal', 'successModal', 'successRegModal', 'profileBiodataModal', 'profileSettingsModal', 'imageViewerModal'].some(id => {
-            const el = document.getElementById(id);
-            return el && !el.classList.contains('hidden');
-        });
-
-        try {
-            let shouldRender = false;
-
-            const resSettings = await fetch(`${SUPABASE_URL}/rest/v1/settings?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
-            if (resSettings.ok) {
-                const sData = await resSettings.json();
-                if (sData && sData.length > 0) {
-                    const newSettings = JSON.stringify(sData[0]);
-                    if (localStorage.getItem('lifting_settings') !== newSettings) {
-                        localStorage.setItem('lifting_settings', newSettings); shouldRender = true;
-                    }
-                }
-            }
-
-            const resUsers = await fetch(`${SUPABASE_URL}/rest/v1/users?select=*`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
-            if (resUsers.ok) {
-                const data = await resUsers.json();
-                if (data && data.length > 0) {
-                    const newData = JSON.stringify(data);
-                    if (localStorage.getItem('lifting_users') !== newData) {
-                        localStorage.setItem('lifting_users', newData); shouldRender = true;
-                    }
-                }
-            }
-
-            const resMaster = await fetch(`${SUPABASE_URL}/rest/v1/master_data?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
-            if (resMaster.ok) {
-                const data = await resMaster.json();
-                if (data && data.length > 0) {
-                    const newData = JSON.stringify(data[0]);
-                    if (localStorage.getItem('lifting_master_data') !== newData) {
-                        localStorage.setItem('lifting_master_data', newData); shouldRender = true;
-                    }
-                }
-            }
-
-            if (shouldRender && !isTyping && !isModalOpen && currentTab !== 'order' && currentTab !== 'master' && currentTab !== 'profile') {
-                renderApp(true);
-            }
-        } catch(e) {}
-    }, 15000);
+            }, 30000);
+        }
+    }
 
     async function fetchFromSupabase(isManual = false) {
         if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
@@ -239,7 +198,7 @@
             if (resUsers.ok) { const data = await resUsers.json(); if(Array.isArray(data) && data.length > 0) localStorage.setItem('lifting_users', JSON.stringify(data)); }
             if (resMaster.ok) { const data = await resMaster.json(); if(data && data.length > 0) localStorage.setItem('lifting_master_data', JSON.stringify(data[0])); }
             
-            if(isManual) { showToast("Data berhasil ditarik!", "success"); renderApp(false); }
+            if(isManual) { showToast("Data tersinkronisasi!", "success"); renderApp(false); }
         } catch(e) { console.warn("Gagal mengambil data:", e); }
     }
 
@@ -282,16 +241,6 @@
         return safeData;
     }
     function saveMasterData(data) { localStorage.setItem('lifting_master_data', JSON.stringify(data)); syncMasterToSupabase(data); }
-
-    function updateShiftField() {
-        const jamEl = document.getElementById('req_jam');
-        const shiftEl = document.getElementById('req_shift');
-        if(jamEl && jamEl.value && shiftEl) {
-            let h = parseInt(jamEl.value.split(':')[0]);
-            shiftEl.value = (h >= 5 && h < 17) ? 'Shift 1' : 'Shift 2';
-        }
-    }
-    window.updateShiftField = updateShiftField;
 
     function handleSort(col) {
         if (sortColumn === col) { sortDirection = sortDirection === 'asc' ? 'desc' : 'asc'; } 
@@ -338,7 +287,6 @@
         document.body.removeChild(el);
     }
 
-    // SMART COPY KE WA DENGAN EMOJI & PERSISTENSI USER FORMAT
     function copyJobToWA(wo) {
         let job = getOrders().find(j => j.no_wo === wo);
         if(!job) return;
@@ -356,12 +304,12 @@
         let mpFormat = `*PELAPORAN PROGRES JOB LIFTING*\n*Status:* ${statusEmoji}\n\n*Nama Job:* ${job.deskripsi}\n*Jam Start:* ${job.jam_start_aktual || '-'}\n*Jam Finish:* ${job.jam_end_aktual || '-'}\n*No. Unit:* ${job.unit || '-'}\n*Nama Operator:* ${job.operator || '-'}\n*Nama Rigger:* ${job.rigger || '-'}${job.rigger2 ? ', ' + job.rigger2 : ''}\n\n*Final Inspeksi:* ${job.final_inspeksi || '-'}\n*Kendala:* ${job.alasan_telat ? 'Telat: ' + job.alasan_telat + ' ' : ''}${job.alasan_overtime ? 'Over: ' + job.alasan_overtime : ''}${(!job.alasan_telat && !job.alasan_overtime) ? '-' : ''}`;
 
         if (currentUser && currentUser.role === 'USER') {
-            waText = userFormat; // User selalu dapat format detail
+            waText = userFormat;
         } else {
             if (job.status === 'SCHEDULED' || job.status === 'UNSCHEDULED') {
                 waText = userFormat;
             } else {
-                waText = mpFormat; // MP/GL dapat laporan eksekusi
+                waText = mpFormat; 
             }
         }
         
@@ -971,7 +919,6 @@
         let pctCT = Math.round((cntCT / totalUnits) * 100) || 0; let pctBC = Math.round((cntBC / totalUnits) * 100) || 0; let pctLB = Math.round((cntLB / totalUnits) * 100) || 0;
         let degCT = (pctCT / 100) * 360; let degBC = degCT + ((pctBC / 100) * 360);
         
-        // Matching pie colors with Rigger bar colors (Merah, Oranye, Coklat)
         let pieStyle = `background: conic-gradient(#ef4444 0deg ${degCT}deg, #f97316 ${degCT}deg ${degBC}deg, #92400e ${degBC}deg 360deg);`;
 
         return `
@@ -1023,7 +970,6 @@
                 <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm flex items-center justify-between"><div class="flex items-center gap-2 text-slate-500"><i class="fa-solid fa-trailer text-base"></i><span class="text-[11px] font-bold">Lowboy</span></div><div class="text-lg font-bold text-slate-800">${cntLB}</div></div>
             </div>
 
-            <!-- Bagian Data Perusahaan Order & Dept Plant dipindah ke atas -->
             <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm mt-3 flex flex-col lg:flex-row gap-6 items-start">
                 <div class="w-full lg:w-1/4 flex flex-col items-center justify-center">
                     <h3 class="text-[10px] font-bold text-slate-600 mb-2 w-full text-left">Data Perusahaan</h3>
@@ -1071,7 +1017,6 @@
                 </div>
             </div>
 
-            <!-- Distribusi Unit & Performa Rigger dipindah ke bawah -->
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-3">
                 <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm flex flex-col items-center justify-center lg:col-span-1 order-last lg:order-none">
                     <h3 class="text-[10px] font-bold text-slate-600 mb-3 w-full text-left">Distribusi Unit</h3>
@@ -1224,9 +1169,9 @@
                 data: {
                     labels: rLabels,
                     datasets: [
-                        { label: 'Crane Truck', data: rDataCT, backgroundColor: '#ef4444' }, // Merah
-                        { label: 'Big Crane', data: rDataBC, backgroundColor: '#f97316' },   // Orange
-                        { label: 'Lowboy', data: rDataLB, backgroundColor: '#92400e' }       // Coklat
+                        { label: 'Crane Truck', data: rDataCT, backgroundColor: '#ef4444' }, 
+                        { label: 'Big Crane', data: rDataBC, backgroundColor: '#f97316' },   
+                        { label: 'Lowboy', data: rDataLB, backgroundColor: '#92400e' }       
                     ]
                 },
                 options: {
@@ -1392,7 +1337,7 @@
                                     </td>
                                     <td class="px-2 py-1.5 align-top relative z-10">
                                         <div class="font-bold text-cyan-600 text-[9px] md:text-[10px] cursor-pointer hover:underline leading-tight inline-block" onclick="viewJobDetail('${job.no_wo}')">${job.no_wo}</div>
-                                        <div class="text-[8px] md:text-[9px] text-slate-500 mb-1 leading-tight">${formatLocalTimestamp(job.timestamp)}</div>
+                                        <div class="text-[8px] md:text-[9px] text-slate-500 mb-1 leading-tight" title="Waktu Order Masuk (Lokal)">${formatLocalTimestamp(job.timestamp)}</div>
                                         <div class="md:hidden"><span class="${statusColor} border text-[7px] px-1 py-0.5 rounded-sm font-bold leading-none whitespace-nowrap inline-block">${job.status}</span></div>
                                     </td>
                                     <td class="px-2 py-1.5 align-top">
@@ -1530,6 +1475,7 @@
                 <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">DURASI REQ</div><div class="font-bold text-slate-700 uppercase">${job.durasi_request}</div></div>
                 <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">OPERATOR</div><div class="font-bold text-slate-700 uppercase">${job.operator || '-'}</div></div>
                 <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">RIGGER</div><div class="font-bold text-slate-700 uppercase">${job.rigger || '-'}${job.rigger2 ? ', ' + job.rigger2 : ''}</div></div>
+                <div class="col-span-2"><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5 mt-2">WAKTU ORDER MASUK</div><div class="font-bold text-slate-700" title="Zona Waktu Perangkat">${formatLocalTimestamp(job.timestamp)}</div></div>
             </div>
             
             <div class="grid grid-cols-1 gap-2 text-[10px] mb-3 mt-3 border-t border-slate-100 pt-3 bg-slate-50 p-2 rounded-sm">
@@ -1695,7 +1641,6 @@
             jobs[idx].alasan_overtime = document.getElementById('edit_alasan_overtime').value;
         }
 
-        // Cukup Group Leader & Unit saja untuk Validasi sukses ke Progress
         let isValidated = (selectedGL && selectedUnit);
 
         if (isValidated && (jobs[idx].status === 'SCHEDULED' || jobs[idx].status === 'UNSCHEDULED' || jobs[idx].status === 'PENDING')) {
@@ -1824,8 +1769,6 @@
         return html;
     }
 
-    let tempMpData = null;
-
     function openManpowerAction(wo, targetStatus) {
         const job = getOrders().find(j => j.no_wo === wo); const m = getMasterData();
         let opOptions = (m.operator || []).map(o => `<option value="${o}">${o}</option>`).join(''); let rigOptions = (m.rigger || []).map(r => `<option value="${r}">${r}</option>`).join('');
@@ -1862,7 +1805,6 @@
         let reqMins = 0; if(job.durasi_request.includes('JAM')) reqMins = parseFloat(job.durasi_request) * 60; else if(job.durasi_request.includes('HARI')) reqMins = parseFloat(job.durasi_request) * 24 * 60;
         let diffStartMins = 0; if(job.jam_pelaksanaan) { let reqStart = new Date(`2000-01-01T${job.jam_pelaksanaan}:00`); diffStartMins = (dStart - reqStart) / (1000 * 60); }
         
-        // TOLERANSI 30 MENIT (TELAT DAN OVERTIME)
         let isLate = diffStartMins > 30; let isOvertime = actualMins > (reqMins + 30);
         
         let pendingReason = targetStatus === 'PENDING' ? document.getElementById('mp_alasan_pending').value : null;
@@ -1909,7 +1851,6 @@
         if (tempMpData.status === 'COMPLETED') { showSuccessAnim('thumb', 'Kerja Bagus!', 'Pekerjaan telah diselesaikan dan laporan siap.'); } else { showToast('Tersimpan di Tab Pending!'); }
     }
 
-    let activeCancelWo = null;
     function initiateCancelJob(wo) { 
         activeCancelWo = wo; 
         document.getElementById('cancelReasonInput').value = ''; 
@@ -1930,12 +1871,15 @@
         }
     }
 
+    // MEMPERTAHANKAN TIKET LAMA MENJADI COMPLETED & MEMBUAT TIKET BARU DENGAN TIMESTAMP SAAT INI
     function promptLanjutPending(wo) {
-        openCustomConfirm('Lanjut Pekerjaan', 'Terbitkan tiket PENDING ini untuk dikerjakan ulang di shift selanjutnya? (Status tiket lama akan menjadi COMPLETED)', () => {
+        openCustomConfirm('Lanjut Pekerjaan', 'Selesaikan tiket lama ini, dan terbitkan tiket lanjutan PENDING ke shift selanjutnya?', () => {
             let jobs = getOrders();
             let idx = jobs.findIndex(j => j.no_wo === wo);
             if(idx !== -1) {
                 let oldJob = jobs[idx];
+                oldJob.status = 'COMPLETED'; // Tiket lama diselesaikan
+
                 let baseWo = oldJob.no_wo.split('-P')[0];
                 let pCount = 1;
                 if(oldJob.no_wo.includes('-P')) {
@@ -1943,28 +1887,24 @@
                 }
                 let newWo = `${baseWo}-P${pCount}`;
 
-                // 1. Order Lama Tetap Dipertahankan (Menjadi COMPLETED)
-                oldJob.status = 'COMPLETED';
-                if (!oldJob.alasan_telat && !oldJob.alasan_overtime) {
-                    oldJob.alasan_telat = "Dilanjutkan ke shift berikutnya.";
-                }
-
-                // 2. Buat duplikat sebagai Orderan Baru
                 let newJob = { ...oldJob };
                 newJob.no_wo = newWo;
-                newJob.timestamp = new Date().toISOString(); 
-                
-                // Hapus penugasan kru shift sebelumnya agar Admin memvalidasi ulang kru baru
+
+                // Reset field penugasan agar admin memvalidasi ulang kru yang bertugas
                 newJob.gl = ''; newJob.unit = ''; newJob.operator = ''; newJob.rigger = ''; newJob.rigger2 = '';
                 newJob.jam_start_aktual = ''; newJob.jam_end_aktual = ''; newJob.durasi_aktual = '';
                 newJob.final_inspeksi = ''; newJob.alasan_telat = ''; newJob.alasan_overtime = '';
+                
                 newJob.status = 'PENDING'; 
+                // Gunakan TIMESTAMP BARU (Waktu tiket ini diterbitkan ulang) agar muncul paling atas di Dashboard Admin
+                newJob.timestamp = new Date().toISOString(); 
 
-                // TIDAK di splice (TIDAK Dihapus), Melainkan dibiarkan dan menambah yang baru
-                jobs.unshift(newJob);
+                jobs[idx] = oldJob; // Update tiket lama yang sudah COMPLETED
+                jobs.unshift(newJob); // Sisipkan tiket lanjutan yang baru
+                
                 saveOrders(jobs);
 
-                showToast('Tiket lanjutan dikirim ke Dashboard Admin!');
+                showToast('Tiket lama diselesaikan. Tiket lanjutan baru dikirim ke Admin!');
                 renderApp(true);
             }
         });
@@ -2007,11 +1947,11 @@
             formFields = `
                 <div class="grid grid-cols-2 gap-2">
                     <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Tgl Pelaksanaan *</label><input type="date" id="req_tgl" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-[10px] focus:outline-none focus:border-cyan-500" required></div>
-                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Jam Req (HH:mm) *</label><input type="time" id="req_jam" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-[10px] focus:outline-none focus:border-cyan-500" required oninput="updateShiftField()"></div>
+                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Jam Req (HH:mm) *</label><input type="time" id="req_jam" oninput="updateShiftField()" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-[10px] focus:outline-none focus:border-cyan-500" required></div>
                 </div>
                 <div class="grid grid-cols-2 gap-2">
                     <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Durasi (Jam) *</label><input type="number" step="0.5" id="req_durasi" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-[10px] focus:outline-none focus:border-cyan-500" required></div>
-                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Shift Kerja</label><input type="text" id="req_shift" class="w-full border border-slate-200 bg-slate-50 rounded-sm px-2 py-1.5 text-[10px] text-slate-500 cursor-not-allowed" placeholder="Otomatis dari Jam" readonly></div>
+                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Shift Kerja</label><input type="text" id="req_shift" class="w-full border border-slate-200 bg-slate-50 rounded-sm px-2 py-1.5 text-[10px] font-bold text-cyan-600 cursor-not-allowed" placeholder="Otomatis dari Jam" readonly></div>
                 </div>
                 <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Lokasi Angkat *</label><input type="text" id="req_lok_asal" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-[10px] focus:outline-none focus:border-cyan-500" placeholder="Titik muat..." required></div>
                 <div><label class="block text-[10px] font-bold text-slate-600 mb-0.5">Lokasi Tujuan *</label><input type="text" id="req_lok_tujuan" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-[10px] focus:outline-none focus:border-cyan-500" placeholder="Titik bongkar..." required></div>
@@ -2080,6 +2020,15 @@
                 </form>
             </div>
         </div>`;
+    }
+
+    function updateShiftField() {
+        let jam = document.getElementById('req_jam')?.value;
+        let shiftInput = document.getElementById('req_shift');
+        if(jam && shiftInput) {
+            let h = parseInt(jam.split(':')[0], 10);
+            shiftInput.value = (h >= 5 && h < 17) ? 'Shift 1' : 'Shift 2';
+        }
     }
 
     async function submitOrder(e) {
@@ -2193,8 +2142,6 @@
         renderApp(false);
         showSuccessAnim('check', 'Order Berhasil!', 'Pesanan Anda telah kami terima.');
     }
-
-    let currentMasterTab = 'branding';
 
     function getMasterDataView() {
         const m = getMasterData(); const users = getUsers();
@@ -2469,7 +2416,6 @@
         return `
         <div class="max-w-md mx-auto relative pt-4 pb-4 px-2 space-y-3">
             
-            <!-- Kartu 1: Info Profil Utama -->
             <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col items-center justify-center relative z-10">
                 <div class="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center text-blue-500 text-3xl mb-3 shadow-sm border border-blue-100">
                     <i class="fa-solid fa-user"></i>
@@ -2479,7 +2425,6 @@
                 <p class="text-[10px] text-slate-400 mt-1 font-medium text-center">NRP: ${user.nrp}</p>
             </div>
             
-            <!-- Kartu 2: Menu Navigasi Profil -->
             <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden relative z-10">
                 <button onclick="document.getElementById('profileBiodataModal').classList.remove('hidden')" class="w-full flex items-center justify-between p-4 hover:bg-slate-50 border-b border-slate-50 transition-colors text-left group">
                     <div class="flex items-center gap-4">
@@ -2508,7 +2453,6 @@
                 </button>
             </div>
             
-            <!-- Kartu 3: Logout -->
             <div class="bg-white rounded-2xl shadow-sm border border-red-100 overflow-hidden relative z-10">
                 <button onclick="openCustomConfirm('Keluar Akun', 'Apakah Anda yakin ingin keluar dari sistem?', handleLogout)" class="w-full flex items-center justify-between p-4 hover:bg-red-50 transition-colors text-left group">
                     <div class="flex items-center gap-4">
@@ -2523,7 +2467,6 @@
                 </button>
             </div>
             
-            <!-- Watermark Footer -->
             <div class="text-center mt-6 mb-2 text-[10px] text-slate-300 font-medium italic relative z-0">
                 created by @fadillm
             </div>
@@ -2603,7 +2546,6 @@
         }
     }
 
-    // ================= MOBILE PWA NAVIGATION (HARDWARE BACK BUTTON / SWIPE BACK) =================
     window.addEventListener('load', () => { 
         fetchFromSupabase().then(() => { 
             const user = JSON.parse(localStorage.getItem('lifting_user'));
