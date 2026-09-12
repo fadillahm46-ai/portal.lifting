@@ -2,8 +2,8 @@
   "name": "Order Lifting PPA",
   "short_name": "Lifting",
   "start_url": "./index.html",
-  "display": "",
-  "background_color": "",
+  "display": "standalone",
+  "background_color": "#ffffff",
   "theme_color": "#0891b2",
   "icons": [
     {
@@ -12,8 +12,8 @@
       "type": "image/png"
     },
     {
-      "src": "https://lh3.googleusercontent.com/d/15jybyF9VjYbc9HTrmzcfgunM4mham3DE",
-      "sizes": "1920x1080",
+      "src": "https://lh3.googleusercontent.com/d/1hQZopiZU-_bQC9aRmyZndlmEF--k4h5U",
+      "sizes": "512x512",
       "type": "image/png"
     }
   ]
