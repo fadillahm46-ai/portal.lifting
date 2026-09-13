@@ -13,12 +13,14 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.11/locales/id.global.min.js"></script>
     
     <!-- Supabase JS Client for Realtime WebSockets -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
         body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #334155; }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -63,6 +65,15 @@
             background-size: cover; background-position: center;
             z-index: 9999; transition: opacity 0.8s ease-out;
         }
+
+        /* KALENDER STYLE */
+        .fc .fc-toolbar-title { font-size: 13px !important; font-weight: bold; color: #0891b2; text-transform: uppercase; }
+        .fc-theme-standard th { background-color: #0891b2; color: white; padding: 6px 0; border-color: #0891b2; text-transform: uppercase; font-size: 10px; }
+        .fc-daygrid-day-number { font-size: 11px; font-weight: bold; color: #334155; width: 100%; text-align: center; margin-top: 4px; text-decoration: none !important; }
+        .fc-button-primary { background-color: #0891b2 !important; border-color: #0891b2 !important; font-size: 10px !important; font-weight: bold !important; text-transform: capitalize !important; }
+        .fc-button-primary:hover { background-color: #0e7490 !important; }
+        .fc-event { cursor: pointer; border: none !important; border-radius: 2px; padding: 2px; font-size: 9px; font-weight: bold; text-align: center; color: white !important;}
+        .fc-daygrid-day.fc-day-today { background-color: #f0fdfa !important; }
     </style>
 </head>
 <body class="antialiased text-[11px] sm:text-xs">
@@ -176,7 +187,7 @@
             const user = localStorage.getItem('lifting_user');
             if (!user) return;
             const isTyping = document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
-            const isModalOpen = ['editJobModal', 'detailJobModal', 'mpActionModal', 'kendalaModal', 'cancelPromptModal', 'globalConfirmModal', 'resetPwdModal', 'successModal', 'successRegModal', 'profileBiodataModal', 'profileSettingsModal', 'imageViewerModal'].some(id => {
+            const isModalOpen = ['editJobModal', 'detailJobModal', 'mpActionModal', 'kendalaModal', 'cancelPromptModal', 'globalConfirmModal', 'resetPwdModal', 'successModal', 'successRegModal', 'profileBiodataModal', 'profileSettingsModal', 'imageViewerModal', 'dayJobsModal'].some(id => {
                 const el = document.getElementById(id); return el && !el.classList.contains('hidden');
             });
             if (!isTyping && !isModalOpen && currentTab !== 'order' && currentTab !== 'master' && currentTab !== 'profile') {
@@ -398,7 +409,7 @@
                         ${currentTab === 'dashboard' && (user.role === 'ADMIN' || user.role === 'GL') ? getDashboardView() : ''}
                         ${currentTab === 'monitoring' ? (user.role === 'MANPOWER' ? getManpowerWorkflow() : getMonitoringView()) : ''}
                         ${currentTab === 'order' ? getOrderFormView() : ''}
-                        ${currentTab === 'master' && user.role === 'ADMIN' ? getMasterDataView() : ''}
+                        ${currentTab === 'jadwal' && (user.role === 'ADMIN' || user.role === 'GL') ? getKalenderBcView() : ''}
                         ${currentTab === 'profile' ? getProfileView() : ''}
                     </div>
                     ${isMobile ? getMobileNav(user) : ''}
@@ -409,6 +420,16 @@
             <div id="imageViewerModal" class="fixed inset-0 bg-black/95 z-[150] hidden flex items-center justify-center p-2" onclick="this.classList.add('hidden')">
                 <img id="viewerImage" src="" class="max-w-full max-h-[90vh] object-contain cursor-zoom-out rounded-sm shadow-2xl transition-transform duration-300" onclick="event.stopPropagation()">
                 <button class="absolute top-4 right-4 text-white text-3xl opacity-70 hover:opacity-100 transition-opacity"><i class="fa-solid fa-times"></i></button>
+            </div>
+
+            <div id="dayJobsModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[130] hidden p-3">
+                <div class="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden flex flex-col max-h-[90vh]">
+                    <div class="p-3 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
+                        <h3 class="font-bold text-slate-800 text-xs" id="dayJobsTitle">Jadwal Tanggal</h3>
+                        <button onclick="document.getElementById('dayJobsModal').classList.add('hidden')" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-base"></i></button>
+                    </div>
+                    <div class="p-3 overflow-y-auto hide-scrollbar bg-slate-50/50 min-h-[100px]" id="dayJobsContent"></div>
+                </div>
             </div>
 
             <div id="globalConfirmModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[100] hidden p-3">
@@ -567,6 +588,9 @@
         if (currentTab === 'dashboard' && (user.role === 'ADMIN' || user.role === 'GL')) {
             setTimeout(initDashboardCharts, 100);
         }
+        if (currentTab === 'jadwal' || (currentTab === 'order' && userOrderFleetMode === 'Big Crane' && user.role === 'USER')) {
+            setTimeout(initBcCalendar, 100);
+        }
     }
 
     function switchTab(tab) {
@@ -600,9 +624,9 @@
                 
                 ${(isUSER || isAdmin || isGL) ? `<button onclick="switchTab('order')" class="w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold transition-all duration-300 flex items-center gap-2 ${currentTab === 'order' ? 'nav-active shadow-sm' : 'text-slate-600 hover:bg-slate-50'}"><i class="fa-solid fa-plus w-5 text-center text-sm"></i> Buat Order</button>` : ''}
                 
+                ${(isAdmin || isGL) ? `<button onclick="switchTab('jadwal')" class="w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold transition-all duration-300 flex items-center gap-2 ${currentTab === 'jadwal' ? 'nav-active shadow-sm' : 'text-slate-600 hover:bg-slate-50'}"><i class="fa-regular fa-calendar-days w-5 text-center text-sm"></i> Jadwal BC</button>` : ''}
+
                 <div class="text-[9px] font-bold text-slate-400 tracking-wider mt-4 mb-1 ml-1 uppercase">Akun</div>
-                
-                ${isAdmin ? `<button onclick="switchTab('master')" class="w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold transition-all duration-300 flex items-center gap-2 ${currentTab === 'master' ? 'nav-active shadow-sm' : 'text-slate-600 hover:bg-slate-50'}"><i class="fa-solid fa-database w-5 text-center text-sm"></i> Master Data</button>` : ''}
                 
                 <button onclick="switchTab('profile')" class="w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold transition-all duration-300 flex items-center gap-2 ${currentTab === 'profile' ? 'nav-active shadow-sm' : 'text-slate-600 hover:bg-slate-50'}"><i class="fa-solid fa-user w-5 text-center text-sm"></i> Profil Saya</button>
             </div>
@@ -614,38 +638,55 @@
     }
 
     function getMobileNav(user) {
-        return `
-        <div class="fixed bottom-0 w-full bg-white border-t border-slate-200 px-1 sm:px-2 py-1.5 flex justify-around items-center z-40 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-            ${(user.role === 'ADMIN' || user.role === 'GL') ? `
+        let html = `<div class="fixed bottom-0 w-full bg-white border-t border-slate-200 px-1 sm:px-2 py-1.5 flex justify-around items-center z-40 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">`;
+        
+        if (user.role === 'ADMIN' || user.role === 'GL') {
+            html += `
             <button onclick="switchTab('dashboard')" class="flex flex-col items-center justify-center p-2 w-16 h-14 rounded-2xl transition-colors duration-300 ${currentTab === 'dashboard' ? 'nav-active' : 'text-slate-400'}">
                 <i class="fa-solid fa-chart-pie text-xl sm:text-2xl mb-1"></i>
                 <span class="text-[9px] sm:text-[10px] font-medium leading-none">Dashboard</span>
-            </button>` : ''}
-            
+            </button>
+            <button onclick="switchTab('monitoring')" class="flex flex-col items-center justify-center p-2 w-16 h-14 rounded-2xl transition-colors duration-300 ${currentTab === 'monitoring' ? 'nav-active' : 'text-slate-400'}">
+                <i class="fa-solid fa-list-check text-xl sm:text-2xl mb-1"></i>
+                <span class="text-[9px] sm:text-[10px] font-medium leading-none">Data</span>
+            </button>
+            `;
+        } else if (user.role === 'USER' || user.role === 'MANPOWER') {
+            html += `
             <button onclick="switchTab('monitoring')" class="flex flex-col items-center justify-center p-2 w-16 h-14 rounded-2xl transition-colors duration-300 ${currentTab === 'monitoring' ? 'nav-active' : 'text-slate-400'}">
                 <i class="fa-solid ${user.role === 'MANPOWER' ? 'fa-hard-hat' : 'fa-list-check'} text-xl sm:text-2xl mb-1"></i>
                 <span class="text-[9px] sm:text-[10px] font-medium leading-none">${user.role === 'MANPOWER' ? 'Tugas Aktif' : 'Data'}</span>
             </button>
-            
-            ${(user.role === 'USER' || user.role === 'ADMIN' || user.role === 'GL') ? `
+            `;
+        }
+
+        if (user.role !== 'MANPOWER') {
+            html += `
             <button onclick="switchTab('order')" class="relative flex flex-col items-center justify-center -mt-8 z-50">
                 <div class="w-14 h-14 rounded-full flex items-center justify-center border-[4px] border-white shadow-md transition-transform duration-300 ${currentTab === 'order' ? 'bg-cyan-600 text-white scale-110' : 'bg-cyan-500 text-white hover:scale-105'}">
                     <i class="fa-solid fa-plus text-3xl ${currentTab === 'order' ? 'animate-[spin_0.3s_ease-out]' : ''}"></i>
                 </div>
                 <span class="text-[10px] font-medium text-slate-500 mt-1 leading-none relative z-50 bg-white px-1 rounded">Order</span>
-            </button>` : ''}
-            
-            ${user.role === 'ADMIN' ? `
-            <button onclick="switchTab('master')" class="flex flex-col items-center justify-center p-2 w-16 h-14 rounded-2xl transition-colors duration-300 ${currentTab === 'master' ? 'nav-active' : 'text-slate-400'}">
-                <i class="fa-solid fa-database text-xl sm:text-2xl mb-1"></i>
-                <span class="text-[9px] sm:text-[10px] font-medium leading-none">Master</span>
-            </button>` : ''}
-            
-            <button onclick="switchTab('profile')" class="flex flex-col items-center justify-center p-2 w-16 h-14 rounded-2xl transition-colors duration-300 ${currentTab === 'profile' ? 'nav-active' : 'text-slate-400'}">
-                <i class="fa-solid fa-user text-xl sm:text-2xl mb-1"></i>
-                <span class="text-[9px] sm:text-[10px] font-medium leading-none">Profil</span>
             </button>
+            `;
+        }
+
+        if (user.role === 'ADMIN' || user.role === 'GL') {
+            html += `
+            <button onclick="switchTab('jadwal')" class="flex flex-col items-center justify-center p-2 w-16 h-14 rounded-2xl transition-colors duration-300 ${currentTab === 'jadwal' ? 'nav-active' : 'text-slate-400'}">
+                <i class="fa-regular fa-calendar-days text-xl sm:text-2xl mb-1"></i>
+                <span class="text-[9px] sm:text-[10px] font-medium leading-none">Jadwal BC</span>
+            </button>
+            `;
+        }
+
+        html += `
+        <button onclick="switchTab('profile')" class="flex flex-col items-center justify-center p-2 w-16 h-14 rounded-2xl transition-colors duration-300 ${currentTab === 'profile' ? 'nav-active' : 'text-slate-400'}">
+            <i class="fa-solid fa-user text-xl sm:text-2xl mb-1"></i>
+            <span class="text-[9px] sm:text-[10px] font-medium leading-none">Profil</span>
+        </button>
         </div>`;
+        return html;
     }
 
     function getAuthView() {
@@ -969,12 +1010,37 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 relative z-0">
-                <div class="bg-white border border-slate-200 rounded-md p-3 text-center shadow-sm flex flex-col justify-center"><div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Order</div><div class="text-xl font-bold text-slate-800">${cntOrder}</div></div>
-                <div class="bg-blue-50 border border-blue-200 rounded-md p-3 text-center shadow-sm flex flex-col justify-center"><div class="text-[9px] font-bold text-blue-500 uppercase tracking-wider mb-1">Progres</div><div class="text-xl font-bold text-blue-700">${cntProg}</div></div>
-                <div class="bg-orange-50 border border-orange-200 rounded-md p-3 text-center shadow-sm flex flex-col justify-center"><div class="text-[9px] font-bold text-orange-500 uppercase tracking-wider mb-1">Pending</div><div class="text-xl font-bold text-orange-600">${cntPend}</div></div>
-                <div class="bg-emerald-50 border border-emerald-200 rounded-md p-3 text-center shadow-sm flex flex-col justify-center"><div class="text-[9px] font-bold text-emerald-500 uppercase tracking-wider mb-1">Selesai</div><div class="text-xl font-bold text-emerald-600">${cntDone}</div></div>
-                <div class="bg-red-50 border border-red-200 rounded-md p-3 text-center shadow-sm flex flex-col justify-center col-span-2 sm:col-span-1"><div class="text-[9px] font-bold text-red-500 uppercase tracking-wider mb-1">Batal</div><div class="text-xl font-bold text-red-600">${cntCancel}</div></div>
+            <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-3 relative z-0">
+                <!-- Order -->
+                <div class="relative overflow-hidden bg-slate-50 border border-slate-200 rounded-xl p-3 shadow-sm flex flex-col justify-between h-20">
+                    <div class="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider mb-1 relative z-10">Total Order</div>
+                    <div class="text-2xl sm:text-3xl font-extrabold text-slate-700 relative z-10">${cntOrder}</div>
+                    <i class="fa-solid fa-file-invoice absolute -bottom-2 -right-2 text-5xl text-slate-300 opacity-20 rotate-[-10deg]"></i>
+                </div>
+                <!-- Progres -->
+                <div class="relative overflow-hidden bg-blue-50 border border-blue-100 rounded-xl p-3 shadow-sm flex flex-col justify-between h-20">
+                    <div class="text-[9px] font-extrabold text-blue-600 uppercase tracking-wider mb-1 relative z-10">ON PROGRESS</div>
+                    <div class="text-2xl sm:text-3xl font-extrabold text-blue-700 relative z-10">${cntProg}</div>
+                    <i class="fa-solid fa-arrows-rotate absolute -bottom-2 -right-2 text-5xl text-blue-500 opacity-20"></i>
+                </div>
+                <!-- Pending -->
+                <div class="relative overflow-hidden bg-orange-50 border border-orange-100 rounded-xl p-3 shadow-sm flex flex-col justify-between h-20">
+                    <div class="text-[9px] font-extrabold text-orange-600 uppercase tracking-wider mb-1 relative z-10">PENDING</div>
+                    <div class="text-2xl sm:text-3xl font-extrabold text-orange-600 relative z-10">${cntPend}</div>
+                    <i class="fa-solid fa-clock absolute -bottom-2 -right-2 text-5xl text-orange-500 opacity-20"></i>
+                </div>
+                <!-- Selesai -->
+                <div class="relative overflow-hidden bg-emerald-50 border border-emerald-100 rounded-xl p-3 shadow-sm flex flex-col justify-between h-20">
+                    <div class="text-[9px] font-extrabold text-emerald-600 uppercase tracking-wider mb-1 relative z-10">COMPLETED</div>
+                    <div class="text-2xl sm:text-3xl font-extrabold text-emerald-600 relative z-10">${cntDone}</div>
+                    <i class="fa-regular fa-circle-check absolute -bottom-2 -right-2 text-5xl text-emerald-500 opacity-20"></i>
+                </div>
+                <!-- Batal -->
+                <div class="relative overflow-hidden bg-red-50 border border-red-100 rounded-xl p-3 shadow-sm flex flex-col justify-between h-20 col-span-2 sm:col-span-1">
+                    <div class="text-[9px] font-extrabold text-red-600 uppercase tracking-wider mb-1 relative z-10">CANCELED</div>
+                    <div class="text-2xl sm:text-3xl font-extrabold text-red-600 relative z-10">${cntCancel}</div>
+                    <i class="fa-solid fa-xmark absolute -bottom-2 -right-2 text-5xl text-red-500 opacity-20"></i>
+                </div>
             </div>
 
             <div class="bg-white border border-slate-200 rounded-md p-3 shadow-sm mt-3 flex flex-col lg:flex-row gap-6 items-start">
@@ -1241,7 +1307,7 @@
                     datasets: [
                         { label: 'Crane Truck', data: rDataCT, backgroundColor: '#ef4444' }, 
                         { label: 'Big Crane', data: rDataBC, backgroundColor: '#f97316' },   
-                        { label: 'Lowboy', data: rDataLB, backgroundColor: '#92400e' }       
+                        { label: 'Lowboy', data: rDataLB, backgroundColor: '#92400e' }        
                     ]
                 },
                 options: {
@@ -1496,511 +1562,6 @@
         return html;
     }
 
-    function openImageViewer(url) {
-        document.getElementById('viewerImage').src = url;
-        document.getElementById('imageViewerModal').classList.remove('hidden');
-    }
-
-    function viewJobDetail(wo) {
-        let job = getOrders().find(j => j.no_wo === wo);
-        if(!job) return;
-
-        let fotoHtml = '';
-        if (job.foto_evidence) {
-            if (job.foto_evidence.startsWith('data:image')) {
-                fotoHtml = `
-                <div class="mb-3">
-                    <div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">LAMPIRAN FOTO</div>
-                    <div class="bg-slate-50 border border-slate-200 rounded-sm p-1 text-center cursor-pointer hover:bg-slate-100 transition-colors group" onclick="openImageViewer('${job.foto_evidence}')">
-                        <img src="${job.foto_evidence}" class="w-full max-h-48 object-contain rounded-sm shadow-sm group-hover:opacity-90 transition-opacity" alt="Lampiran Foto">
-                        <div class="text-[9px] font-bold text-slate-500 mt-1.5 mb-0.5"><i class="fa-solid fa-magnifying-glass-plus text-cyan-600"></i> Klik untuk Perbesar</div>
-                    </div>
-                </div>`;
-            } else {
-                fotoHtml = `
-                <div class="mb-3">
-                    <div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">LAMPIRAN FOTO</div>
-                    <div class="bg-blue-50 border border-blue-100 p-1.5 rounded-sm text-[9px] text-blue-700 flex items-center gap-1 font-medium"><i class="fa-solid fa-image text-xs"></i> <a href="${job.foto_evidence}" target="_blank" class="underline hover:text-blue-800">Buka Foto Bukti Drive</a></div>
-                </div>`;
-            }
-        }
-
-        document.getElementById('detailJobContent').innerHTML = `
-            <div class="bg-cyan-50 border border-cyan-100 rounded-sm p-2 mb-3 relative">
-                <div class="text-[8px] font-bold text-cyan-600 mb-0.5 uppercase">PEMOHON</div>
-                <div class="font-bold text-cyan-900 text-[11px] mb-0.5 uppercase">${job.nama_pemohon}</div>
-                <div class="text-[10px] text-cyan-800 flex items-center gap-1 mb-0.5">
-                    <i class="fa-brands fa-whatsapp w-3 text-center"></i> ${job.no_wa} 
-                    <span onclick="copyText('${job.no_wa}', 'Nomor WA')" class="cursor-pointer ml-1 bg-white border border-cyan-200 rounded-sm px-1 py-0.5 hover:bg-cyan-100 shadow-sm"><i class="fa-regular fa-copy text-[8px]"></i></span>
-                </div>
-                <div class="text-[9px] text-cyan-700 flex items-center gap-1 uppercase"><i class="fa-regular fa-building w-3 text-center"></i> ${job.departemen} | <span class="font-semibold">${job.section || 'N/A'}</span> | ${job.perusahaan}</div>
-            </div>
-            
-            <div class="grid grid-cols-2 gap-y-2 gap-x-2 text-[10px] mb-3">
-                <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">NO. WO</div><div class="font-mono text-[9px] font-bold text-slate-700">${job.no_wo}</div></div>
-                <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">STATUS</div><div class="font-bold text-cyan-600 text-[9px] uppercase">${job.status}</div></div>
-                <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">GROUP LEADER</div><div class="font-bold text-slate-700 uppercase">${job.gl || '-'}</div></div>
-                <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">UNIT</div><div class="font-bold text-slate-700 uppercase">${job.unit || '-'}</div></div>
-                <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">TGL & JAM</div><div class="font-bold text-slate-700 uppercase">${job.tgl_pelaksanaan} ${job.jam_pelaksanaan||''}</div></div>
-                <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">DURASI REQ</div><div class="font-bold text-slate-700 uppercase">${job.durasi_request}</div></div>
-                <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">OPERATOR</div><div class="font-bold text-slate-700 uppercase">${job.operator || '-'}</div></div>
-                <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">RIGGER</div><div class="font-bold text-slate-700 uppercase">${job.rigger || '-'}${job.rigger2 ? ', ' + job.rigger2 : ''}</div></div>
-            </div>
-            
-            <div class="grid grid-cols-1 gap-2 text-[10px] mb-3 mt-3 border-t border-slate-100 pt-3 bg-slate-50 p-2 rounded-sm">
-                <div class="font-bold text-slate-500 mb-1 tracking-wider uppercase text-[9px]"><i class="fa-solid fa-clock mr-1"></i>Data Waktu Lapangan Aktual</div>
-                <div class="grid grid-cols-2 gap-2">
-                    <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">WAKTU KERJA</div><div class="font-bold text-slate-700 font-mono tracking-tighter">${job.jam_start_aktual || '--:--'} s/d ${job.jam_end_aktual || '--:--'}</div></div>
-                    <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">DURASI AKTUAL</div><div class="font-bold text-slate-700">${job.durasi_aktual ? job.durasi_aktual + ' Jam' : '-'}</div></div>
-                </div>
-                <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">KENDALA LAPANGAN</div><div class="font-bold text-red-600">${job.alasan_telat || job.alasan_overtime ? (job.alasan_telat || '') + ' ' + (job.alasan_overtime || '') : '-'}</div></div>
-            </div>
-
-            ${job.kategori !== 'Big Crane' ? `
-            <div class="mb-2">
-                <div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">RUTE / LOKASI</div>
-                <div class="bg-slate-50 border border-slate-100 p-1.5 rounded-sm text-[10px] font-semibold text-slate-600 uppercase">${job.lokasi_angkat||'-'} <i class="fa-solid fa-arrow-right mx-1 text-[8px] text-slate-400"></i> ${job.lokasi_tujuan||'-'}</div>
-            </div>` : ''}
-            <div class="mb-3">
-                <div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">DESKRIPSI</div>
-                <div class="bg-slate-50 border border-slate-100 p-1.5 rounded-sm text-[10px] text-slate-600">${job.deskripsi}</div>
-            </div>
-            
-            ${fotoHtml}
-            
-            <div class="flex gap-2 mt-2">
-                <button onclick="copyJobToWA('${job.no_wo}')" class="flex-1 bg-[#0891b2] hover:bg-cyan-700 text-white font-bold py-2 rounded-md text-[11px] flex items-center justify-center gap-1.5 shadow-sm transition-colors"><i class="fa-regular fa-copy"></i> Salin Job</button>
-                <button onclick="document.getElementById('detailJobModal').classList.add('hidden')" class="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-bold py-2 rounded-md text-[11px] shadow-sm transition-colors">Tutup Detail</button>
-            </div>
-        `;
-        document.getElementById('detailJobModal').classList.remove('hidden');
-    }
-
-    function openAdminEditJob(wo) {
-        const job = getOrders().find(j => j.no_wo === wo && j.status !== 'CANCELED');
-        if(!job) return;
-        const currentUser = JSON.parse(localStorage.getItem('lifting_user'));
-        
-        const m = getMasterData();
-        let unitOptions = '';
-        if (job.kategori === 'Crane Truck') unitOptions = (m.unit_ct || []).map(u => `<option value="${u}" ${job.unit===u?'selected':''}>${u}</option>`).join('');
-        else if (job.kategori === 'Big Crane') unitOptions = (m.unit_big_crane || []).map(u => `<option value="${u}" ${job.unit===u?'selected':''}>${u}</option>`).join('');
-        else unitOptions = (m.unit_lowboy || []).map(u => `<option value="${u}" ${job.unit===u?'selected':''}>${u}</option>`).join('');
-
-        const glOptions = (m.gl || []).map(g => `<option value="${g}" ${job.gl===g?'selected':''}>${g}</option>`).join('');
-        const opOptions = (m.operator || []).map(o => `<option value="${o}" ${job.operator===o?'selected':''}>${o}</option>`).join('');
-        const rigOptions1 = (m.rigger || []).map(r => `<option value="${r}" ${job.rigger===r?'selected':''}>${r}</option>`).join('');
-        const rigOptions2 = (m.rigger || []).map(r => `<option value="${r}" ${job.rigger2===r?'selected':''}>${r}</option>`).join('');
-
-        let riggerHTML = '';
-        if (job.kategori === 'Big Crane') {
-            riggerHTML = `
-                <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Rigger 1 (Opsional)</label><select id="edit_rig" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500 bg-white"><option value="">-- Pilih --</option>${rigOptions1}</select></div>
-                <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Rigger 2 (Opsional)</label><select id="edit_rig2" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500 bg-white"><option value="">-- Pilih --</option>${rigOptions2}</select></div>
-            `;
-        } else {
-             riggerHTML = `
-                <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Rigger (Opsional)</label><select id="edit_rig" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500 bg-white"><option value="">-- Pilih --</option>${rigOptions1}</select></div>
-            `;
-        }
-
-        let aktualHtml = '';
-        if (job.status === 'COMPLETED') {
-            aktualHtml = `
-                <hr class="my-2 border-slate-200">
-                <div class="text-[9px] font-bold text-orange-500 tracking-wider mb-1 uppercase"><i class="fa-solid fa-user-shield mr-1"></i>Revisi Data Lapangan (MP)</div>
-                <div class="grid grid-cols-3 gap-2">
-                    <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Mulai Aktual</label><input type="time" id="edit_start" value="${job.jam_start_aktual || ''}" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500"></div>
-                    <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Selesai Aktual</label><input type="time" id="edit_end" value="${job.jam_end_aktual || ''}" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500"></div>
-                    <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Durasi (Jam)</label><input type="number" step="0.01" id="edit_durasi_aktual" value="${job.durasi_aktual || ''}" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500"></div>
-                </div>
-                <div class="grid grid-cols-1 gap-2 mt-2">
-                    <div><label class="block text-[10px] font-bold text-green-600 mb-0.5">Final Inspeksi</label><input type="time" id="edit_inspeksi" value="${job.final_inspeksi || ''}" class="w-full border border-green-300 bg-green-50 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-green-500"></div>
-                    <div><label class="block text-[10px] font-bold text-red-500 mb-0.5">Alasan Telat</label><textarea id="edit_alasan_telat" class="w-full border border-red-300 bg-red-50 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-red-500 h-10">${job.alasan_telat || ''}</textarea></div>
-                    <div><label class="block text-[10px] font-bold text-red-500 mb-0.5">Alasan Overtime</label><textarea id="edit_alasan_overtime" class="w-full border border-red-300 bg-red-50 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-red-500 h-10">${job.alasan_overtime || ''}</textarea></div>
-                </div>
-            `;
-        }
-
-        document.getElementById('editJobContent').innerHTML = `
-            <form onsubmit="saveAdminEditJob(event, '${wo}')" class="space-y-2">
-                <div class="bg-cyan-50 border border-cyan-100 p-1.5 rounded-sm mb-1 text-center">
-                    <p class="text-[10px] font-bold text-cyan-700">${job.no_wo} (${job.kategori})</p>
-                </div>
-                <div class="grid grid-cols-2 gap-2">
-                    <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Tgl Pelaksanaan</label><input type="date" id="edit_tgl" value="${job.tgl_pelaksanaan}" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
-                    <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Jam Req</label><input type="time" id="edit_jam" value="${job.jam_pelaksanaan || ''}" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500" ${job.kategori==='Crane Truck'?'required':''}></div>
-                </div>
-                ${job.kategori !== 'Big Crane' ? `
-                <div class="grid grid-cols-2 gap-2">
-                    <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Lokasi Asal</label><input type="text" id="edit_lok_asal" value="${job.lokasi_angkat || ''}" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
-                    <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Lokasi Tujuan</label><input type="text" id="edit_lok_tujuan" value="${job.lokasi_tujuan || ''}" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
-                </div>` : ''}
-                <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Deskripsi / Beban</label><input type="text" id="edit_deskripsi" value="${job.deskripsi || ''}" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
-
-                <hr class="my-2 border-slate-200">
-                <div class="text-[9px] font-bold text-slate-400 tracking-wider mb-1">PENUGASAN (GL)</div>
-
-                <div class="grid grid-cols-2 gap-2">
-                    <div>
-                        <label class="block text-[10px] font-bold text-slate-500 mb-0.5">Group Leader *</label>
-                        <select id="edit_gl" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500 bg-white" required><option value="">-- Pilih --</option>${glOptions}</select>
-                    </div>
-                    <div>
-                        <label class="block text-[10px] font-bold text-slate-500 mb-0.5">Unit *</label>
-                        <select id="edit_unit" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500 bg-white" required><option value="">-- Pilih --</option>${unitOptions}</select>
-                    </div>
-                </div>
-                <div class="grid grid-cols-2 gap-2 mt-2">
-                    <div>
-                        <label class="block text-[10px] font-bold text-slate-500 mb-0.5">Operator (Opsional)</label>
-                        <select id="edit_op" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500 bg-white"><option value="">-- Pilih --</option>${opOptions}</select>
-                    </div>
-                    ${riggerHTML}
-                </div>
-                
-                ${aktualHtml}
-                
-                <div class="flex gap-1.5 mt-3 pt-2 border-t border-slate-200">
-                    ${currentUser.role === 'ADMIN' ? `<button type="button" onclick="confirmHapusOrder('${job.no_wo}')" class="bg-red-50 text-red-600 font-bold px-3 py-1.5 rounded-sm text-[11px] transition-colors border-0" title="Hapus Order"><i class="fa-solid fa-trash"></i> Hapus</button>` : ''}
-                    <button type="submit" class="flex-1 bg-[#0891b2] hover:bg-cyan-700 text-white font-bold py-1.5 rounded-sm text-[11px] transition-colors shadow-sm">${job.status === 'COMPLETED' ? 'Simpan Revisi' : 'Simpan & Validasi'}</button>
-                </div>
-            </form>
-        `;
-        document.getElementById('editJobModal').classList.remove('hidden');
-    }
-
-    function saveAdminEditJob(e, wo) {
-        e.preventDefault();
-        let jobs = getOrders();
-        let idx = jobs.findIndex(j => j.no_wo === wo && j.status !== 'CANCELED');
-        if(idx === -1) return;
-
-        let prevStatus = jobs[idx].status;
-        let prevOp = jobs[idx].operator;
-
-        jobs[idx].tgl_pelaksanaan = document.getElementById('edit_tgl').value;
-        jobs[idx].jam_pelaksanaan = document.getElementById('edit_jam').value;
-        if(jobs[idx].kategori === 'Crane Truck' && jobs[idx].jam_pelaksanaan) {
-            let h = parseInt(jobs[idx].jam_pelaksanaan.split(':')[0]);
-            jobs[idx].shift = (h >= 5 && h < 17) ? 'Shift 1' : 'Shift 2';
-        }
-        
-        if (jobs[idx].kategori !== 'Big Crane') {
-            jobs[idx].lokasi_angkat = document.getElementById('edit_lok_asal').value;
-            jobs[idx].lokasi_tujuan = document.getElementById('edit_lok_tujuan').value;
-        }
-        jobs[idx].deskripsi = document.getElementById('edit_deskripsi').value;
-        
-        const selectedGL = document.getElementById('edit_gl').value;
-        const selectedUnit = document.getElementById('edit_unit').value;
-        const op = document.getElementById('edit_op').value;
-        const rig = document.getElementById('edit_rig').value;
-        const rig2 = document.getElementById('edit_rig2') ? document.getElementById('edit_rig2').value : '';
-        
-        jobs[idx].gl = selectedGL;
-        jobs[idx].unit = selectedUnit;
-        jobs[idx].operator = op;
-        jobs[idx].rigger = rig;
-        jobs[idx].rigger2 = rig2;
-
-        if (jobs[idx].status === 'COMPLETED') {
-            jobs[idx].jam_start_aktual = document.getElementById('edit_start').value;
-            jobs[idx].jam_end_aktual = document.getElementById('edit_end').value;
-            jobs[idx].durasi_aktual = document.getElementById('edit_durasi_aktual').value;
-            jobs[idx].final_inspeksi = document.getElementById('edit_inspeksi').value;
-            jobs[idx].alasan_telat = document.getElementById('edit_alasan_telat').value;
-            jobs[idx].alasan_overtime = document.getElementById('edit_alasan_overtime').value;
-        }
-
-        let isValidated = (selectedGL && selectedUnit);
-
-        if (isValidated && (prevStatus === 'SCHEDULED' || prevStatus === 'UNSCHEDULED' || (prevStatus === 'PENDING' && !prevOp))) {
-            jobs[idx].status = 'ON PROGRESS';
-            showToast('Job divalidasi ke Manpower!');
-        } else {
-            showToast('Perubahan Disimpan!');
-        }
-
-        saveOrders(jobs);
-        document.getElementById('editJobModal').classList.add('hidden');
-        renderApp(true); 
-    }
-
-    function confirmHapusOrder(wo) {
-        openCustomConfirm('Hapus Data', `Apakah Anda yakin ingin menghapus order ${wo}?`, async () => {
-            let jobs = getOrders().filter(j => j.no_wo !== wo);
-            localStorage.setItem('lifting_orders', JSON.stringify(jobs));
-            
-            if (SUPABASE_KEY && !SUPABASE_KEY.includes('PASTE_KUNCI')) {
-                try { await fetch(`${SUPABASE_URL}/rest/v1/orders?no_wo=eq.${wo}`, { method: 'DELETE', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }); } 
-                catch(e) { console.warn(e); }
-            }
-            showToast('Data dihapus!'); 
-            document.getElementById('editJobModal').classList.add('hidden'); 
-            renderApp(true);
-        });
-    }
-
-    function downloadCSVBlob() {
-        const jobs = getOrders();
-        if(jobs.length === 0) return showToast("Tidak ada data", "error");
-        
-        let csvContent = "No WO,Status,Pemohon,Dept,Kategori,Tgl Pelaksanaan,Jam Req,Shift,Durasi Req,Lokasi Angkat,Lokasi Tujuan,Deskripsi,GL,Unit,Operator,Rigger,Jam Start,Jam End,Durasi Aktual,Final Inspeksi,Alasan Telat,Alasan Overtime\n";
-        
-        jobs.forEach(j => {
-            let riggerCombined = j.rigger || '';
-            if (j.rigger2) riggerCombined += ' & ' + j.rigger2;
-            let row = [
-                j.no_wo, j.status, j.nama_pemohon, j.departemen, j.kategori,
-                j.tgl_pelaksanaan, j.jam_pelaksanaan||'', j.shift, j.durasi_request,
-                `"${(j.lokasi_angkat||'').replace(/"/g, '""')}"`, `"${(j.lokasi_tujuan||'').replace(/"/g, '""')}"`, `"${(j.deskripsi||'').replace(/"/g, '""')}"`,
-                j.gl||'', j.unit||'', j.operator||'', `"${riggerCombined}"`,
-                j.jam_start_aktual||'', j.jam_end_aktual||'', j.durasi_aktual||'',
-                j.final_inspeksi||'', `"${(j.alasan_telat||'').replace(/"/g, '""')}"`, `"${(j.alasan_overtime||'').replace(/"/g, '""')}"`
-            ].join(",");
-            csvContent += row + "\n";
-        });
-        
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.setAttribute("href", url);
-        link.setAttribute("download", `Data_Lifting_${new Date().toISOString().split('T')[0]}.csv`);
-        document.body.appendChild(link); link.click(); document.body.removeChild(link);
-    }
-
-    function getManpowerWorkflow() {
-        const settings = getSettings() || {};
-        
-        const getUnitCard = (type, modeVar, iconUrl, iconClass, label) => {
-            const bgStyle = iconUrl ? `style="background-image: url('${iconUrl}'); background-size: cover; background-position: center;"` : '';
-            const content = iconUrl 
-                ? `<div class="absolute inset-0 bg-slate-900/40 group-hover:bg-slate-900/20 transition-colors"></div><span class="font-bold text-white text-sm sm:text-base uppercase relative z-10 tracking-widest drop-shadow-lg text-center leading-tight px-2">${label}</span>`
-                : `<div class="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-slate-50 group-hover:bg-cyan-50 flex items-center justify-center transition-colors"><i class="fa-solid ${iconClass} text-2xl sm:text-3xl text-slate-400 group-hover:text-cyan-600"></i></div><span class="font-bold text-slate-700 text-[11px] sm:text-xs uppercase tracking-wide text-center leading-tight mt-2 px-2">${label}</span>`;
-            return `<button onclick="${modeVar}='${type}'; renderApp(false);" class="relative bg-white border border-slate-200 hover:border-cyan-500 hover:shadow-md rounded-xl flex flex-col items-center justify-center shadow-sm transition-all group aspect-square sm:aspect-[4/3] w-full sm:w-44 overflow-hidden" ${bgStyle}>${content}</button>`;
-        };
-
-        const btnCT = getUnitCard('Crane Truck', 'mpFleetMode', settings.icon_ct_url, 'fa-truck-moving', 'Crane Truck');
-        const btnBC = getUnitCard('Big Crane', 'mpFleetMode', settings.icon_bc_url, 'fa-truck-ramp-box', 'Big Crane');
-        const btnLB = getUnitCard('Lowboy', 'mpFleetMode', settings.icon_lb_url, 'fa-trailer', 'Lowboy');
-
-        if (!mpFleetMode) return `<div class="min-h-[70vh] flex flex-col items-center justify-center max-w-[900px] mx-auto w-full px-4 py-8"><h2 class="text-sm sm:text-base font-bold text-slate-800 mb-6 text-center"><i class="fa-solid fa-list-check mr-1.5 text-cyan-600"></i>Pilih Unit Armada</h2><div class="grid grid-cols-2 sm:flex sm:flex-row sm:justify-center gap-4 sm:gap-6 w-full max-w-2xl mx-auto">${btnCT}${btnBC}${btnLB}</div></div>`;
-
-        const m = getMasterData(); let unitOptions = [];
-        if (mpFleetMode === 'Crane Truck') unitOptions = m.unit_ct || []; 
-        let filterUnit = document.getElementById('mp_filter_unit') ? document.getElementById('mp_filter_unit').value : 'ALL';
-        
-        let tglMulai = document.getElementById('mp_filter_mulai') ? document.getElementById('mp_filter_mulai').value : getShiftDateString();
-        let tglSelesai = document.getElementById('mp_filter_selesai') ? document.getElementById('mp_filter_selesai').value : getShiftDateString();
-
-        let jobs = getOrders().filter(j => j.kategori === mpFleetMode);
-        jobs = jobs.filter(j => j.tgl_pelaksanaan >= tglMulai && j.tgl_pelaksanaan <= tglSelesai);
-        
-        if (currentMpPanel === 'PENDING') jobs = jobs.filter(j => j.status === 'PENDING'); else jobs = jobs.filter(j => j.status === currentMpPanel);
-        if (mpFleetMode === 'Crane Truck' && filterUnit !== 'ALL') jobs = jobs.filter(j => j.unit === filterUnit);
-
-        let unitFilterHtml = mpFleetMode === 'Crane Truck' ? `<select id="mp_filter_unit" onchange="renderApp(true)" class="text-[9px] font-bold bg-white border border-slate-300 text-slate-700 rounded-full px-2 py-1 outline-none shadow-sm focus:border-cyan-500 cursor-pointer ml-auto"><option value="ALL">Semua Unit</option>${unitOptions.map(u => `<option value="${u}" ${filterUnit === u ? 'selected' : ''}>${u}</option>`).join('')}</select>` : '';
-
-        let html = `
-        <div class="flex items-center gap-2 mb-2 mt-2"><button onclick="mpFleetMode=null; renderApp(false);" class="w-6 h-6 rounded-sm border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 bg-white shadow-sm"><i class="fa-solid fa-arrow-left text-[10px]"></i></button><h2 class="text-xs font-bold text-slate-800">Tugas: <span class="text-cyan-600">${mpFleetMode}</span></h2></div>
-        
-        <div class="flex items-center border border-slate-200 bg-white rounded-md p-1 shadow-sm mb-2 w-full sm:w-auto mx-auto justify-center text-[10px] text-slate-600">
-            <i class="fa-regular fa-calendar ml-1 mr-2 text-slate-400"></i>
-            <input type="date" id="mp_filter_mulai" class="bg-transparent focus:outline-none" value="${tglMulai}" onchange="renderApp(true)">
-            <span class="mx-1 font-semibold text-slate-400">s/d</span>
-            <input type="date" id="mp_filter_selesai" class="bg-transparent focus:outline-none" value="${tglSelesai}" onchange="renderApp(true)">
-        </div>
-
-        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
-            <div class="flex gap-1 overflow-x-auto hide-scrollbar bg-white p-0.5 rounded-full shadow-sm border border-slate-200">${['ON PROGRESS', 'PENDING', 'COMPLETED', 'CANCELED'].map(panel => `<button onclick="currentMpPanel='${panel}'; renderApp(true)" class="px-2.5 py-1 rounded-full text-[9px] font-bold whitespace-nowrap transition-colors ${currentMpPanel === panel ? 'bg-[#0891b2] text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}">${panel}</button>`).join('')}</div>
-            ${unitFilterHtml}
-        </div>
-        <div class="space-y-2 pb-4">`;
-
-        if (jobs.length === 0) html += `<div class="bg-white rounded-md p-4 text-center border shadow-sm"><p class="text-slate-400 text-[11px]">Kosong.</p></div>`;
-
-        jobs.forEach(job => {
-            html += `
-            <div class="bg-white rounded-md p-3 border border-slate-200 shadow-sm relative text-[11px]">
-                <div class="flex justify-between items-start mb-2"><div class="text-[10px] font-mono font-bold text-cyan-600 cursor-pointer hover:underline" onclick="viewJobDetail('${job.no_wo}')" title="Buka Detail">${job.no_wo}</div><div class="text-[14px] bg-cyan-50 text-cyan-700 border border-cyan-200 px-2 py-1 rounded-md font-bold shadow-sm">Unit: ${job.unit || '-'}</div></div>
-                <div class="font-bold text-slate-800 text-xs mb-1">Req: ${job.tgl_pelaksanaan} ${job.jam_pelaksanaan || ''}</div>
-                ${job.kategori !== 'Big Crane' ? `<div class="text-[11px] text-slate-500 mb-3 truncate">Lokasi: ${job.lokasi_angkat||'-'} ➔ ${job.lokasi_tujuan||'-'}</div>` : `<div class="text-[11px] text-slate-500 mb-3 truncate border-l-2 border-slate-300 pl-1">${job.deskripsi}</div>`}
-                <div class="flex gap-1.5">
-                    ${job.status === 'ON PROGRESS' ? `
-                        <button onclick="openManpowerAction('${job.no_wo}', 'COMPLETED')" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-1.5 rounded-sm text-[11px] shadow-sm"><i class="fa-solid fa-check"></i> Close Job</button>
-                        <button onclick="openManpowerAction('${job.no_wo}', 'PENDING')" class="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-bold py-1.5 rounded-sm text-[11px] shadow-sm"><i class="fa-solid fa-pause"></i> Pending</button>
-                        <button onclick="initiateCancelJob('${job.no_wo}')" class="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-1.5 rounded-sm text-[11px] shadow-sm"><i class="fa-solid fa-xmark"></i> Cancel</button>
-                    ` : ''}
-                    ${job.status === 'PENDING' ? `
-                        <div class="text-[10px] text-orange-600 font-bold w-full text-center bg-orange-50 py-1.5 rounded-sm border border-orange-200 shadow-sm"><i class="fa-solid fa-clock mr-1"></i> Job Pending - Menunggu Validasi Lanjutan dari GL</div>
-                    ` : ''}
-                </div>
-            </div>`;
-        });
-
-        html += `</div>`;
-        return html;
-    }
-
-    let tempMpData = null;
-
-    function openManpowerAction(wo, targetStatus) {
-        const job = getOrders().find(j => j.no_wo === wo); const m = getMasterData();
-        let opOptions = (m.operator || []).map(o => `<option value="${o}">${o}</option>`).join(''); let rigOptions = (m.rigger || []).map(r => `<option value="${r}">${r}</option>`).join('');
-        let mpRiggerHtml = `<div><label class="block text-[9px] text-slate-500 mb-0.5">Rigger 1</label><select id="mp_rig" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] bg-white"><option value="">-- Pilih --</option>${rigOptions}</select></div>`;
-        if (job.kategori === 'Big Crane') mpRiggerHtml += `<div><label class="block text-[9px] text-slate-500 mb-0.5">Rigger 2</label><select id="mp_rig2" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] bg-white"><option value="">-- Pilih --</option>${rigOptions}</select></div>`;
-
-        // KOTAK FINAL INSPEKSI SELALU MUNCUL
-        let extraInspeksiHtml = `<div><label class="block text-[9px] text-green-600 font-bold mb-0.5"><i class="fa-solid fa-check-double mr-1"></i>Final Inspeksi</label><input type="time" id="mp_inspeksi" class="w-full border border-green-300 bg-green-50 rounded-sm px-1.5 py-1 text-[10px] focus:outline-none focus:border-green-500" required></div>`;
-
-        let extraPendingHtml = targetStatus === 'PENDING' ? `<div class="mt-2"><label class="block text-[9px] font-bold text-orange-600 mb-0.5"><i class="fa-solid fa-clock-rotate-left mr-0.5"></i>Alasan Pending</label><textarea id="mp_alasan_pending" class="w-full border border-orange-300 bg-orange-50 rounded-sm px-1.5 py-1 text-[10px] focus:border-orange-500 h-10 outline-none" required></textarea></div>` : '';
-
-        document.getElementById('mpActionTitle').innerText = targetStatus === 'COMPLETED' ? "Selesaikan Pekerjaan (Close Job)" : "Tunda Pekerjaan (Pending)";
-        
-        document.getElementById('mpActionContent').innerHTML = `
-            <div class="bg-blue-50 border border-blue-100 text-blue-700 p-1.5 text-[9px] rounded-sm mb-2"><strong>Target:</strong> Jam ${job.jam_pelaksanaan || '-'} | Durasi ${job.durasi_request}</div>
-            <div id="mpFormError" class="bg-red-50 border border-red-200 text-red-600 font-bold p-1.5 text-[9px] rounded-sm mb-2 hidden"></div>
-            <form onsubmit="processMpAction(event, '${wo}', '${targetStatus}')" class="space-y-2">
-                <div><label class="block text-[9px] text-slate-500 mb-0.5">Operator</label><select id="mp_op" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] bg-white"><option value="">-- Pilih --</option>${opOptions}</select></div>
-                <div class="grid grid-cols-${job.kategori === 'Big Crane' ? '2' : '1'} gap-2">${mpRiggerHtml}</div>
-                <div class="grid grid-cols-2 gap-2"><div><label class="block text-[9px] text-slate-500 mb-0.5">Mulai Aktual</label><input type="time" id="mp_start" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px]"></div><div><label class="block text-[9px] text-slate-500 mb-0.5">Selesai Aktual</label><input type="time" id="mp_end" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px]"></div></div>
-                ${extraInspeksiHtml}
-                ${extraPendingHtml}
-                <button type="submit" class="w-full mt-3 ${targetStatus === 'COMPLETED' ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-orange-500 hover:bg-orange-600'} text-white font-bold py-2 rounded-sm text-[11px] shadow-sm transition-colors uppercase tracking-wider">${targetStatus === 'COMPLETED' ? '<i class="fa-solid fa-check mr-1"></i> Proses Close Job' : '<i class="fa-solid fa-pause mr-1"></i> Simpan Pending'}</button>
-            </form>`;
-        document.getElementById('mpActionModal').classList.remove('hidden');
-    }
-
-    function processMpAction(e, wo, targetStatus) {
-        e.preventDefault(); const job = getOrders().find(j => j.no_wo === wo); if(!job) return;
-        const elStart = document.getElementById('mp_start'); const elEnd = document.getElementById('mp_end'); const elOp = document.getElementById('mp_op'); const elRig = document.getElementById('mp_rig'); const elRig2 = document.getElementById('mp_rig2'); const elInsp = document.getElementById('mp_inspeksi'); const errorBox = document.getElementById('mpFormError');
-        let isMissing = false; const markError = (el) => { if(!el) return false; if(!el.value) { el.classList.add('border-red-500', 'bg-red-50', 'text-red-600'); el.classList.remove('border-slate-300'); return true; } else { el.classList.remove('border-red-500', 'bg-red-50', 'text-red-600'); el.classList.add('border-slate-300'); return false; } };
-        
-        if (markError(elStart)) isMissing = true; if (markError(elEnd)) isMissing = true; if (markError(elOp)) isMissing = true; if (markError(elRig)) isMissing = true; if (job.kategori === 'Big Crane' && markError(elRig2)) isMissing = true; if(markError(elInsp)) isMissing = true;
-        if (isMissing) { errorBox.innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-1"></i> Lengkapi seluruh form waktu dan personal!'; errorBox.classList.remove('hidden'); return; } else { errorBox.classList.add('hidden'); }
-        
-        const start = elStart.value; const end = elEnd.value; const op = elOp.value; const rig = elRig.value; const rig2 = elRig2 ? elRig2.value : ''; const finalInspeksi = elInsp.value;
-        let dStart = new Date(`2000-01-01T${start}:00`); let dEnd = new Date(`2000-01-01T${end}:00`); if(dEnd < dStart) dEnd = new Date(`2000-01-02T${end}:00`); let actualMins = (dEnd - dStart) / (1000 * 60);
-        let reqMins = 0; if(job.durasi_request.includes('JAM')) reqMins = parseFloat(job.durasi_request) * 60; else if(job.durasi_request.includes('HARI')) reqMins = parseFloat(job.durasi_request) * 24 * 60;
-        let diffStartMins = 0; if(job.jam_pelaksanaan) { let reqStart = new Date(`2000-01-01T${job.jam_pelaksanaan}:00`); diffStartMins = (dStart - reqStart) / (1000 * 60); }
-        
-        let isLate = diffStartMins > 30; let isOvertime = actualMins > (reqMins + 30);
-        
-        let pendingReason = targetStatus === 'PENDING' ? document.getElementById('mp_alasan_pending').value : null;
-
-        tempMpData = { wo, start, end, op, rig, rig2, actualMins, finalInspeksi, isLate, isOvertime, diffStartMins, diffOvertime: actualMins - reqMins, status: targetStatus, pendingReason };
-        
-        if(isLate || isOvertime) showKendalaModal(); else saveMpFinal(null, null); 
-    }
-
-    function showKendalaModal() {
-        document.getElementById('mpActionModal').classList.add('hidden'); 
-        
-        const formatMins = (mins) => {
-            let h = Math.floor(mins / 60); let m = Math.round(mins % 60);
-            return (h > 0 ? `${h} Jam ` : '') + `${m} Menit`;
-        };
-
-        let html = `<div class="bg-red-50 border border-red-200 text-red-600 p-1.5 text-[9px] rounded-sm mb-2"><strong>Wajib Diisi:</strong> Waktu aktual > toleransi 30 mnt.</div><form onsubmit="submitKendala(event)" class="space-y-2">`;
-        if(tempMpData.isLate) html += `<div><label class="block text-[9px] font-bold text-red-600 mb-0.5"><i class="fa-regular fa-clock mr-1"></i>Alasan Telat (${formatMins(tempMpData.diffStartMins)}):</label><textarea id="alasan_telat" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px]" required></textarea></div>`;
-        if(tempMpData.isOvertime) html += `<div><label class="block text-[9px] font-bold text-red-600 mb-0.5"><i class="fa-solid fa-stopwatch mr-1"></i>Alasan Over (${formatMins(tempMpData.diffOvertime)}):</label><textarea id="alasan_over" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px]" required></textarea></div>`;
-        html += `<div class="flex gap-1.5 pt-1 mt-1 border-t border-slate-100"><button type="button" onclick="document.getElementById('kendalaModal').classList.add('hidden'); document.getElementById('mpActionModal').classList.remove('hidden');" class="flex-1 bg-slate-100 text-slate-600 font-bold py-1.5 rounded-sm text-[10px]">Cancel</button><button type="submit" class="flex-1 bg-red-500 text-white font-bold py-1.5 rounded-sm text-[10px]">Simpan Kendala</button></div></form>`;
-        
-        document.getElementById('kendalaContent').innerHTML = html; document.getElementById('kendalaModal').classList.remove('hidden');
-    }
-
-    function submitKendala(e) { e.preventDefault(); let aTelat = tempMpData.isLate ? document.getElementById('alasan_telat').value : null; let aOver = tempMpData.isOvertime ? document.getElementById('alasan_over').value : null; saveMpFinal(aTelat, aOver); document.getElementById('kendalaModal').classList.add('hidden'); }
-
-    function saveMpFinal(alasanTelat, alasanOvertime) {
-        let jobs = getOrders(); let idx = jobs.findIndex(j => j.no_wo === tempMpData.wo);
-        if (idx === -1) return;
-
-        let oldJob = jobs[idx];
-        oldJob.operator = tempMpData.op; 
-        oldJob.rigger = tempMpData.rig; 
-        if (tempMpData.rig2) oldJob.rigger2 = tempMpData.rig2;
-        oldJob.jam_start_aktual = tempMpData.start; 
-        oldJob.jam_end_aktual = tempMpData.end; 
-        oldJob.durasi_aktual = (tempMpData.actualMins / 60).toFixed(2); 
-        oldJob.status = tempMpData.status;
-        
-        if (tempMpData.finalInspeksi) oldJob.final_inspeksi = tempMpData.finalInspeksi;
-
-        let prefixReason = tempMpData.status === 'PENDING' ? `PENDING (${tempMpData.pendingReason}) - ` : '';
-
-        if(alasanTelat) oldJob.alasan_telat = prefixReason + alasanTelat; 
-        else if (tempMpData.status === 'PENDING') oldJob.alasan_telat = prefixReason + "Laporan Tertunda";
-        
-        if(alasanOvertime) oldJob.alasan_overtime = alasanOvertime;
-        
-        // OTOMATISASI PENERBITAN TIKET LANJUTAN (-P) JIKA PENDING
-        if (tempMpData.status === 'PENDING') {
-            let baseWo = oldJob.no_wo.split('-P')[0];
-            let pCount = 1;
-            if(oldJob.no_wo.includes('-P')) {
-                pCount = parseInt(oldJob.no_wo.split('-P')[1]) + 1;
-            }
-            let newWo = `${baseWo}-P${pCount}`;
-
-            let newJob = { ...oldJob };
-            newJob.no_wo = newWo;
-            newJob.timestamp = new Date().toISOString(); 
-            
-            // Hapus assignment personil agar divalidasi ulang GL (Unit & GL dipertahankan)
-            newJob.operator = ''; newJob.rigger = ''; newJob.rigger2 = '';
-            newJob.jam_start_aktual = ''; newJob.jam_end_aktual = ''; newJob.durasi_aktual = '';
-            newJob.final_inspeksi = ''; newJob.alasan_telat = ''; newJob.alasan_overtime = '';
-            
-            // Status PENDING agar masuk antrean validasi GL dan riwayat MP
-            newJob.status = 'PENDING'; 
-
-            jobs.unshift(newJob);
-        }
-        
-        saveOrders(jobs); 
-        document.getElementById('mpActionModal').classList.add('hidden'); 
-        renderApp(true);
-        
-        if (tempMpData.status === 'COMPLETED') { 
-            showSuccessAnim('thumb', 'Kerja Bagus!', 'Pekerjaan telah diselesaikan dan laporan siap.'); 
-        } else { 
-            showSuccessAnim('check', 'Pending Tersimpan', 'Laporan PENDING tersimpan & Tiket Lanjutan telah terbit untuk divalidasi Admin!'); 
-        }
-    }
-
-    let activeCancelWo = null;
-    function initiateCancelJob(wo) { 
-        activeCancelWo = wo; 
-        document.getElementById('cancelReasonInput').value = ''; 
-        document.getElementById('cancelPromptModal').classList.remove('hidden'); 
-    }
-    
-    function confirmCancelJob() {
-        let alasan = document.getElementById('cancelReasonInput').value.trim(); 
-        if(!alasan) return showToast('Alasan wajib diisi!', 'error'); 
-        let jobs = getOrders(); let idx = jobs.findIndex(j => j.no_wo === activeCancelWo); 
-        if(idx !== -1) {
-            jobs[idx].status = 'CANCELED'; 
-            jobs[idx].alasan_telat = "Dibatalkan: " + alasan; 
-            saveOrders(jobs); 
-            showToast('Dibatalkan!'); 
-            document.getElementById('cancelPromptModal').classList.add('hidden'); 
-            renderApp(true); 
-        }
-    }
-
-    // HELPER AUTO-FILL SHIFT DARI JAM REQUEST
-    function updateShiftField() {
-        let jamVal = document.getElementById('req_jam')?.value;
-        if(jamVal) {
-            let h = parseInt(jamVal.split(':')[0]);
-            let shift = (h >= 5 && h < 17) ? 'Shift 1' : 'Shift 2';
-            let elShift = document.getElementById('req_shift');
-            if (elShift) elShift.value = shift;
-        }
-    }
-
     function getOrderFormView() {
         const user = JSON.parse(localStorage.getItem('lifting_user'));
         const m = getMasterData();
@@ -2060,7 +1621,7 @@
             formFields = `
                 <div class="grid grid-cols-2 gap-2">
                     <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Tgl Pelaksanaan *</label><input type="date" id="req_tgl" value="${shiftDate}" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-[10px] focus:outline-none focus:border-cyan-500" required></div>
-                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Durasi *</label><div class="flex gap-1"><input type="number" step="0.5" id="req_durasi" class="w-2/3 border border-slate-300 rounded-sm px-2 py-1.5 text-[10px] focus:outline-none focus:border-cyan-500" required><select id="req_satuan" class="w-1/3 border border-slate-300 rounded-sm px-1 py-1.5 text-[10px] focus:outline-none focus:border-cyan-500 bg-white"><option value="JAM">Jam</option><option value="HARI">Hari</option></select></div></div>
+                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Durasi *</label><div class="flex gap-1"><input type="number" step="0.5" id="req_durasi" class="w-2/3 border border-slate-300 rounded-sm px-2 py-1.5 text-[10px] focus:outline-none focus:border-cyan-500" required><select id="req_satuan" class="w-1/3 border border-slate-300 rounded-sm px-1 py-1.5 text-[10px] focus:outline-none focus:border-cyan-500 bg-white"><option value="HARI">Hari</option><option value="JAM">Jam</option></select></div></div>
                 </div>
                 <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Deskripsi Pekerjaan *</label><textarea id="req_deskripsi" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-[10px] focus:outline-none focus:border-cyan-500 h-16" placeholder="Rincian pekerjaan angkat..." required></textarea></div>
                 <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Upload Foto Area (Opsional)</label><input type="file" id="req_foto" accept="image/*" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-[10px] focus:outline-none focus:border-cyan-500 file:mr-2 file:py-0.5 file:px-2 file:rounded-sm file:border-0 file:text-[9px] file:font-semibold file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100 cursor-pointer"></div>
@@ -2107,8 +1668,16 @@
                 <div class="text-3xl text-slate-200"><i class="fa-solid fa-address-card"></i></div>
             </div>`;
 
+        let calendarSectionHtml = '';
+        if (cat === 'Big Crane' && user.role === 'USER') {
+            calendarSectionHtml = `
+            <div class="max-w-md mx-auto mt-4 mb-8">
+                ${getKalenderBcView()}
+            </div>`;
+        }
+
         return `
-        <div class="max-w-md mx-auto bg-white rounded-md shadow-sm border border-slate-200 overflow-hidden mt-2">
+        <div class="max-w-md mx-auto bg-white rounded-md shadow-sm border border-slate-200 overflow-hidden mt-2 mb-6">
             <div class="p-2 border-b border-slate-100 flex items-center gap-2"><button onclick="userOrderFleetMode=null; renderApp(false);" class="w-6 h-6 rounded-sm border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50"><i class="fa-solid fa-arrow-left text-[10px]"></i></button><h2 class="text-sm font-bold text-slate-800">Order: <span class="text-cyan-600">${cat}</span></h2></div>
             <div class="p-3">
                 ${requesterHtml}
@@ -2117,7 +1686,8 @@
                     <div class="pt-2 mt-3 border-t border-slate-100"><button id="btnSubmitOrder" type="submit" class="w-full bg-[#0891b2] hover:bg-cyan-700 text-white font-bold py-1.5 rounded-sm transition-colors text-xs shadow-sm"><i class="fa-solid fa-paper-plane mr-1"></i> Submit Order</button></div>
                 </form>
             </div>
-        </div>`;
+        </div>
+        ${calendarSectionHtml}`;
     }
 
     async function submitOrder(e) {
@@ -2350,298 +1920,118 @@
         <div class="bg-white rounded-md shadow-sm border border-slate-200 p-3 min-h-[50vh]"><h3 class="text-xs font-bold text-slate-800 capitalize mb-2">Data: ${currentMasterTab.replace('_', ' ')}</h3>${contentHtml}</div>`;
     }
 
-    async function saveBranding(e) {
-        e.preventDefault();
-        if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return showToast('Error: API Supabase belum dipasang!', 'error');
-
-        const btn = e.target.querySelector('button[type="submit"]');
-        const originalText = btn.innerHTML; btn.innerHTML = "Menyimpan ke Cloud..."; btn.disabled = true;
-        
-        let newSettings = {
-            id: 1, 
-            bg_url: document.getElementById('setting_bg').value.trim(), 
-            logo_url: document.getElementById('setting_logo').value.trim(),
-            icon_ct_url: document.getElementById('setting_icon_ct').value.trim(), 
-            icon_bc_url: document.getElementById('setting_icon_bc').value.trim(), 
-            icon_lb_url: document.getElementById('setting_icon_lb').value.trim()
-        };
-        
-        try {
-            const res = await fetch(`${SUPABASE_URL}/rest/v1/settings?on_conflict=id`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'resolution=merge-duplicates' },
-                body: JSON.stringify(newSettings)
-            });
-            if (!res.ok) throw new Error("Gagal simpan database");
-
-            localStorage.setItem('lifting_settings', JSON.stringify(newSettings));
-            showToast('Branding berhasil disimpan ke Cloud!'); 
-            renderApp(true);
-        } catch(err) {
-            showToast('Gagal simpan branding ke cloud!', 'error');
-        } finally { 
-            btn.innerHTML = originalText; btn.disabled = false; 
-        }
-    }
-
-    function addMasterData(e, key) { 
-        e.preventDefault(); 
-        const val = document.getElementById('new_master_val').value.trim(); 
-        const m = getMasterData(); 
-        if (!m[key]) m[key] = []; 
-        if(m[key].includes(val)) return showToast('Data sudah ada!', 'error'); 
-        m[key].push(val); 
-        saveMasterData(m); 
-        showToast('Ditambahkan!'); 
-        renderApp(true); 
-    }
-    
-    function addAccountMasterData(e, key) { 
-        e.preventDefault(); 
-        const name = document.getElementById('new_master_name').value.trim(); 
-        const nrp = document.getElementById('new_master_nrp').value.trim().toUpperCase(); 
-        const pwd = document.getElementById('new_master_pwd').value; 
-        
-        const users = getUsers(); 
-        if (users.find(u => (u.nrp || '').toUpperCase() === nrp)) return showToast('NRP terdaftar!', 'error'); 
-        
-        const m = getMasterData(); 
-        if (!m[key]) m[key] = []; 
-        if(m[key].includes(name)) return showToast('Nama sudah ada!', 'error'); 
-        
-        m[key].push(name); 
-        saveMasterData(m); 
-        
-        let role = key === 'gl' ? 'GL' : 'MANPOWER'; 
-        let jabatan = key === 'gl' ? 'Group Leader' : (key === 'operator' ? 'Operator' : 'Rigger'); 
-        
-        users.unshift({ nrp: nrp, nama_lengkap: name, jabatan: jabatan, perusahaan: 'PPA', departemen: 'OPERATION', section: 'LIFTING', no_wa: '-', password_hash: pwd, role: role, status_akun: 'ACTIVE' }); 
-        saveUsers(users); 
-        
-        showToast(`Akun dibuat & Master diupdate!`); 
-        renderApp(true); 
-    }
-
-    function addAccountManual(e) {
-        e.preventDefault();
-        const nrp = document.getElementById('new_user_nrp').value.trim().toUpperCase();
-        const name = document.getElementById('new_user_name').value.trim().toUpperCase();
-        const role = document.getElementById('new_user_role').value;
-        const pwd = document.getElementById('new_user_pwd').value;
-        
-        const users = getUsers();
-        if (users.find(u => (u.nrp || '').toUpperCase() === nrp)) return showToast('NRP terdaftar!', 'error');
-        
-        let jabatan = role === 'GL' ? 'GROUP LEADER' : (role === 'MANPOWER' ? 'OPERATOR' : (role === 'ADMIN' ? 'ADMIN' : 'USER'));
-        users.unshift({ nrp: nrp, nama_lengkap: name, jabatan: jabatan, perusahaan: 'PPA', departemen: 'OPERATION', section: 'LIFTING', no_wa: '-', password_hash: pwd, role: role, status_akun: 'ACTIVE' });
-        saveUsers(users);
-        showToast('Akun Pengguna ditambahkan!');
-        renderApp(true);
-    }
-    
-    function confirmDeleteMasterData(key, index) { 
-        openCustomConfirm('Hapus Master Data', 'Yakin ingin menghapus item ini dari data master?', () => { 
-            const m = getMasterData(); 
-            if (!m[key]) m[key] = []; 
-            m[key].splice(index, 1); 
-            saveMasterData(m); 
-            showToast('Dihapus!'); 
-            renderApp(true); 
-        }); 
-    }
-
-    function confirmDeleteUser(nrp) {
-        const currentUser = JSON.parse(localStorage.getItem('lifting_user'));
-        if((currentUser.nrp || '').toUpperCase() === nrp) return showToast('Tidak bisa menghapus akun Anda sendiri!', 'error');
-
-        openCustomConfirm('Hapus Pengguna', `Hapus permanen akun dengan NRP: ${nrp}?`, async () => {
-            let users = getUsers().filter(u => (u.nrp || '').toUpperCase() !== nrp);
-            localStorage.setItem('lifting_users', JSON.stringify(users)); 
-            
-            if (SUPABASE_KEY && !SUPABASE_KEY.includes('PASTE_KUNCI')) {
-                try { 
-                    await fetch(`${SUPABASE_URL}/rest/v1/users?nrp=eq.${nrp}`, { 
-                        method: 'DELETE', 
-                        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } 
-                    }); 
-                } catch(e) { console.warn(e); }
-            }
-            
-            showToast('Akun berhasil dihapus!'); 
-            renderApp(true);
-        });
-    }
-
-    function openResetPwd(nrp) { document.getElementById('resetNrpLabel').innerText = nrp; document.getElementById('resetNrpVal').value = nrp; document.getElementById('resetPwdInput').value = ''; document.getElementById('resetPwdModal').classList.remove('hidden'); }
-    
-    function processResetPassword(e) { 
-        e.preventDefault(); 
-        const nrp = document.getElementById('resetNrpVal').value; 
-        const newPwd = document.getElementById('resetPwdInput').value; 
-        const users = getUsers(); 
-        const idx = users.findIndex(u => (u.nrp || '').toUpperCase() === nrp); 
-        
-        if(idx !== -1) { 
-            users[idx].password_hash = newPwd; 
-            saveUsers(users); 
-            
-            if (SUPABASE_KEY && !SUPABASE_KEY.includes('PASTE_KUNCI')) {
-                fetch(`${SUPABASE_URL}/rest/v1/users?nrp=eq.${nrp}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` },
-                    body: JSON.stringify({ password_hash: newPwd })
-                }).catch(err => console.warn(err));
-            }
-
-            showToast(`Password direset!`); 
-            document.getElementById('resetPwdModal').classList.add('hidden'); 
-            renderApp(true); 
-        } 
-    }
-
-    function getProfileView() {
-        const user = JSON.parse(localStorage.getItem('lifting_user'));
-        const m = getMasterData();
-        
-        const optProfPerusahaan = `<option value="" disabled>-- Perusahaan --</option>` + (m.perusahaan || []).map(p=>`<option value="${p}" ${user.perusahaan===p?'selected':''}>${p}</option>`).join('');
-        const optProfDepartemen = `<option value="" disabled>-- Departemen --</option>` + (m.departemen || []).map(d=>`<option value="${d}" ${user.departemen===d?'selected':''}>${d}</option>`).join('');
-        const optProfSection = `<option value="" disabled>-- Section --</option>` + (m.section || []).map(s=>`<option value="${s}" ${user.section===s?'selected':''}>${s}</option>`).join('');
-
+    function getKalenderBcView() {
         return `
-        <div class="max-w-md mx-auto relative pt-4 pb-4 px-2 space-y-3">
-            
-            <!-- Kartu 1: Info Profil Utama -->
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col items-center justify-center relative z-10">
-                <div class="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center text-blue-500 text-3xl mb-3 shadow-sm border border-blue-100">
-                    <i class="fa-solid fa-user"></i>
+        <div class="bg-white rounded-md shadow-sm border border-slate-200 p-3 flex flex-col relative z-10 w-full min-h-[400px]">
+            <div class="flex justify-between items-center mb-3 border-b border-slate-100 pb-3">
+                <div class="flex items-center gap-2">
+                    <h2 class="text-sm font-bold text-slate-800"><i class="fa-solid fa-calendar-days mr-1.5 text-cyan-600"></i>Jadwal Big Crane</h2>
                 </div>
-                <h2 class="text-base sm:text-lg font-bold text-slate-800 tracking-tight text-center">${user.nama_lengkap}</h2>
-                <p class="text-[10px] sm:text-[11px] text-slate-500 font-medium uppercase tracking-wider mt-1 text-center">${user.role} ${user.departemen}</p>
-                <p class="text-[10px] text-slate-400 mt-1 font-medium text-center">NRP: ${user.nrp}</p>
+                <div class="flex items-center gap-2 bg-cyan-50 text-cyan-700 px-2 py-1 border border-cyan-200 rounded-md shadow-sm text-[10px] font-bold">
+                    Total: <span id="bcTotalCount">0</span> Job
+                </div>
             </div>
-            
-            <!-- Kartu 2: Menu Navigasi Profil -->
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden relative z-10">
-                <button onclick="document.getElementById('profileBiodataModal').classList.remove('hidden')" class="w-full flex items-center justify-between p-4 hover:bg-slate-50 border-b border-slate-50 transition-colors text-left group">
-                    <div class="flex items-center gap-4">
-                        <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg border border-emerald-100 group-hover:bg-emerald-100 transition-colors">
-                            <i class="fa-solid fa-address-card"></i>
-                        </div>
-                        <div>
-                            <div class="font-bold text-slate-700 text-[11px] sm:text-xs">Identitas Saya</div>
-                            <div class="text-[9px] sm:text-[10px] text-slate-400 mt-0.5">Informasi detail personal</div>
-                        </div>
-                    </div>
-                    <i class="fa-solid fa-chevron-right text-slate-300 text-[10px]"></i>
-                </button>
-
-                <button onclick="document.getElementById('profileSettingsModal').classList.remove('hidden')" class="w-full flex items-center justify-between p-4 hover:bg-slate-50 transition-colors text-left group">
-                    <div class="flex items-center gap-4">
-                        <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center text-lg border border-slate-200 group-hover:bg-slate-200 transition-colors">
-                            <i class="fa-solid fa-lock"></i>
-                        </div>
-                        <div>
-                            <div class="font-bold text-slate-700 text-[11px] sm:text-xs">Keamanan / Password</div>
-                            <div class="text-[9px] sm:text-[10px] text-slate-400 mt-0.5">Ubah kata sandi Anda</div>
-                        </div>
-                    </div>
-                    <i class="fa-solid fa-chevron-right text-slate-300 text-[10px]"></i>
-                </button>
-            </div>
-            
-            <!-- Kartu 3: Logout -->
-            <div class="bg-white rounded-2xl shadow-sm border border-red-100 overflow-hidden relative z-10">
-                <button onclick="openCustomConfirm('Keluar Akun', 'Apakah Anda yakin ingin keluar dari sistem?', handleLogout)" class="w-full flex items-center justify-between p-4 hover:bg-red-50 transition-colors text-left group">
-                    <div class="flex items-center gap-4">
-                        <div class="w-10 h-10 rounded-xl bg-red-50 text-red-500 flex items-center justify-center text-lg border border-red-100 group-hover:bg-red-100 transition-colors">
-                            <i class="fa-solid fa-arrow-right-from-bracket"></i>
-                        </div>
-                        <div>
-                            <div class="font-bold text-red-500 text-[11px] sm:text-xs">Keluar Akun</div>
-                        </div>
-                    </div>
-                    <i class="fa-solid fa-chevron-right text-red-200 text-[10px]"></i>
-                </button>
-            </div>
-            
-            <!-- Watermark Footer -->
-            <div class="text-center mt-6 mb-2 text-[10px] text-slate-300 font-medium italic relative z-0">
-                created by @fadillm
-            </div>
-            
+            <div id="fullcalendar-container" class="flex-1 w-full bg-white border border-slate-100 rounded-md p-1 min-h-[350px]"></div>
         </div>`;
     }
 
-    function saveProfile(e) { 
-        e.preventDefault(); 
-        let user = JSON.parse(localStorage.getItem('lifting_user')); 
-        let users = getUsers(); 
-        let idx = users.findIndex(u => (u.nrp || '').toUpperCase() === (user.nrp || '').toUpperCase()); 
+    function initBcCalendar() {
+        const el = document.getElementById('fullcalendar-container'); 
+        if (!el || typeof FullCalendar === 'undefined') return;
         
-        user.nama_lengkap = document.getElementById('profName').value; 
-        user.jabatan = document.getElementById('profJabatan').value; 
-        user.perusahaan = document.getElementById('profPerusahaan').value; 
-        user.departemen = document.getElementById('profDepartemen').value; 
-        user.section = document.getElementById('profSection').value; 
-        user.no_wa = document.getElementById('profWa').value; 
+        const jobs = getOrders().filter(j => j.kategori === 'Big Crane' && j.status !== 'CANCELED');
         
-        if(idx !== -1) {
-            users[idx] = user; 
-            saveUsers(users); 
-            localStorage.setItem('lifting_user', JSON.stringify(user)); 
-            
-            if (SUPABASE_KEY && !SUPABASE_KEY.includes('PASTE_KUNCI')) {
-                fetch(`${SUPABASE_URL}/rest/v1/users?nrp=eq.${user.nrp}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` },
-                    body: JSON.stringify({
-                        nama_lengkap: user.nama_lengkap,
-                        jabatan: user.jabatan,
-                        perusahaan: user.perusahaan,
-                        departemen: user.departemen,
-                        section: user.section,
-                        no_wa: user.no_wa
-                    })
-                }).catch(err => console.warn(err));
-            }
+        // Palet warna variatif dengan efek transparansi 70%
+        const eventColors = [
+            'rgba(14, 165, 233, 0.7)',  // Biru Muda
+            'rgba(30, 64, 175, 0.7)',   // Biru Tua
+            'rgba(16, 185, 129, 0.7)',  // Hijau
+            'rgba(234, 179, 8, 0.7)',   // Kuning
+            'rgba(249, 115, 22, 0.7)'   // Oranye
+        ];
 
-            showToast('Profil diupdate!'); 
-            document.getElementById('profileBiodataModal').classList.add('hidden');
-            renderApp(true); 
-        }
-    }
-    
-    function savePassword(e) { 
-        e.preventDefault(); 
-        let pwd1 = document.getElementById('profPwd1').value; 
-        let pwd2 = document.getElementById('profPwd2').value; 
-        if (pwd1 !== pwd2) return showToast('Password tidak cocok!', 'error'); 
-        
-        let user = JSON.parse(localStorage.getItem('lifting_user')); 
-        let users = getUsers(); 
-        let idx = users.findIndex(u => (u.nrp || '').toUpperCase() === (user.nrp || '').toUpperCase()); 
-        
-        if (idx !== -1) {
-            users[idx].password_hash = pwd1; 
-            saveUsers(users); 
-            user.password_hash = pwd1;
-            localStorage.setItem('lifting_user', JSON.stringify(user)); 
-            
-            if (SUPABASE_KEY && !SUPABASE_KEY.includes('PASTE_KUNCI')) {
-                fetch(`${SUPABASE_URL}/rest/v1/users?nrp=eq.${user.nrp}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` },
-                    body: JSON.stringify({ password_hash: pwd1 })
-                }).catch(err => console.warn(err));
+        const events = jobs.map((j, idx) => {
+            let startStr = j.tgl_pelaksanaan; 
+            let endStr = null;
+            if (j.durasi_request && j.durasi_request.includes('HARI')) {
+                let days = parseInt(j.durasi_request.split(' ')[0]) || 0;
+                if (days > 0) {
+                    let endDate = new Date(j.tgl_pelaksanaan); 
+                    endDate.setDate(endDate.getDate() + days); 
+                    endStr = endDate.getFullYear() + '-' + String(endDate.getMonth() + 1).padStart(2, '0') + '-' + String(endDate.getDate()).padStart(2, '0');
+                }
+            } else if (j.jam_pelaksanaan) { 
+                startStr += 'T' + j.jam_pelaksanaan + ':00'; 
             }
             
-            document.getElementById('profPwd1').value = ''; 
-            document.getElementById('profPwd2').value = ''; 
-            showToast('Password berhasil diubah!'); 
-            document.getElementById('profileSettingsModal').classList.add('hidden');
+            let color = eventColors[idx % eventColors.length];
+            let displayTitle = (j.deskripsi || 'TANPA DESKRIPSI').toUpperCase();
+            
+            let eventObj = { title: displayTitle, start: startStr, backgroundColor: color, borderColor: color, extendedProps: { wo: j.no_wo, status: j.status, deskripsi: j.deskripsi } };
+            if (endStr) { eventObj.end = endStr; eventObj.allDay = true; }
+            return eventObj;
+        });
+
+        if (el._calendarInstance) { el._calendarInstance.destroy(); }
+        const calendar = new FullCalendar.Calendar(el, {
+            locale: 'id', 
+            firstDay: 0, // Dimulai dari hari Minggu
+            initialView: 'dayGridMonth', 
+            headerToolbar: { left: 'prev,next today', center: 'title', right: '' }, 
+            buttonText: { today: 'Hari Ini' },
+            events: events, 
+            height: 'auto', 
+            contentHeight: 'auto', 
+            dayMaxEvents: 2, 
+            eventClick: function(info) { 
+                // Menghilangkan fungsi error saat order diklik
+                info.jsEvent.preventDefault(); 
+            },
+            dateClick: function(info) { showDayJobsModal(info.dateStr); }, 
+            datesSet: function(info) { 
+                let currentMonth = info.view.currentStart; 
+                let yyyy = currentMonth.getFullYear(); 
+                let mm = String(currentMonth.getMonth() + 1).padStart(2, '0'); 
+                
+                let monthPrefix = `${yyyy}-${mm}`;
+                let totalJobCount = jobs.filter(j => j.tgl_pelaksanaan && j.tgl_pelaksanaan.startsWith(monthPrefix)).length;
+                let totalEl = document.getElementById('bcTotalCount');
+                if(totalEl) totalEl.innerText = totalJobCount;
+            }
+        });
+        calendar.render(); 
+        el._calendarInstance = calendar;
+        window.bcCalendarInstance = calendar;
+    }
+
+    function showDayJobsModal(dateStr) {
+        let clickDate = new Date(dateStr); clickDate.setHours(0,0,0,0);
+        const jobs = getOrders().filter(j => {
+            if (j.kategori !== 'Big Crane' || j.status === 'CANCELED') return false;
+            let startDate = new Date(j.tgl_pelaksanaan); startDate.setHours(0,0,0,0);
+            let endDate = new Date(j.tgl_pelaksanaan); endDate.setHours(0,0,0,0);
+            if (j.durasi_request && j.durasi_request.includes('HARI')) {
+                let days = parseInt(j.durasi_request.split(' ')[0]) || 0;
+                if (days > 0) { endDate.setDate(endDate.getDate() + days - 1); }
+            }
+            return clickDate >= startDate && clickDate <= endDate;
+        });
+
+        let content = ''; 
+        let dateObj = new Date(dateStr); 
+        let dateIndo = dateObj.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+        
+        if (jobs.length === 0) { 
+            content = `<div class="flex flex-col items-center justify-center p-6 text-center"><i class="fa-regular fa-calendar-xmark text-4xl text-slate-300 mb-2"></i><p class="text-slate-500 font-medium text-[11px]">Jadwal Kosong</p><p class="text-slate-400 text-[9px] mt-1">Tidak ada jadwal Big Crane untuk tanggal ini.</p></div>`; 
         } else {
-            showToast('Gagal mereset, user tidak ditemukan', 'error');
+            content = jobs.map(job => {
+                let statusColor = job.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : (job.status === 'ON PROGRESS' ? 'bg-blue-100 text-blue-700 border-blue-200' : (job.status === 'PENDING' ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-slate-100 text-slate-700 border-slate-200'));
+                return `<div class="bg-white border border-slate-200 rounded-md p-2.5 mb-2 cursor-pointer hover:border-cyan-400 shadow-sm transition-all" onclick="document.getElementById('dayJobsModal').classList.add('hidden'); viewJobDetail('${job.no_wo}')"><div class="flex justify-between items-center mb-1 border-b border-slate-100 pb-1"><span class="text-[10px] font-bold text-cyan-600 font-mono">${job.no_wo}</span><span class="${statusColor} text-[8px] font-bold px-1.5 py-0.5 border rounded-sm tracking-wide">${job.status}</span></div><div class="text-[11px] font-bold text-slate-800 uppercase mt-1 leading-tight">${job.unit ? '['+job.unit+']' : '<span class="text-red-500">[TBA]</span>'} ${job.nama_pemohon}</div><div class="text-[9px] text-slate-500 truncate mt-1 bg-slate-50 p-1 rounded border border-slate-100">${job.deskripsi}</div></div>`;
+            }).join('');
         }
+        document.getElementById('dayJobsTitle').innerText = dateIndo; 
+        document.getElementById('dayJobsContent').innerHTML = content; 
+        document.getElementById('dayJobsModal').classList.remove('hidden');
     }
 
     // ================= MOBILE PWA NAVIGATION =================
