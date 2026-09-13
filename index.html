@@ -18,6 +18,9 @@
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.11/locales/id.global.min.js"></script>
 
+    <!-- SheetJS (xlsx) for direct Excel (.xlsx) export with native columns -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
     <!-- Supabase JS Client for Realtime WebSockets -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
@@ -65,7 +68,7 @@
         .fc-daygrid-day-frame { cursor: pointer !important; transition: background-color 0.2s; }
         .fc-daygrid-day-frame:hover { background-color: rgba(8, 145, 178, 0.05); }
         .fc-daygrid-day.fc-day-today { background-color: #f0fdfa !important; }
-        .fc-event { pointer-events: none !important; cursor: default !important; border: none !important; border-radius: 2px; padding: 4px 2px; font-size: 9px; font-weight: bold; text-align: left; color: white !important; white-space: normal !important; }
+        .fc-event, .fc-event-main, .fc-event-title { pointer-events: none !important; cursor: default !important; border: none !important; border-radius: 2px; padding: 4px 2px; font-size: 9px; font-weight: bold; text-align: left; color: #000000 !important; white-space: normal !important; }
     </style>
 </head>
 <body class="antialiased text-[11px] sm:text-xs">
@@ -319,7 +322,7 @@
         
         let userFormat = `*DETAIL JOB LIFTING*\n- *NO WO :* ${job.no_wo}\n- *ORDER UNIT :* ${job.kategori} ${job.unit ? '('+job.unit+')' : ''}\n- *STATUS :* ${statusEmoji}\n- *PEMOHON :* ${job.nama_pemohon}\n- *PERUSAHAAN :* ${job.perusahaan}\n- *DEPARTEMEN :* ${job.departemen}\n- *SECTION :* ${job.section}\n- *KONTAK WA :* ${job.no_wa}\n- *TANGGAL :* ${job.tgl_pelaksanaan} ${job.jam_pelaksanaan ? '| Jam : '+job.jam_pelaksanaan : ''}\n- *LOKASI :* ${job.lokasi_angkat || '-'} ➔ ${job.lokasi_tujuan || '-'}\n- *DESKRIPSI :* ${job.deskripsi}`;
 
-        let mpFormat = `*PELAPORAN PROGRES JOB LIFTING*\n- *NO WO :* ${job.no_wo}\n- *STATUS :* ${statusEmoji}\n- *NAMA JOB :* ${job.deskripsi}\n- *JAM START :* ${job.jam_start_aktual || '-'}\n- *JAM FINISH :* ${job.jam_end_aktual || '-'}\n- *NO. UNIT :* ${job.unit || '-'}\n- *NAMA OPERATOR :* ${job.operator || '-'}\n- *NAMA RIGGER :* ${job.rigger || '-'}${job.rigger2 ? ', ' + job.rigger2 : ''}\n- *FINAL INSPEKSI :* ${job.final_inspeksi || '-'}\n- *KENDALA :* ${job.alasan_telat ? 'Telat : ' + job.alasan_telat + ' ' : ''}${job.alasan_overtime ? 'Over : ' + job.alasan_overtime : ''}${(!job.alasan_telat && !job.alasan_overtime) ? '-' : ''}`;
+        let mpFormat = `*PELAPORAN PROGRES JOB LIFTING*\n- *STATUS :* ${statusEmoji}\n- *NAMA JOB :* ${job.deskripsi}\n- *JAM START :* ${job.jam_start_aktual || '-'}\n- *JAM FINISH :* ${job.jam_end_aktual || '-'}\n- *NO. UNIT :* ${job.unit || '-'}\n- *NAMA OPERATOR :* ${job.operator || '-'}\n- *NAMA RIGGER :* ${job.rigger || '-'}${job.rigger2 ? ', ' + job.rigger2 : ''}\n- *FINAL INSPEKSI :* ${job.final_inspeksi || '-'}\n- *KENDALA :* ${job.alasan_telat ? 'Telat : ' + job.alasan_telat + ' ' : ''}${job.alasan_overtime ? 'Over : ' + job.alasan_overtime : ''}${(!job.alasan_telat && !job.alasan_overtime) ? '-' : ''}`;
 
         if (currentUser && currentUser.role === 'USER') {
             waText = userFormat;
@@ -1691,53 +1694,131 @@
     }
 
     function downloadCSVBlob() {
+        const currentUser = JSON.parse(localStorage.getItem('lifting_user'));
         let jobs = getOrders();
-        if (jobs.length === 0) return showToast('Belum ada data untuk diexport', 'error');
 
-        let headers = ['No WO', 'Timestamp', 'Kategori', 'Pemohon', 'Perusahaan', 'Departemen', 'Section', 'No WA', 'Tgl Pelaksanaan', 'Shift', 'Durasi Request', 'Lokasi Asal', 'Lokasi Tujuan', 'Deskripsi', 'Status', 'GL', 'Unit', 'Operator', 'Rigger 1', 'Rigger 2', 'Start Aktual', 'End Aktual', 'Durasi Aktual', 'Final Inspeksi', 'Alasan Telat', 'Alasan Overtime'];
-        
-        let csvContent = headers.join(',') + '\n';
-        jobs.forEach(j => {
-            let row = [
-                `"${j.no_wo || ''}"`,
-                `"${j.timestamp || ''}"`,
-                `"${j.kategori || ''}"`,
-                `"${(j.nama_pemohon || '').replace(/"/g, '""')}"`,
-                `"${j.perusahaan || ''}"`,
-                `"${j.departemen || ''}"`,
-                `"${j.section || ''}"`,
-                `"${j.no_wa || ''}"`,
-                `"${j.tgl_pelaksanaan || ''}"`,
-                `"${j.shift || ''}"`,
-                `"${j.durasi_request || ''}"`,
-                `"${(j.lokasi_angkat || '').replace(/"/g, '""')}"`,
-                `"${(j.lokasi_tujuan || '').replace(/"/g, '""')}"`,
-                `"${(j.deskripsi || '').replace(/"/g, '""')}"`,
-                `"${j.status || ''}"`,
-                `"${j.gl || ''}"`,
-                `"${j.unit || ''}"`,
-                `"${j.operator || ''}"`,
-                `"${j.rigger || ''}"`,
-                `"${j.rigger2 || ''}"`,
-                `"${j.jam_start_aktual || ''}"`,
-                `"${j.jam_end_aktual || ''}"`,
-                `"${j.durasi_aktual || ''}"`,
-                `"${j.final_inspeksi || ''}"`,
-                `"${(j.alasan_telat || '').replace(/"/g, '""')}"`,
-                `"${(j.alasan_overtime || '').replace(/"/g, '""')}"`
-            ];
-            csvContent += row.join(',') + '\n';
-        });
+        if (currentUser && (currentUser.role === 'ADMIN' || currentUser.role === 'GL')) {
+            const tglMulai = document.getElementById('filter_tgl_mulai') ? document.getElementById('filter_tgl_mulai').value : '';
+            const tglSelesai = document.getElementById('filter_tgl_selesai') ? document.getElementById('filter_tgl_selesai').value : '';
+            const filterShift = document.getElementById('filter_shift') ? document.getElementById('filter_shift').value : 'ALL';
+            const filterKategori = document.getElementById('filter_admin_kategori') ? document.getElementById('filter_admin_kategori').value : 'ALL';
 
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.setAttribute('href', url);
-        link.setAttribute('download', `Order_Lifting_${getShiftDateString()}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        showToast('Data CSV berhasil diunduh!');
+            if (tglMulai && tglSelesai) {
+                jobs = jobs.filter(j => j.tgl_pelaksanaan >= tglMulai && j.tgl_pelaksanaan <= tglSelesai);
+            } else if (tglMulai) {
+                jobs = jobs.filter(j => j.tgl_pelaksanaan >= tglMulai);
+            } else if (tglSelesai) {
+                jobs = jobs.filter(j => j.tgl_pelaksanaan <= tglSelesai);
+            }
+
+            if (filterShift !== 'ALL') {
+                jobs = jobs.filter(j => j.shift === filterShift);
+            }
+            if (filterKategori !== 'ALL') {
+                jobs = jobs.filter(j => j.kategori === filterKategori);
+            }
+
+            // Urutkan data sesuai kolom dan arah sort aktif di tabel
+            jobs.sort((a, b) => {
+                let valA = (a[sortColumn] || '').toString().toLowerCase(); 
+                let valB = (b[sortColumn] || '').toString().toLowerCase();
+                let comparison = valA.localeCompare(valB, undefined, {numeric: true});
+                if (comparison < 0) return sortDirection === 'asc' ? -1 : 1; 
+                if (comparison > 0) return sortDirection === 'asc' ? 1 : -1; 
+                return 0;
+            });
+        } else if (currentUser && currentUser.role === 'USER') {
+            jobs = jobs.filter(j => j.nrp_pemohon === currentUser.nrp);
+            const filterCat = document.getElementById('filter_kategori') ? document.getElementById('filter_kategori').value : 'ALL';
+            if (filterCat !== 'ALL') {
+                jobs = jobs.filter(j => j.kategori === filterCat);
+            }
+        }
+
+        if (jobs.length === 0) {
+            return showToast('Tidak ada data sesuai filter untuk diexport!', 'error');
+        }
+
+        const tglMulaiVal = document.getElementById('filter_tgl_mulai')?.value;
+        const tglSelesaiVal = document.getElementById('filter_tgl_selesai')?.value;
+        const dateRangeLabel = (tglMulaiVal && tglSelesaiVal) ? `${tglMulaiVal}_sd_${tglSelesaiVal}` : getShiftDateString();
+        const fileName = `Order_Lifting_${dateRangeLabel}.xlsx`;
+
+        // Definisi Header Kolom Excel
+        const headers = [
+            'No WO', 'Waktu Pengajuan', 'Kategori Unit', 'Nama Pemohon', 'Perusahaan', 
+            'Departemen', 'Section', 'No WhatsApp', 'Tgl Pelaksanaan', 'Shift', 
+            'Durasi Request', 'Lokasi Muat (Asal)', 'Lokasi Bongkar (Tujuan)', 'Deskripsi Tugas / Muatan', 
+            'Status', 'Group Leader', 'Unit Ditugaskan', 'Operator', 'Rigger 1', 'Rigger 2', 
+            'Start Aktual', 'End Aktual', 'Durasi Aktual (Jam)', 'Final Inspeksi', 
+            'Alasan Telat', 'Alasan Overtime'
+        ];
+
+        // Format Baris Data
+        const rows = jobs.map(j => [
+            j.no_wo || '',
+            formatLocalTimestamp(j.timestamp) || '',
+            j.kategori || '',
+            j.nama_pemohon || '',
+            j.perusahaan || '',
+            j.departemen || '',
+            j.section || '',
+            j.no_wa ? String(j.no_wa) : '',
+            j.tgl_pelaksanaan || '',
+            j.shift || '',
+            j.durasi_request || '',
+            j.lokasi_angkat || '',
+            j.lokasi_tujuan || '',
+            j.deskripsi || '',
+            j.status || '',
+            j.gl || '',
+            j.unit || '',
+            j.operator || '',
+            j.rigger || '',
+            j.rigger2 || '',
+            j.jam_start_aktual || '',
+            j.jam_end_aktual || '',
+            j.durasi_aktual ? (Number(j.durasi_aktual) || j.durasi_aktual) : '',
+            j.final_inspeksi || '',
+            j.alasan_telat || '',
+            j.alasan_overtime || ''
+        ]);
+
+        if (typeof XLSX !== 'undefined') {
+            const worksheetData = [headers, ...rows];
+            const ws = XLSX.utils.aoa_to_sheet(worksheetData);
+
+            // Pengaturan otomatis lebar kolom agar pas dan rapi
+            const colWidths = headers.map((h, i) => {
+                let maxLen = h.length;
+                rows.forEach(r => {
+                    const cellVal = r[i] ? String(r[i]) : '';
+                    if (cellVal.length > maxLen) maxLen = cellVal.length;
+                });
+                return { wch: Math.min(Math.max(maxLen + 3, 12), 50) };
+            });
+            ws['!cols'] = colWidths;
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Data Order");
+            XLSX.writeFile(wb, fileName);
+            showToast(`${jobs.length} data berhasil diexport ke Excel (.xlsx)!`);
+        } else {
+            // Fallback CSV dengan UTF-8 BOM dan penegasan separator titik koma agar Excel langsung membagi kolom
+            let csvRows = [headers.join(';')];
+            rows.forEach(r => {
+                csvRows.push(r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';'));
+            });
+            const blob = new Blob(['\uFEFF' + csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            link.setAttribute('download', `Order_Lifting_${dateRangeLabel}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showToast(`${jobs.length} data diexport!`);
+        }
     }
 
     function getMonitoringView() {
@@ -2600,7 +2681,7 @@
             let color = eventColors[idx % eventColors.length];
             let displayTitle = (j.deskripsi || 'TANPA DESKRIPSI').toUpperCase();
 
-            let eventObj = { title: displayTitle, start: startStr, backgroundColor: color, borderColor: color, extendedProps: { wo: j.no_wo, status: j.status, deskripsi: j.deskripsi } };
+            let eventObj = { title: displayTitle, start: startStr, backgroundColor: color, borderColor: color, textColor: '#000000', extendedProps: { wo: j.no_wo, status: j.status, deskripsi: j.deskripsi } };
             if (endStr) { eventObj.end = endStr; eventObj.allDay = true; }
             return eventObj;
         });
