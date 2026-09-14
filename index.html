@@ -226,6 +226,45 @@
         return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     }
 
+    function formatDurationHM(minutes) {
+        minutes = Math.round(minutes);
+        if (isNaN(minutes) || minutes <= 0) return '0 Menit';
+        const h = Math.floor(minutes / 60);
+        const m = minutes % 60;
+        if (h > 0 && m > 0) return `${h} Jam ${m} Menit`;
+        if (h > 0) return `${h} Jam`;
+        return `${m} Menit`;
+    }
+
+    function getJobOperationalDate(j) {
+        if (!j || !j.tgl_pelaksanaan) return '';
+        const tgl = j.tgl_pelaksanaan;
+        const jam = j.jam_pelaksanaan;
+        if (!jam) return tgl;
+        const parts = jam.split(':');
+        const h = parseInt(parts[0], 10);
+        // Jam 00:00 s/d 04:59 terhitung hari operasional kemarin (Shift 2)
+        if (!isNaN(h) && h < 5) {
+            const d = new Date(tgl + 'T12:00:00');
+            d.setDate(d.getDate() - 1);
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        }
+        return tgl;
+    }
+
+    function getJobOperationalShift(j) {
+        if (!j) return 'Shift 1';
+        if (!j.jam_pelaksanaan) return j.shift || 'Shift 1';
+        const parts = j.jam_pelaksanaan.split(':');
+        const h = parseInt(parts[0], 10);
+        if (isNaN(h)) return j.shift || 'Shift 1';
+        // Shift 1: 05:00 - 16:59, Shift 2: 17:00 - 04:59
+        return (h >= 5 && h < 17) ? 'Shift 1' : 'Shift 2';
+    }
+
     function formatLocalTimestamp(isoString) {
         if (!isoString) return '-';
         let d = new Date(isoString);
@@ -254,6 +293,7 @@
     let pendingCancelWo = null;
     let currentActionWo = null;
     let currentActionStatus = null;
+    let pendingActionData = null;
 
     var isPreviewCanvas = window.self !== window.top || window.location.hostname.includes('usercontent.goog');
 
@@ -553,6 +593,16 @@
                         <h2 class="text-sm font-bold text-slate-800 tracking-tight mt-1" id="mpActionTitle">Progres Pekerjaan</h2>
                     </div>
                     <div class="p-3 overflow-y-auto hide-scrollbar" id="mpActionContent"></div>
+                </div>
+            </div>
+
+            <div id="kendalaModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex justify-center items-center z-[130] hidden p-3">
+                <div class="bg-white rounded-xl shadow-2xl w-full max-w-[320px] overflow-hidden flex flex-col">
+                    <div class="p-4 border-b border-slate-100 text-center shrink-0">
+                        <h2 class="text-sm font-bold text-slate-800 tracking-tight">Kendala Waktu Terdeteksi!</h2>
+                        <p class="text-[10px] text-slate-500 mt-0.5">Waktu aktual melebihi batas toleransi yang ditentukan.</p>
+                    </div>
+                    <div class="p-4 overflow-y-auto hide-scrollbar" id="kendalaContent"></div>
                 </div>
             </div>
 
@@ -1455,8 +1505,11 @@
         let dashShift = document.getElementById('dash_shift') ? document.getElementById('dash_shift').value : 'ALL';
         let dashUnit = document.getElementById('dash_unit') ? document.getElementById('dash_unit').value : 'ALL';
 
-        let filteredJobs = jobs.filter(j => j.tgl_pelaksanaan >= tglMulai && j.tgl_pelaksanaan <= tglSelesai);
-        if (dashShift !== 'ALL') filteredJobs = filteredJobs.filter(j => j.shift === dashShift);
+        let filteredJobs = jobs.filter(j => {
+            const opDate = getJobOperationalDate(j);
+            return opDate >= tglMulai && opDate <= tglSelesai;
+        });
+        if (dashShift !== 'ALL') filteredJobs = filteredJobs.filter(j => getJobOperationalShift(j) === dashShift);
         if (dashUnit !== 'ALL') filteredJobs = filteredJobs.filter(j => j.kategori === dashUnit);
 
         let cntOrder = filteredJobs.length;
@@ -1789,15 +1842,18 @@
             const filterKategori = document.getElementById('filter_admin_kategori') ? document.getElementById('filter_admin_kategori').value : 'ALL';
 
             if (tglMulai && tglSelesai) {
-                jobs = jobs.filter(j => j.tgl_pelaksanaan >= tglMulai && j.tgl_pelaksanaan <= tglSelesai);
+                jobs = jobs.filter(j => {
+                    const opDate = getJobOperationalDate(j);
+                    return opDate >= tglMulai && opDate <= tglSelesai;
+                });
             } else if (tglMulai) {
-                jobs = jobs.filter(j => j.tgl_pelaksanaan >= tglMulai);
+                jobs = jobs.filter(j => getJobOperationalDate(j) >= tglMulai);
             } else if (tglSelesai) {
-                jobs = jobs.filter(j => j.tgl_pelaksanaan <= tglSelesai);
+                jobs = jobs.filter(j => getJobOperationalDate(j) <= tglSelesai);
             }
 
             if (filterShift !== 'ALL') {
-                jobs = jobs.filter(j => j.shift === filterShift);
+                jobs = jobs.filter(j => getJobOperationalShift(j) === filterShift);
             }
             if (filterKategori !== 'ALL') {
                 jobs = jobs.filter(j => j.kategori === filterKategori);
@@ -1916,8 +1972,24 @@
             let filterShift = document.getElementById('filter_shift') ? document.getElementById('filter_shift').value : 'ALL';
             let filterKategori = document.getElementById('filter_admin_kategori') ? document.getElementById('filter_admin_kategori').value : 'ALL';
 
-            if (tglMulai && tglSelesai) jobs = jobs.filter(j => j.tgl_pelaksanaan >= tglMulai && j.tgl_pelaksanaan <= tglSelesai);
-            if (filterShift !== 'ALL') jobs = jobs.filter(j => j.shift === filterShift);
+            if (tglMulai && tglSelesai) {
+                jobs = jobs.filter(j => {
+                    const opDate = getJobOperationalDate(j);
+                    return opDate >= tglMulai && opDate <= tglSelesai;
+                });
+            } else if (tglMulai) {
+                jobs = jobs.filter(j => getJobOperationalDate(j) >= tglMulai);
+            } else if (tglSelesai) {
+                jobs = jobs.filter(j => getJobOperationalDate(j) <= tglSelesai);
+            }
+
+            if (filterShift !== 'ALL') {
+                jobs = jobs.filter(j => {
+                    if (!j.jam_pelaksanaan && (!j.shift || j.shift === '-')) return true;
+                    return getJobOperationalShift(j) === filterShift;
+                });
+            }
+
             if (filterKategori !== 'ALL') jobs = jobs.filter(j => j.kategori === filterKategori);
 
             jobs.sort((a, b) => {
@@ -1958,8 +2030,8 @@
                         <input type="date" id="filter_tgl_selesai" class="border border-slate-300 rounded-sm px-1 py-0.5 text-slate-700 focus:outline-none focus:border-cyan-500 shrink-0" value="${tglSelesai}" onchange="renderApp(true)">
                         <select id="filter_shift" class="border border-slate-300 rounded-sm px-1 py-0.5 text-slate-700 focus:outline-none focus:border-cyan-500 shrink-0 ml-1 bg-white cursor-pointer" onchange="renderApp(true)">
                             <option value="ALL" ${filterShift === 'ALL' ? 'selected' : ''}>Semua Shift</option>
-                            <option value="Shift 1" ${filterShift === 'Shift 1' ? 'selected' : ''}>Shift 1</option>
-                            <option value="Shift 2" ${filterShift === 'Shift 2' ? 'selected' : ''}>Shift 2</option>
+                            <option value="Shift 1" ${filterShift === 'Shift 1' ? 'selected' : ''}>Shift 1 (05:00-16:59)</option>
+                            <option value="Shift 2" ${filterShift === 'Shift 2' ? 'selected' : ''}>Shift 2 (17:00-04:59)</option>
                         </select>
                         <select id="filter_admin_kategori" class="border border-slate-300 rounded-sm px-1 py-0.5 text-slate-700 focus:outline-none focus:border-cyan-500 shrink-0 ml-1 bg-white cursor-pointer" onchange="renderApp(true)">
                             <option value="ALL" ${filterKategori === 'ALL' ? 'selected' : ''}>Semua Armada</option>
@@ -1981,7 +2053,7 @@
                                 <th class="px-2 py-1.5 text-center font-semibold w-24 hidden md:table-cell cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('status')">Status ${getSortIcon('status')}</th>
                                 <th class="px-2 py-1.5 font-semibold w-28 hidden md:table-cell cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('unit')">Penugasan ${getSortIcon('unit')}</th>
                                 <th class="px-2 py-1.5 font-semibold w-20 hidden md:table-cell cursor-pointer hover:bg-slate-200 select-none transition-colors whitespace-nowrap" onclick="handleSort('jam_start_aktual')">Waktu Aktual ${getSortIcon('jam_start_aktual')}</th>
-                                <th class="px-2 py-1.5 text-center font-semibold w-12 hidden md:table-cell cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('durasi_aktual')">Durasi ${getSortIcon('durasi_aktual')}</th>
+                                <th class="px-2 py-1.5 text-center font-semibold w-16 hidden md:table-cell cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('durasi_aktual')">Durasi ${getSortIcon('durasi_aktual')}</th>
                                 <th class="px-2 py-1.5 font-semibold w-20 md:w-28 hidden md:table-cell">Kendala</th>
                             </tr>
                         </thead>
@@ -2014,7 +2086,7 @@
                                     <td class="px-2 py-1.5 text-center align-top hidden md:table-cell"><span class="${statusColor} border text-[9px] px-1.5 py-0.5 rounded-sm font-semibold whitespace-nowrap inline-block">${job.status}</span></td>
                                     <td class="px-2 py-1.5 text-[9px] align-top text-slate-600 leading-tight hidden md:table-cell"><div class="flex flex-col gap-0.5"><div><span class="text-slate-400">GL:</span> <span class="font-semibold text-slate-800">${job.gl || '-'}</span></div><div><span class="text-slate-400">Unit:</span> <span class="font-semibold text-slate-800">${job.unit || '-'}</span></div><div><span class="text-slate-400">OP:</span> <span class="font-semibold text-slate-800">${job.operator || '-'}</span></div><div><span class="text-slate-400">Rg:</span> <span class="font-semibold text-slate-800">${job.rigger || '-'}${job.rigger2 ? ', ' + job.rigger2 : ''}</span></div></div></td>
                                     <td class="px-2 py-1.5 text-[9px] align-top text-slate-600 font-mono tracking-tighter hidden md:table-cell whitespace-nowrap">${job.jam_start_aktual || '--:--'} s/d ${job.jam_end_aktual || '--:--'}</td>
-                                    <td class="px-2 py-1.5 text-center text-[10px] font-semibold text-slate-800 align-top hidden md:table-cell">${job.durasi_aktual ? job.durasi_aktual + ' J' : '-'}</td>
+                                    <td class="px-2 py-1.5 text-center text-[10px] font-semibold text-slate-800 align-top hidden md:table-cell whitespace-nowrap">${job.durasi_aktual ? formatDurationHM(parseFloat(job.durasi_aktual) * 60) : '-'}</td>
                                     <td class="px-2 py-1.5 align-top hidden md:table-cell"><div class="flex flex-col">${kendalaHtml}</div></td>
                                 </tr>`;
                             }).join('')}
@@ -2083,7 +2155,10 @@
         let tglSelesai = document.getElementById('mp_filter_selesai') ? document.getElementById('mp_filter_selesai').value : getShiftDateString();
 
         let jobs = getOrders().filter(j => j.kategori === mpFleetMode);
-        jobs = jobs.filter(j => j.tgl_pelaksanaan >= tglMulai && j.tgl_pelaksanaan <= tglSelesai);
+        jobs = jobs.filter(j => {
+            const opDate = getJobOperationalDate(j);
+            return opDate >= tglMulai && opDate <= tglSelesai;
+        });
         
         if (currentMpPanel === 'PENDING') jobs = jobs.filter(j => j.status === 'PENDING'); else jobs = jobs.filter(j => j.status === currentMpPanel);
         if (mpFleetMode === 'Crane Truck' && filterUnit !== 'ALL') jobs = jobs.filter(j => j.unit === filterUnit);
@@ -2137,40 +2212,97 @@
         const job = getOrders().find(j => j.no_wo === wo);
         if (!job) return;
         
+        const m = getMasterData();
         const now = new Date();
         const timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
-        const mTitle = document.getElementById('mpActionTitle');
-        if (mTitle) mTitle.innerText = status === 'COMPLETED' ? 'Selesaikan Pekerjaan' : 'Pending Pekerjaan';
         
+        const mTitle = document.getElementById('mpActionTitle');
+        if (mTitle) {
+            mTitle.innerText = status === 'COMPLETED' ? 'Selesaikan Pekerjaan (Close Job)' : 'Tunda Pekerjaan (Pending)';
+        }
+        
+        const opOptions = (m.operator || []).map(o => `<option value="${o}" ${job.operator === o ? 'selected' : ''}>${o}</option>`).join('');
+        const rigOptions1 = (m.rigger || []).map(r => `<option value="${r}" ${job.rigger === r ? 'selected' : ''}>${r}</option>`).join('');
+        const rigOptions2 = (m.rigger || []).map(r => `<option value="${r}" ${job.rigger2 === r ? 'selected' : ''}>${r}</option>`).join('');
+
+        const targetLabel = job.jam_pelaksanaan ? `Jam ${job.jam_pelaksanaan}` : (job.tgl_pelaksanaan || '-');
+        const durasiReqLabel = job.durasi_request || '-';
+
         const content = document.getElementById('mpActionContent');
         if (content) {
             content.innerHTML = `
-                <form onsubmit="submitManpowerAction(event)" class="space-y-2">
-                    <div class="bg-cyan-50 border border-cyan-100 p-2 rounded-sm text-center mb-2">
-                        <div class="font-mono text-xs font-bold text-cyan-800">${job.no_wo}</div>
-                        <div class="text-[10px] text-cyan-600 font-medium">${job.deskripsi || '-'}</div>
+                <form onsubmit="submitManpowerAction(event)" class="space-y-2.5 text-left">
+                    <!-- Banner Target -->
+                    <div class="bg-blue-50/80 border border-blue-100 p-2 rounded-md text-[11px] text-blue-700 font-bold">
+                        Target: <span class="font-semibold text-blue-600">${targetLabel}</span> | <span class="font-semibold text-blue-600">Durasi ${durasiReqLabel}</span>
                     </div>
+
+                    <!-- Operator -->
+                    <div>
+                        <label class="block text-[10px] font-semibold text-slate-500 mb-0.5">Operator</label>
+                        <select id="mp_operator" class="w-full border border-slate-300 rounded-md px-2.5 py-1.5 text-xs focus:border-cyan-500 outline-none bg-white font-medium cursor-pointer" required>
+                            <option value="" disabled ${!job.operator ? 'selected' : ''}>-- Pilih --</option>
+                            ${opOptions}
+                        </select>
+                    </div>
+
+                    <!-- Rigger 1 -->
+                    <div>
+                        <label class="block text-[10px] font-semibold text-slate-500 mb-0.5">Rigger 1</label>
+                        <select id="mp_rigger" class="w-full border border-slate-300 rounded-md px-2.5 py-1.5 text-xs focus:border-cyan-500 outline-none bg-white font-medium cursor-pointer" required>
+                            <option value="" disabled ${!job.rigger ? 'selected' : ''}>-- Pilih --</option>
+                            ${rigOptions1}
+                        </select>
+                    </div>
+
+                    ${job.kategori === 'Big Crane' ? `
+                    <div>
+                        <label class="block text-[10px] font-semibold text-slate-500 mb-0.5">Rigger 2 (Opsional)</label>
+                        <select id="mp_rigger2" class="w-full border border-slate-300 rounded-md px-2.5 py-1.5 text-xs focus:border-cyan-500 outline-none bg-white font-medium cursor-pointer">
+                            <option value="">-- Pilih --</option>
+                            ${rigOptions2}
+                        </select>
+                    </div>` : ''}
+
+                    <!-- Mulai dan Selesai Aktual -->
                     <div class="grid grid-cols-2 gap-2">
                         <div>
-                            <label class="block text-[9px] font-bold text-slate-500 mb-0.5">Jam Mulai Aktual</label>
-                            <input type="time" id="mp_start_time" value="${job.jam_start_aktual || job.jam_pelaksanaan || timeStr}" class="w-full border border-slate-300 rounded px-1.5 py-1 text-xs focus:border-cyan-500 outline-none" required>
+                            <label class="block text-[10px] font-semibold text-slate-500 mb-0.5">Mulai Aktual</label>
+                            <input type="time" id="mp_start_time" value="${job.jam_start_aktual || job.jam_pelaksanaan || timeStr}" class="w-full border border-slate-300 rounded-md px-2 py-1 text-xs focus:border-cyan-500 outline-none text-slate-700" required>
                         </div>
                         <div>
-                            <label class="block text-[9px] font-bold text-slate-500 mb-0.5">Jam Selesai Aktual</label>
-                            <input type="time" id="mp_end_time" value="${timeStr}" class="w-full border border-slate-300 rounded px-1.5 py-1 text-xs focus:border-cyan-500 outline-none" required>
+                            <label class="block text-[10px] font-semibold text-slate-500 mb-0.5">Selesai Aktual</label>
+                            <input type="time" id="mp_end_time" value="${job.jam_end_aktual || timeStr}" class="w-full border border-slate-300 rounded-md px-2 py-1 text-xs focus:border-cyan-500 outline-none text-slate-700" required>
                         </div>
                     </div>
+
+                    <!-- Final Inspeksi -->
                     <div>
-                        <label class="block text-[9px] font-bold text-slate-500 mb-0.5">Final Inspeksi (Waktu)</label>
-                        <input type="time" id="mp_final_insp" value="${timeStr}" class="w-full border border-slate-300 rounded px-1.5 py-1 text-xs focus:border-cyan-500 outline-none">
+                        <label class="block text-[10px] font-bold text-emerald-600 mb-0.5 flex items-center gap-1">
+                            <i class="fa-solid fa-check text-[10px]"></i> Final Inspeksi
+                        </label>
+                        <input type="time" id="mp_final_insp" value="${job.final_inspeksi || timeStr}" class="w-full border border-emerald-400 bg-emerald-50/20 rounded-md px-2 py-1 text-xs focus:border-emerald-600 outline-none text-emerald-800 font-semibold" required>
                     </div>
+
+                    ${status === 'PENDING' ? `
+                    <!-- Alasan Pending -->
                     <div>
-                        <label class="block text-[9px] font-bold text-slate-500 mb-0.5">${status === 'PENDING' ? 'Alasan Pending *' : 'Kendala / Keterangan (Opsional)'}</label>
-                        <textarea id="mp_kendala_note" class="w-full border border-slate-300 rounded px-1.5 py-1 text-xs focus:border-cyan-500 outline-none h-14" placeholder="${status === 'PENDING' ? 'Jelaskan alasan pending...' : 'Tulis kendala jika ada...'}" ${status === 'PENDING' ? 'required' : ''}></textarea>
+                        <label class="block text-[10px] font-bold text-orange-500 mb-0.5 flex items-center gap-1">
+                            <i class="fa-solid fa-rotate-left text-[10px]"></i> Alasan Pending
+                        </label>
+                        <textarea id="mp_pending_reason" class="w-full border border-orange-300 bg-orange-50/20 rounded-md px-2 py-1.5 text-xs focus:border-orange-500 outline-none h-14" placeholder="Ketik alasan pending..." required></textarea>
+                    </div>` : ''}
+
+                    <!-- Tombol Aksi -->
+                    <div class="pt-2">
+                        ${status === 'COMPLETED' ? `
+                        <button type="submit" class="w-full bg-[#059669] hover:bg-emerald-700 text-white font-bold py-2.5 rounded-md text-xs transition-colors shadow flex items-center justify-center gap-1.5">
+                            <i class="fa-solid fa-check text-xs"></i> PROSES CLOSE JOB
+                        </button>` : `
+                        <button type="submit" class="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-2.5 rounded-md text-xs transition-colors shadow flex items-center justify-center gap-1.5">
+                            <i class="fa-solid fa-pause text-xs"></i> SIMPAN PENDING
+                        </button>`}
                     </div>
-                    <button type="submit" class="w-full ${status === 'COMPLETED' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-orange-500 hover:bg-orange-600'} text-white font-bold py-2 rounded text-xs transition-colors shadow-sm mt-2">
-                        ${status === 'COMPLETED' ? '<i class="fa-solid fa-check mr-1"></i> Simpan Selesai' : '<i class="fa-solid fa-pause mr-1"></i> Simpan Pending'}
-                    </button>
                 </form>
             `;
         }
@@ -2180,39 +2312,177 @@
     function submitManpowerAction(e) {
         e.preventDefault();
         if (!currentActionWo) return;
-        let jobs = getOrders();
-        let idx = jobs.findIndex(j => j.no_wo === currentActionWo);
-        if (idx === -1) return;
+        let job = getOrders().find(j => j.no_wo === currentActionWo);
+        if (!job) return;
 
         let startTime = document.getElementById('mp_start_time').value;
         let endTime = document.getElementById('mp_end_time').value;
         let finalInsp = document.getElementById('mp_final_insp')?.value || '';
-        let note = document.getElementById('mp_kendala_note')?.value.trim() || '';
+        let operatorVal = document.getElementById('mp_operator')?.value || '';
+        let riggerVal = document.getElementById('mp_rigger')?.value || '';
+        let rigger2Val = document.getElementById('mp_rigger2')?.value || '';
+        let pendingReason = document.getElementById('mp_pending_reason')?.value.trim() || '';
 
-        let durasiHours = 0;
-        if (startTime && endTime) {
-            let [h1, m1] = startTime.split(':').map(Number);
-            let [h2, m2] = endTime.split(':').map(Number);
-            let diffMin = (h2 * 60 + m2) - (h1 * 60 + m1);
-            if (diffMin < 0) diffMin += 24 * 60;
-            durasiHours = (diffMin / 60).toFixed(2);
+        // Hitung durasi kerja aktual
+        let [h1, m1] = startTime.split(':').map(Number);
+        let [h2, m2] = endTime.split(':').map(Number);
+        let actualMin = (h2 * 60 + m2) - (h1 * 60 + m1);
+        if (actualMin < 0) actualMin += 1440; // Lintas tengah malam
+
+        // Evaluasi toleransi waktu keterlambatan datang (> 15 menit)
+        let telatMinutes = 0;
+        if (job.jam_pelaksanaan && startTime) {
+            let [th, tm] = job.jam_pelaksanaan.split(':').map(Number);
+            let targetMin = th * 60 + tm;
+            let startMin = h1 * 60 + m1;
+            let diff = startMin - targetMin;
+            if (diff < -720) diff += 1440;
+            if (diff > 720) diff -= 1440;
+            if (diff > 15) telatMinutes = diff;
         }
 
-        jobs[idx].jam_start_aktual = startTime;
-        jobs[idx].jam_end_aktual = endTime;
-        jobs[idx].durasi_aktual = durasiHours;
-        jobs[idx].final_inspeksi = finalInsp;
-        jobs[idx].status = currentActionStatus;
+        // Evaluasi toleransi durasi pekerjaan overtime (> 15 menit)
+        let overMinutes = 0;
+        if (job.durasi_request) {
+            let reqMin = 0;
+            if (job.durasi_request.includes('HARI')) {
+                let days = parseFloat(job.durasi_request) || 0;
+                reqMin = days * 24 * 60;
+            } else {
+                let hours = parseFloat(job.durasi_request) || 0;
+                reqMin = hours * 60;
+            }
+            if (reqMin > 0 && (actualMin - reqMin) > 15) {
+                overMinutes = actualMin - reqMin;
+            }
+        }
 
-        if (currentActionStatus === 'PENDING') {
-            jobs[idx].alasan_telat = (jobs[idx].alasan_telat ? jobs[idx].alasan_telat + ' | ' : '') + 'Pending: ' + note;
-        } else if (note) {
-            jobs[idx].alasan_overtime = note;
+        pendingActionData = {
+            wo: currentActionWo,
+            status: currentActionStatus,
+            startTime: startTime,
+            endTime: endTime,
+            finalInsp: finalInsp,
+            operator: operatorVal,
+            rigger: riggerVal,
+            rigger2: rigger2Val,
+            pendingReason: pendingReason,
+            actualMinutes: actualMin,
+            telatMinutes: telatMinutes,
+            overMinutes: overMinutes
+        };
+
+        // Jika terdapat toleransi waktu yang terlanggar, buka modal kendala
+        if (telatMinutes > 0 || overMinutes > 0) {
+            showKendalaModal(telatMinutes, overMinutes);
+        } else {
+            finalizeJobAction('', '');
+        }
+    }
+
+    function showKendalaModal(telatMin, overMin) {
+        const c = document.getElementById('kendalaContent');
+        if (!c) return;
+
+        let telatHtml = '';
+        let overHtml = '';
+
+        if (telatMin > 0) {
+            const formattedTelat = formatDurationHM(telatMin);
+            telatHtml = `
+                <div class="mb-3">
+                    <label class="block text-[10px] font-bold text-red-600 mb-1 flex items-center gap-1">
+                        <i class="fa-solid fa-triangle-exclamation"></i> Alasan Telat Datang (+${formattedTelat}) *
+                    </label>
+                    <textarea id="kendala_telat_text" class="w-full border border-red-300 bg-red-50/20 rounded-md px-2.5 py-1.5 text-xs focus:border-red-500 outline-none h-14" placeholder="Ketik alasan telat datang..." required></textarea>
+                </div>
+            `;
+        }
+
+        if (overMin > 0) {
+            const formattedOver = formatDurationHM(overMin);
+            overHtml = `
+                <div class="mb-3">
+                    <label class="block text-[10px] font-bold text-orange-600 mb-1 flex items-center gap-1">
+                        <i class="fa-solid fa-hourglass-half"></i> Alasan Over Job (+${formattedOver}) *
+                    </label>
+                    <textarea id="kendala_over_text" class="w-full border border-orange-300 bg-orange-50/20 rounded-md px-2.5 py-1.5 text-xs focus:border-orange-500 outline-none h-14" placeholder="Ketik alasan pekerjaan overtime..." required></textarea>
+                </div>
+            `;
+        }
+
+        c.innerHTML = `
+            <p class="text-[10px] text-slate-600 mb-3 leading-relaxed">
+                Pekerjaan terdeteksi melebihi toleransi waktu (15 menit). Silakan masukkan alasan kendala:
+            </p>
+            <form onsubmit="submitKendalaAction(event)">
+                ${telatHtml}
+                ${overHtml}
+                <div class="flex gap-2 mt-4">
+                    <button type="button" onclick="document.getElementById('kendalaModal').classList.add('hidden')" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 rounded-md text-xs transition-colors">
+                        Batal
+                    </button>
+                    <button type="submit" class="flex-1 bg-[#0891b2] hover:bg-cyan-700 text-white font-bold py-2 rounded-md text-xs transition-colors shadow">
+                        Simpan Kendala
+                    </button>
+                </div>
+            </form>
+        `;
+        document.getElementById('kendalaModal').classList.remove('hidden');
+    }
+
+    function submitKendalaAction(e) {
+        e.preventDefault();
+        const telatEl = document.getElementById('kendala_telat_text');
+        const overEl = document.getElementById('kendala_over_text');
+
+        let telatReason = telatEl ? telatEl.value.trim() : '';
+        let overReason = overEl ? overEl.value.trim() : '';
+
+        if (pendingActionData.telatMinutes > 0 && !telatReason) {
+            return showToast('Mohon isi alasan telat datang!', 'error');
+        }
+        if (pendingActionData.overMinutes > 0 && !overReason) {
+            return showToast('Mohon isi alasan over job!', 'error');
+        }
+
+        document.getElementById('kendalaModal').classList.add('hidden');
+        finalizeJobAction(telatReason, overReason);
+    }
+
+    function finalizeJobAction(telatReason, overReason) {
+        if (!pendingActionData) return;
+        let jobs = getOrders();
+        let idx = jobs.findIndex(j => j.no_wo === pendingActionData.wo);
+        if (idx === -1) return;
+
+        const durasiHours = (pendingActionData.actualMinutes / 60).toFixed(2);
+
+        jobs[idx].jam_start_aktual = pendingActionData.startTime;
+        jobs[idx].jam_end_aktual = pendingActionData.endTime;
+        jobs[idx].durasi_aktual = durasiHours;
+        jobs[idx].final_inspeksi = pendingActionData.finalInsp;
+        jobs[idx].operator = pendingActionData.operator || jobs[idx].operator;
+        jobs[idx].rigger = pendingActionData.rigger || jobs[idx].rigger;
+        if (pendingActionData.rigger2) jobs[idx].rigger2 = pendingActionData.rigger2;
+        jobs[idx].status = pendingActionData.status;
+
+        if (telatReason) {
+            const formattedTelat = formatDurationHM(pendingActionData.telatMinutes);
+            jobs[idx].alasan_telat = `Telat (+${formattedTelat}): ${telatReason}`;
+        }
+        if (overReason) {
+            const formattedOver = formatDurationHM(pendingActionData.overMinutes);
+            jobs[idx].alasan_overtime = `Over (+${formattedOver}): ${overReason}`;
+        }
+        if (pendingActionData.status === 'PENDING' && pendingActionData.pendingReason) {
+            jobs[idx].alasan_telat = (jobs[idx].alasan_telat ? jobs[idx].alasan_telat + ' | ' : '') + 'Pending: ' + pendingActionData.pendingReason;
         }
 
         saveOrders(jobs);
-        showToast(currentActionStatus === 'COMPLETED' ? 'Job diselesaikan!' : 'Job ditandai pending.');
+        showToast(pendingActionData.status === 'COMPLETED' ? 'Pekerjaan berhasil diselesaikan!' : 'Pekerjaan berhasil dipending.');
         document.getElementById('mpActionModal').classList.add('hidden');
+        pendingActionData = null;
         renderApp(true);
     }
 
@@ -2528,7 +2798,7 @@
                 <div class="font-bold text-slate-500 mb-1 tracking-wider uppercase text-[9px]"><i class="fa-solid fa-clock mr-1"></i>Data Waktu Lapangan Aktual</div>
                 <div class="grid grid-cols-2 gap-2">
                     <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">WAKTU KERJA</div><div class="font-bold text-slate-700 font-mono tracking-tighter">${job.jam_start_aktual || '--:--'} s/d ${job.jam_end_aktual || '--:--'}</div></div>
-                    <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">DURASI AKTUAL</div><div class="font-bold text-slate-700">${job.durasi_aktual ? job.durasi_aktual + ' Jam' : '-'}</div></div>
+                    <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">DURASI AKTUAL</div><div class="font-bold text-slate-700">${job.durasi_aktual ? formatDurationHM(parseFloat(job.durasi_aktual) * 60) : '-'}</div></div>
                 </div>
                 <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">KENDALA LAPANGAN</div><div class="font-bold text-red-600">${job.alasan_telat || job.alasan_overtime ? (job.alasan_telat || '') + ' ' + (job.alasan_overtime || '') : '-'}</div></div>
             </div>
