@@ -69,6 +69,8 @@
         .fc-daygrid-day-frame:hover { background-color: rgba(8, 145, 178, 0.05); }
         .fc-daygrid-day.fc-day-today { background-color: #f0fdfa !important; }
         .fc-event, .fc-event-main, .fc-event-title { pointer-events: none !important; cursor: default !important; border: none !important; border-radius: 2px; padding: 4px 2px; font-size: 9px; font-weight: bold; text-align: left; color: #000000 !important; white-space: normal !important; }
+        .fc-daygrid-more-link { font-size: 9px !important; font-weight: 700 !important; color: #0891b2 !important; text-decoration: none !important; padding: 1px 5px !important; background-color: #ecfeff !important; border: 1px solid #cffafe !important; border-radius: 4px !important; display: inline-block !important; margin: 2px 0 1px 2px !important; transition: all 0.2s !important; }
+        .fc-daygrid-more-link:hover { background-color: #cffafe !important; color: #0e7490 !important; }
 
         /* Tata letak simetris 3 kolom: Kiri (Navigasi), Tengah (Bulan & Tahun), Kanan (Legenda) */
         @media (min-width: 641px) {
@@ -107,30 +109,49 @@
                 flex-wrap: wrap !important;
                 justify-content: space-between !important;
                 align-items: center !important;
-                gap: 8px !important;
+                gap: 6px !important;
+                margin-bottom: 8px !important;
             }
-            .fc .fc-toolbar-chunk:nth-child(1) {
-                order: 1;
-                display: flex !important;
-                align-items: center !important;
-                gap: 4px !important;
-            }
+            /* Baris 1: Judul Bulan & Tahun berada di atas dan tepat di tengah (center) */
             .fc .fc-toolbar-chunk:nth-child(2) {
-                order: 2;
-                display: flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-                text-align: center !important;
-                margin: 0 auto !important;
-            }
-            .fc .fc-toolbar-chunk:nth-child(3) {
-                order: 3;
+                order: 1 !important;
                 width: 100% !important;
                 display: flex !important;
                 align-items: center !important;
                 justify-content: center !important;
-                gap: 6px !important;
-                margin-top: 2px !important;
+                text-align: center !important;
+                margin: 0 auto 4px auto !important;
+            }
+            .fc .fc-toolbar-title {
+                font-size: 13px !important;
+                text-align: center !important;
+                width: 100% !important;
+            }
+            /* Baris 2 Kiri: Tombol navigasi (< > dan Hari Ini) */
+            .fc .fc-toolbar-chunk:nth-child(1) {
+                order: 2 !important;
+                display: flex !important;
+                align-items: center !important;
+                gap: 3px !important;
+            }
+            /* Baris 2 Kanan: Keterangan status di bawah berdampingan dengan tombol navigasi */
+            .fc .fc-toolbar-chunk:nth-child(3) {
+                order: 3 !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: flex-end !important;
+                gap: 3px !important;
+                flex: 1 !important;
+            }
+            #bcCalendarLegend {
+                display: flex !important;
+                flex-wrap: wrap !important;
+                justify-content: flex-end !important;
+                gap: 3px !important;
+            }
+            #bcCalendarLegend span {
+                font-size: 8px !important;
+                padding: 2px 4px !important;
             }
         }
     </style>
@@ -2786,7 +2807,18 @@
             events: events,
             height: 'auto',
             contentHeight: 'auto',
-            dayMaxEvents: false,
+            dayMaxEvents: 5,
+            moreLinkText: function(num) { return '+' + num; },
+            moreLinkClick: function(arg) {
+                if (arg && arg.jsEvent) arg.jsEvent.preventDefault();
+                let dateStr = arg ? arg.dateStr : null;
+                if (!dateStr && arg && arg.date) {
+                    let d = arg.date;
+                    dateStr = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+                }
+                if (dateStr) showDayJobsModal(dateStr);
+                return false;
+            },
             eventClick: function(info) { info.jsEvent.preventDefault(); },
             dateClick: function(info) { showDayJobsModal(info.dateStr); },
             datesSet: function(info) {
