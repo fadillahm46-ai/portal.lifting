@@ -60,7 +60,7 @@
         }
 
         /* FullCalendar Custom Theme */
-        .fc .fc-toolbar-title { font-size: 13px !important; font-weight: bold; color: #0891b2; text-transform: uppercase; }
+        .fc .fc-toolbar-title { font-size: 13px !important; font-weight: bold; color: #0891b2; text-transform: uppercase; text-align: center !important; }
         .fc-theme-standard th { background-color: #0891b2; color: white; padding: 6px 0; border-color: #0891b2; text-transform: uppercase; font-size: 10px; }
         .fc-daygrid-day-number { font-size: 11px; font-weight: bold; color: #334155; width: 100%; text-align: center; margin-top: 4px; text-decoration: none !important; }
         .fc-button-primary { background-color: #0891b2 !important; border-color: #0891b2 !important; font-size: 10px !important; font-weight: bold !important; text-transform: capitalize !important; }
@@ -69,6 +69,70 @@
         .fc-daygrid-day-frame:hover { background-color: rgba(8, 145, 178, 0.05); }
         .fc-daygrid-day.fc-day-today { background-color: #f0fdfa !important; }
         .fc-event, .fc-event-main, .fc-event-title { pointer-events: none !important; cursor: default !important; border: none !important; border-radius: 2px; padding: 4px 2px; font-size: 9px; font-weight: bold; text-align: left; color: #000000 !important; white-space: normal !important; }
+
+        /* Tata letak simetris 3 kolom: Kiri (Navigasi), Tengah (Bulan & Tahun), Kanan (Legenda) */
+        @media (min-width: 641px) {
+            .fc .fc-toolbar {
+                display: grid !important;
+                grid-template-columns: 1fr auto 1fr !important;
+                align-items: center !important;
+                gap: 8px !important;
+            }
+            .fc .fc-toolbar-chunk:nth-child(1) {
+                display: flex !important;
+                align-items: center !important;
+                gap: 6px !important;
+                justify-self: start !important;
+            }
+            .fc .fc-toolbar-chunk:nth-child(2) {
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                justify-self: center !important;
+                text-align: center !important;
+            }
+            .fc .fc-toolbar-chunk:nth-child(3) {
+                display: flex !important;
+                align-items: center !important;
+                justify-content: flex-end !important;
+                justify-self: end !important;
+                gap: 6px !important;
+            }
+        }
+
+        /* Penataan responsif untuk layar HP kecil */
+        @media (max-width: 640px) {
+            .fc .fc-toolbar {
+                display: flex !important;
+                flex-wrap: wrap !important;
+                justify-content: space-between !important;
+                align-items: center !important;
+                gap: 8px !important;
+            }
+            .fc .fc-toolbar-chunk:nth-child(1) {
+                order: 1;
+                display: flex !important;
+                align-items: center !important;
+                gap: 4px !important;
+            }
+            .fc .fc-toolbar-chunk:nth-child(2) {
+                order: 2;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                text-align: center !important;
+                margin: 0 auto !important;
+            }
+            .fc .fc-toolbar-chunk:nth-child(3) {
+                order: 3;
+                width: 100% !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                gap: 6px !important;
+                margin-top: 2px !important;
+            }
+        }
     </style>
 </head>
 <body class="antialiased text-[11px] sm:text-xs">
@@ -1075,7 +1139,7 @@
             
             <!-- Watermark Footer -->
             <div class="text-center mt-6 mb-2 text-[10px] text-slate-300 font-medium italic relative z-0">
-                Created by Fadilahm
+                Support Equipment &bull; PT Putra Perkasa Abadi
             </div>
             
         </div>`;
@@ -2653,8 +2717,20 @@
         const el = document.getElementById('fullcalendar-container');
         if (!el || typeof FullCalendar === 'undefined') return;
 
-        const activeStatuses = ['SCHEDULED', 'UNSCHEDULED', 'PENDING', 'ON PROGRESS'];
-        const jobs = getOrders().filter(j => j.kategori === 'Big Crane' && activeStatuses.includes(j.status));
+        const currentUser = JSON.parse(localStorage.getItem('lifting_user')) || {};
+        const isAdminOrGL = currentUser.role === 'ADMIN' || currentUser.role === 'GL';
+
+        // Filter pekerjaan Big Crane berdasarkan role
+        // Admin & GL: Semua job yang belum di-action maupun sudah selesai (CANCELED diabaikan)
+        // User: Hanya yang masih terjadwal dan in-progress (COMPLETED & CANCELED dihilangkan)
+        const jobs = getOrders().filter(j => {
+            if (j.kategori !== 'Big Crane' || j.status === 'CANCELED') return false;
+            if (isAdminOrGL) {
+                return true; // Tampilkan SCHEDULED, UNSCHEDULED, PENDING, ON PROGRESS, COMPLETED
+            } else {
+                return ['SCHEDULED', 'UNSCHEDULED', 'PENDING', 'ON PROGRESS'].includes(j.status);
+            }
+        });
 
         const eventColors = [
             'rgba(14, 165, 233, 0.7)',
@@ -2679,7 +2755,21 @@
             }
 
             let color = eventColors[idx % eventColors.length];
-            let displayTitle = (j.deskripsi || 'TANPA DESKRIPSI').toUpperCase();
+
+            // Tanda status di ujung teks:
+            // Schedule / Unscheduled / Pending: ⚪ Abu-abu
+            // Progres: 🔵 Biru tua
+            // Completed: 🟢 Hijau
+            let statusEmoji = '⚪';
+            if (j.status === 'COMPLETED') {
+                statusEmoji = '🟢';
+            } else if (j.status === 'ON PROGRESS') {
+                statusEmoji = '🔵';
+            } else {
+                statusEmoji = '⚪';
+            }
+
+            let displayTitle = `${(j.deskripsi || 'TANPA DESKRIPSI').toUpperCase()} ${statusEmoji}`;
 
             let eventObj = { title: displayTitle, start: startStr, backgroundColor: color, borderColor: color, textColor: '#000000', extendedProps: { wo: j.no_wo, status: j.status, deskripsi: j.deskripsi } };
             if (endStr) { eventObj.end = endStr; eventObj.allDay = true; }
@@ -2707,6 +2797,46 @@
                 let jobCount = jobs.filter(j => j.tgl_pelaksanaan && j.tgl_pelaksanaan.startsWith(monthPrefix)).length;
                 let textEl = document.getElementById('bcTotalJobText');
                 if (textEl) textEl.innerText = jobCount;
+
+                // Menempatkan legenda status di ujung kanan toolbar kalender
+                const toolbar = el.querySelector('.fc-toolbar');
+                if (toolbar) {
+                    const chunks = toolbar.querySelectorAll('.fc-toolbar-chunk');
+                    const rightChunk = chunks.length >= 3 ? chunks[2] : chunks[chunks.length - 1];
+                    if (rightChunk) {
+                        let legendEl = document.getElementById('bcCalendarLegend');
+                        if (!legendEl) {
+                            legendEl = document.createElement('div');
+                            legendEl.id = 'bcCalendarLegend';
+                        }
+                        legendEl.className = 'flex items-center gap-1.5 flex-wrap justify-end';
+                        if (legendEl.parentElement !== rightChunk) {
+                            rightChunk.appendChild(legendEl);
+                        }
+                        if (isAdminOrGL) {
+                            legendEl.innerHTML = `
+                                <span class="inline-flex items-center gap-1 text-[8px] sm:text-[9px] font-bold text-slate-700 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded shadow-2xs" title="Scheduled / Unscheduled">
+                                    <span>⚪</span> SCH/UNSC
+                                </span>
+                                <span class="inline-flex items-center gap-1 text-[8px] sm:text-[9px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded shadow-2xs" title="On Progress">
+                                    <span>🔵</span> PROGRES
+                                </span>
+                                <span class="inline-flex items-center gap-1 text-[8px] sm:text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded shadow-2xs" title="Completed">
+                                    <span>🟢</span> COMPLETED
+                                </span>
+                            `;
+                        } else {
+                            legendEl.innerHTML = `
+                                <span class="inline-flex items-center gap-1 text-[8px] sm:text-[9px] font-bold text-slate-700 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded shadow-2xs" title="Scheduled / Unscheduled">
+                                    <span>⚪</span> SCH/UNSC
+                                </span>
+                                <span class="inline-flex items-center gap-1 text-[8px] sm:text-[9px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded shadow-2xs" title="On Progress">
+                                    <span>🔵</span> PROGRES
+                                </span>
+                            `;
+                        }
+                    }
+                }
             }
         });
         calendar.render();
@@ -2716,9 +2846,13 @@
 
     function showDayJobsModal(dateStr) {
         let clickDate = new Date(dateStr); clickDate.setHours(0,0,0,0);
-        const activeStatuses = ['SCHEDULED', 'UNSCHEDULED', 'PENDING', 'ON PROGRESS'];
+        const currentUser = JSON.parse(localStorage.getItem('lifting_user')) || {};
+        const isAdminOrGL = currentUser.role === 'ADMIN' || currentUser.role === 'GL';
+
         const jobs = getOrders().filter(j => {
-            if (j.kategori !== 'Big Crane' || !activeStatuses.includes(j.status)) return false;
+            if (j.kategori !== 'Big Crane' || j.status === 'CANCELED') return false;
+            if (!isAdminOrGL && j.status === 'COMPLETED') return false;
+
             let startDate = new Date(j.tgl_pelaksanaan); startDate.setHours(0,0,0,0);
             let endDate = new Date(j.tgl_pelaksanaan); endDate.setHours(0,0,0,0);
             if (j.durasi_request && j.durasi_request.includes('HARI')) {
@@ -2737,7 +2871,8 @@
         } else {
             content = jobs.map(job => {
                 let statusColor = job.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : (job.status === 'ON PROGRESS' ? 'bg-blue-100 text-blue-700 border-blue-200' : (job.status === 'PENDING' ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-slate-100 text-slate-700 border-slate-200'));
-                return `<div class="bg-white border border-slate-200 rounded-md p-2.5 mb-2 cursor-pointer hover:border-cyan-400 shadow-sm transition-all" onclick="document.getElementById('dayJobsModal').classList.add('hidden'); viewJobDetail('${job.no_wo}')"><div class="flex justify-between items-center mb-1 border-b border-slate-100 pb-1"><span class="text-[10px] font-bold text-cyan-600 font-mono">${job.no_wo}</span><span class="${statusColor} text-[8px] font-bold px-1.5 py-0.5 border rounded-sm tracking-wide">${job.status}</span></div><div class="text-[11px] font-bold text-slate-800 uppercase mt-1 leading-tight">${job.unit ? '['+job.unit+']' : '<span class="text-red-500">[TBA]</span>'} ${job.nama_pemohon}</div><div class="text-[9px] text-slate-500 truncate mt-1 bg-slate-50 p-1 rounded border border-slate-100">${job.deskripsi}</div></div>`;
+                let statusEmoji = job.status === 'COMPLETED' ? '🟢' : (job.status === 'ON PROGRESS' ? '🔵' : '⚪');
+                return `<div class="bg-white border border-slate-200 rounded-md p-2.5 mb-2 cursor-pointer hover:border-cyan-400 shadow-sm transition-all" onclick="document.getElementById('dayJobsModal').classList.add('hidden'); viewJobDetail('${job.no_wo}')"><div class="flex justify-between items-center mb-1 border-b border-slate-100 pb-1"><span class="text-[10px] font-bold text-cyan-600 font-mono">${job.no_wo}</span><span class="${statusColor} text-[8px] font-bold px-1.5 py-0.5 border rounded-sm tracking-wide flex items-center gap-1"><span>${statusEmoji}</span>${job.status}</span></div><div class="text-[11px] font-bold text-slate-800 uppercase mt-1 leading-tight">${job.unit ? '['+job.unit+']' : '<span class="text-red-500">[TBA]</span>'} ${job.nama_pemohon}</div><div class="text-[9px] text-slate-500 truncate mt-1 bg-slate-50 p-1 rounded border border-slate-100">${job.deskripsi} ${statusEmoji}</div></div>`;
             }).join('');
         }
         document.getElementById('dayJobsTitle').innerText = dateIndo;
