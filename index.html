@@ -253,34 +253,21 @@
         return `${m} Menit`;
     }
 
-    function getJobOperationalDate(j) {
-        if (!j || !j.tgl_pelaksanaan) return '';
-        const tgl = j.tgl_pelaksanaan;
-        const jam = j.jam_pelaksanaan;
-        if (!jam) return tgl;
-        const parts = jam.split(':');
-        const h = parseInt(parts[0], 10);
-        // Jam 00:00 s/d 04:59 terhitung hari operasional kemarin (Shift 2)
-        if (!isNaN(h) && h < 5) {
-            const d = new Date(tgl + 'T12:00:00');
-            d.setDate(d.getDate() - 1);
-            const yyyy = d.getFullYear();
-            const mm = String(d.getMonth() + 1).padStart(2, '0');
-            const dd = String(d.getDate()).padStart(2, '0');
-            return `${yyyy}-${mm}-${dd}`;
-        }
-        return tgl;
-    }
+function getJobOperationalDate(j) {
+    if (!j || !j.tgl_pelaksanaan) return '';
+    // Murni membaca tanggal pelaksanaan sesuai yang diinput tanpa dimundurkan
+    return j.tgl_pelaksanaan;
+}
 
-    function getJobOperationalShift(j) {
-        if (!j) return 'Shift 1';
-        if (!j.jam_pelaksanaan) return j.shift || 'Shift 1';
-        const parts = j.jam_pelaksanaan.split(':');
-        const h = parseInt(parts[0], 10);
-        if (isNaN(h)) return j.shift || 'Shift 1';
-        // Shift 1: 05:00 - 16:59, Shift 2: 17:00 - 04:59
-        return (h >= 5 && h < 17) ? 'Shift 1' : 'Shift 2';
-    }
+function getJobOperationalShift(j) {
+    if (!j) return 'Shift 1';
+    if (!j.jam_pelaksanaan) return j.shift || 'Shift 1';
+    const parts = j.jam_pelaksanaan.split(':');
+    const h = parseInt(parts[0], 10);
+    if (isNaN(h)) return j.shift || 'Shift 1';
+    // Shift 1: 05:00 - 16:59, Shift 2: 17:00 - 04:59 (termasuk jam 02:00 dini hari)
+    return (h >= 5 && h < 17) ? 'Shift 1' : 'Shift 2';
+}
 
     function formatLocalTimestamp(isoString) {
         if (!isoString) return '-';
