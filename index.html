@@ -59,6 +59,15 @@
             z-index: 9999; transition: opacity 0.8s ease-out;
         }
 
+        /* Sticky Table Header styling */
+        .table-sticky-header th {
+            position: sticky;
+            top: 0;
+            background-color: #f1f5f9;
+            z-index: 20;
+            box-shadow: inset 0 -1px 0 #e2e8f0;
+        }
+
         /* FullCalendar Custom Theme */
         .fc .fc-toolbar-title { font-size: 13px !important; font-weight: bold; color: #0891b2; text-transform: uppercase; text-align: center !important; }
         .fc-theme-standard th { background-color: #0891b2; color: white; padding: 6px 0; border-color: #0891b2; text-transform: uppercase; font-size: 10px; }
@@ -289,11 +298,27 @@
     let userRoleFilter = 'ALL'; 
     let userSortCol = 'nama_lengkap'; 
     let userSortDir = 'asc';
+    let orderSearchQuery = '';
 
     let pendingCancelWo = null;
     let currentActionWo = null;
     let currentActionStatus = null;
     let pendingActionData = null;
+
+    function executeOrderSearch() {
+        const input = document.getElementById('order_search_input');
+        if (input) {
+            orderSearchQuery = input.value.trim();
+            renderApp(true);
+        }
+    }
+
+    function clearOrderSearch() {
+        orderSearchQuery = '';
+        const input = document.getElementById('order_search_input');
+        if (input) input.value = '';
+        renderApp(true);
+    }
 
     var isPreviewCanvas = window.self !== window.top || window.location.hostname.includes('usercontent.goog');
 
@@ -1859,6 +1884,19 @@
                 jobs = jobs.filter(j => j.kategori === filterKategori);
             }
 
+            if (orderSearchQuery) {
+                const q = orderSearchQuery.toLowerCase();
+                jobs = jobs.filter(j => {
+                    const fullText = [
+                        j.no_wo, j.nama_pemohon, j.nrp_pemohon, j.perusahaan, j.departemen,
+                        j.section, j.kategori, j.unit, j.operator, j.rigger, j.rigger2,
+                        j.gl, j.lokasi_angkat, j.lokasi_tujuan, j.deskripsi, j.status,
+                        j.alasan_telat, j.alasan_overtime
+                    ].filter(Boolean).join(' ').toLowerCase();
+                    return fullText.includes(q);
+                });
+            }
+
             // Urutkan data sesuai kolom dan arah sort aktif di tabel
             jobs.sort((a, b) => {
                 let valA = (a[sortColumn] || '').toString().toLowerCase(); 
@@ -1992,6 +2030,19 @@
 
             if (filterKategori !== 'ALL') jobs = jobs.filter(j => j.kategori === filterKategori);
 
+            if (orderSearchQuery) {
+                const q = orderSearchQuery.toLowerCase();
+                jobs = jobs.filter(j => {
+                    const fullText = [
+                        j.no_wo, j.nama_pemohon, j.nrp_pemohon, j.perusahaan, j.departemen,
+                        j.section, j.kategori, j.unit, j.operator, j.rigger, j.rigger2,
+                        j.gl, j.lokasi_angkat, j.lokasi_tujuan, j.deskripsi, j.status,
+                        j.alasan_telat, j.alasan_overtime
+                    ].filter(Boolean).join(' ').toLowerCase();
+                    return fullText.includes(q);
+                });
+            }
+
             jobs.sort((a, b) => {
                 let valA = (a[sortColumn] || '').toString().toLowerCase(); 
                 let valB = (b[sortColumn] || '').toString().toLowerCase();
@@ -2012,38 +2063,65 @@
             let pendingCount = jobs.filter(j => j.status === 'SCHEDULED' || j.status === 'UNSCHEDULED' || (j.status === 'PENDING' && (!j.operator || !j.rigger))).length;
 
             return `
-            <div class="bg-white rounded-md shadow-sm border border-slate-200">
-                <div class="p-2 border-b border-slate-200 flex flex-col sm:flex-row gap-2 justify-between bg-slate-50/50 rounded-t-md relative z-20">
-                    <div class="flex items-center justify-between sm:justify-start gap-2 w-full sm:w-auto">
-                        <div class="flex items-center gap-1.5 shrink-0">
-                            <h2 class="text-sm font-bold text-slate-800"><i class="fa-solid fa-database mr-1 text-cyan-600"></i>Data Order</h2>
-                            <button onclick="fetchFromSupabase(true)" class="bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-600 font-bold px-1.5 py-0.5 rounded-sm shadow-sm text-[9px] flex items-center gap-1 transition-colors"><i class="fa-solid fa-rotate"></i> Sync</button>
+            <div class="bg-white rounded-md shadow-sm border border-slate-200 flex flex-col">
+                <!-- WRAPPER STICKY HEADER: BARIS 1 & BARIS 2 TETAP DIAM DI ATAS SAAT SCROLL -->
+                <div class="sticky top-0 z-30 bg-white rounded-t-md border-b border-slate-200 shadow-xs">
+                    <!-- HEADER BARIS 1: DATA ORDER, TOMBOL SYNC, LOGO VALIDASI & EXPORT DI UJUNG KANAN -->
+                    <div class="p-2.5 border-b border-slate-200 flex items-center justify-between bg-slate-50/95 rounded-t-md backdrop-blur-xs">
+                        <div class="flex items-center gap-2">
+                            <h2 class="text-sm font-bold text-slate-800 flex items-center"><i class="fa-solid fa-database mr-1.5 text-cyan-600"></i>Data Order</h2>
+                            <button onclick="fetchFromSupabase(true)" class="bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-600 font-bold px-2 py-1 rounded shadow-2xs text-[10px] flex items-center gap-1 transition-colors"><i class="fa-solid fa-rotate"></i> Sync</button>
                         </div>
-                        <div class="flex items-center gap-1.5 shrink-0">
-                            <div class="bg-red-50 text-red-600 border border-red-200 px-1.5 py-0.5 rounded-sm font-semibold text-[10px]" title="Butuh Validasi/Penugasan">Validasi: ${pendingCount}</div>
-                            <button onclick="downloadCSVBlob()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-0.5 rounded-sm transition-colors flex items-center gap-1 shadow-sm text-[10px]"><i class="fa-solid fa-file-excel"></i> Export</button>
+                        <div class="flex items-center gap-2">
+                            <div class="bg-red-50 text-red-600 border border-red-200 px-2.5 py-1 rounded font-bold text-[10px] shadow-2xs" title="Butuh Validasi/Penugasan">Validasi: ${pendingCount}</div>
+                            <button onclick="downloadCSVBlob()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1 rounded shadow-2xs transition-colors flex items-center gap-1.5 text-[10px]"><i class="fa-solid fa-file-excel"></i> Export</button>
                         </div>
                     </div>
-                    <div class="flex items-center gap-1 text-[10px] w-full sm:w-auto overflow-x-auto hide-scrollbar pb-0.5 sm:pb-0">
-                        <input type="date" id="filter_tgl_mulai" class="border border-slate-300 rounded-sm px-1 py-0.5 text-slate-700 focus:outline-none focus:border-cyan-500 shrink-0" value="${tglMulai}" onchange="renderApp(true)">
-                        <span class="text-slate-400 shrink-0">-</span>
-                        <input type="date" id="filter_tgl_selesai" class="border border-slate-300 rounded-sm px-1 py-0.5 text-slate-700 focus:outline-none focus:border-cyan-500 shrink-0" value="${tglSelesai}" onchange="renderApp(true)">
-                        <select id="filter_shift" class="border border-slate-300 rounded-sm px-1 py-0.5 text-slate-700 focus:outline-none focus:border-cyan-500 shrink-0 ml-1 bg-white cursor-pointer" onchange="renderApp(true)">
-                            <option value="ALL" ${filterShift === 'ALL' ? 'selected' : ''}>Semua Shift</option>
-                            <option value="Shift 1" ${filterShift === 'Shift 1' ? 'selected' : ''}>Shift 1 (05:00-16:59)</option>
-                            <option value="Shift 2" ${filterShift === 'Shift 2' ? 'selected' : ''}>Shift 2 (17:00-04:59)</option>
-                        </select>
-                        <select id="filter_admin_kategori" class="border border-slate-300 rounded-sm px-1 py-0.5 text-slate-700 focus:outline-none focus:border-cyan-500 shrink-0 ml-1 bg-white cursor-pointer" onchange="renderApp(true)">
-                            <option value="ALL" ${filterKategori === 'ALL' ? 'selected' : ''}>Semua Armada</option>
-                            <option value="Crane Truck" ${filterKategori === 'Crane Truck' ? 'selected' : ''}>Crane Truck</option>
-                            <option value="Big Crane" ${filterKategori === 'Big Crane' ? 'selected' : ''}>Big Crane</option>
-                            <option value="Lowboy" ${filterKategori === 'Lowboy' ? 'selected' : ''}>Lowboy</option>
-                        </select>
+
+                    <!-- HEADER BARIS 2: SEARCHING DENGAN TOMBOL HIJAU TOSKA & FILTER TANGGAL/SHIFT/ARMADA SIMETRIS -->
+                    <div class="p-2.5 bg-white flex flex-col md:flex-row items-center justify-between gap-3">
+                        <!-- Sisi Kiri: Kotak Pencarian Global -->
+                        <div class="flex items-center w-full md:w-80 shrink-0">
+                            <div class="relative flex-1">
+                                <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                                <input type="text" id="order_search_input" value="${orderSearchQuery}" onkeyup="if(event.key==='Enter') executeOrderSearch()" placeholder="Search with keyword..." class="w-full pl-8 pr-7 py-1.5 text-xs bg-slate-50/50 border border-r-0 border-slate-300 rounded-l-lg focus:outline-none focus:border-teal-500 focus:bg-white transition-colors">
+                                ${orderSearchQuery ? `<button onclick="clearOrderSearch()" class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs p-1" title="Hapus pencarian"><i class="fa-solid fa-xmark"></i></button>` : ''}
+                            </div>
+                            <button onclick="executeOrderSearch()" class="bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-semibold text-xs px-4 py-1.5 rounded-r-lg border border-teal-600 transition-colors shadow-sm flex items-center justify-center">Search</button>
+                        </div>
+
+                        <!-- Sisi Tengah / Kanan: Filter Tanggal, Shift, dan Armada Simetris -->
+                        <div class="flex flex-wrap items-center justify-center md:justify-end gap-1.5 text-[10px] w-full md:w-auto">
+                            <div class="flex items-center bg-slate-50 border border-slate-300 rounded-md px-1.5 py-1 shadow-2xs">
+                                <i class="fa-regular fa-calendar text-slate-400 mr-1 text-[10px]"></i>
+                                <input type="date" id="filter_tgl_mulai" class="bg-transparent text-slate-700 focus:outline-none text-[10px]" value="${tglMulai}" onchange="renderApp(true)">
+                                <span class="text-slate-400 mx-1 font-semibold">-</span>
+                                <input type="date" id="filter_tgl_selesai" class="bg-transparent text-slate-700 focus:outline-none text-[10px]" value="${tglSelesai}" onchange="renderApp(true)">
+                            </div>
+                            <div class="flex items-center bg-slate-50 border border-slate-300 rounded-md px-1.5 py-1 shadow-2xs">
+                                <select id="filter_shift" class="bg-transparent text-slate-700 focus:outline-none cursor-pointer text-[10px] font-medium" onchange="renderApp(true)">
+                                    <option value="ALL" ${filterShift === 'ALL' ? 'selected' : ''}>Semua Shift</option>
+                                    <option value="Shift 1" ${filterShift === 'Shift 1' ? 'selected' : ''}>Shift 1 (05:00-16:59)</option>
+                                    <option value="Shift 2" ${filterShift === 'Shift 2' ? 'selected' : ''}>Shift 2 (17:00-04:59)</option>
+                                </select>
+                            </div>
+                            <div class="flex items-center bg-slate-50 border border-slate-300 rounded-md px-1.5 py-1 shadow-2xs">
+                                <select id="filter_admin_kategori" class="bg-transparent text-slate-700 focus:outline-none cursor-pointer text-[10px] font-medium" onchange="renderApp(true)">
+                                    <option value="ALL" ${filterKategori === 'ALL' ? 'selected' : ''}>Semua Armada</option>
+                                    <option value="Crane Truck" ${filterKategori === 'Crane Truck' ? 'selected' : ''}>Crane Truck</option>
+                                    <option value="Big Crane" ${filterKategori === 'Big Crane' ? 'selected' : ''}>Big Crane</option>
+                                    <option value="Lowboy" ${filterKategori === 'Lowboy' ? 'selected' : ''}>Lowboy</option>
+                                </select>
+                            </div>
+                            ${orderSearchQuery ? `<button onclick="clearOrderSearch()" class="bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-600 px-2 py-1 rounded text-[9px] font-semibold flex items-center gap-1 transition-colors"><i class="fa-solid fa-rotate-left text-[9px]"></i> Reset Filter</button>` : ''}
+                        </div>
                     </div>
                 </div>
-                <div class="overflow-x-auto w-full relative z-0">
+
+                <!-- TABEL DATA DENGAN SCROLL MANDIRI & STICKY COLUMN HEADER -->
+                <div class="overflow-x-auto overflow-y-auto max-h-[calc(100vh-270px)] md:max-h-[calc(100vh-185px)] w-full relative z-0">
                     <table class="w-full text-left border-collapse">
-                        <thead class="bg-slate-100 text-slate-600 text-[10px] border-b border-slate-200">
+                        <thead class="table-sticky-header text-slate-600 text-[10px] border-b border-slate-200">
                             <tr>
                                 <th class="px-1 md:px-2 py-1.5 text-center font-semibold w-8 md:w-20 cursor-pointer hover:bg-slate-200" onclick="handleSort('status')">Aksi ${getSortIcon('status')}</th>
                                 <th class="px-2 py-1.5 font-semibold w-24 md:w-28 cursor-pointer hover:bg-slate-200 select-none transition-colors" onclick="handleSort('no_wo')">No LIFT & Waktu ${getSortIcon('no_wo')}</th>
