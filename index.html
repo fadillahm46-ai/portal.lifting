@@ -253,21 +253,34 @@
         return `${m} Menit`;
     }
 
-function getJobOperationalDate(j) {
-    if (!j || !j.tgl_pelaksanaan) return '';
-    // Murni membaca tanggal pelaksanaan sesuai yang diinput tanpa dimundurkan
-    return j.tgl_pelaksanaan;
-}
+    function getJobOperationalDate(j) {
+        if (!j || !j.tgl_pelaksanaan) return '';
+        const tgl = j.tgl_pelaksanaan;
+        const jam = j.jam_pelaksanaan;
+        if (!jam) return tgl;
+        const parts = jam.split(':');
+        const h = parseInt(parts[0], 10);
+        // Jam 00:00 s/d 04:59 terhitung hari operasional kemarin (Shift 2)
+        if (!isNaN(h) && h < 5) {
+            const d = new Date(tgl + 'T12:00:00');
+            d.setDate(d.getDate() - 1);
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        }
+        return tgl;
+    }
 
-function getJobOperationalShift(j) {
-    if (!j) return 'Shift 1';
-    if (!j.jam_pelaksanaan) return j.shift || 'Shift 1';
-    const parts = j.jam_pelaksanaan.split(':');
-    const h = parseInt(parts[0], 10);
-    if (isNaN(h)) return j.shift || 'Shift 1';
-    // Shift 1: 05:00 - 16:59, Shift 2: 17:00 - 04:59 (termasuk jam 02:00 dini hari)
-    return (h >= 5 && h < 17) ? 'Shift 1' : 'Shift 2';
-}
+    function getJobOperationalShift(j) {
+        if (!j) return 'Shift 1';
+        if (!j.jam_pelaksanaan) return j.shift || 'Shift 1';
+        const parts = j.jam_pelaksanaan.split(':');
+        const h = parseInt(parts[0], 10);
+        if (isNaN(h)) return j.shift || 'Shift 1';
+        // Shift 1: 05:00 - 16:59, Shift 2: 17:00 - 04:59
+        return (h >= 5 && h < 17) ? 'Shift 1' : 'Shift 2';
+    }
 
     function formatLocalTimestamp(isoString) {
         if (!isoString) return '-';
@@ -406,7 +419,7 @@ function getJobOperationalShift(j) {
 
     function saveOrderDraft() {
         const key = getOrderDraftKey();
-        if (!key || currentTab !== 'order' || userOrderFleetMode == null) return;
+        if (!key || currentTab !== 'order' || !userOrderFleetMode) return;
         const draft = {
             fleetMode: userOrderFleetMode,
             tgl: document.getElementById('req_tgl')?.value,
@@ -1621,7 +1634,7 @@ function getJobOperationalShift(j) {
         let pieStyle = `background: conic-gradient(#0d9488 0deg ${degCT}deg, #4ade80 ${degCT}deg ${degBC}deg, #a7f3d0 ${degBC}deg 360deg);`;
 
         return `
-        <div class="max-w-6xl w-full mx-auto space-y-3 relative z-10">
+        <div class="max-w-6xl space-y-3 relative z-10">
             <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-2">
                 <div class="flex items-center gap-2">
                     <h2 class="text-sm font-bold text-slate-800 shrink-0"><i class="fa-solid fa-chart-pie mr-1.5 text-cyan-600"></i>Dashboard Analytics</h2>
@@ -2907,8 +2920,8 @@ function getJobOperationalShift(j) {
                     <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Shift Kerja</label><input type="text" id="req_shift" value="${valShift}" class="w-full border border-slate-200 bg-slate-50 rounded-sm px-2 py-1.5 text-[10px] text-slate-500 cursor-not-allowed font-bold" readonly></div>
                 </div>
                 <div class="grid grid-cols-2 gap-2">
-                <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Jam Req (HH:mm) *</label><input type="time" id="req_jam" value="${valJam}" oninput="updateShiftField(); saveOrderDraft();" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-[10px] focus:outline-none focus:border-cyan-500" required></div>
-                <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Durasi (Jam) *</label><input type="number" step="0.5" id="req_durasi" value="${valDurasi}" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-[10px] focus:outline-none focus:border-cyan-500" required></div>
+                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Jam Req (HH:mm) *</label><input type="time" id="req_jam" value="${valJam}" oninput="updateShiftField(); saveOrderDraft();" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-[10px] focus:outline-none focus:border-cyan-500" required></div>
+                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Durasi (Jam) *</label><input type="number" step="0.5" id="req_durasi" value="${valDurasi}" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-[10px] focus:outline-none focus:border-cyan-500" required></div>
                 </div>
                 <div><label class="block text-[10px] font-semibold text-slate-600 mb-0.5">Lokasi Angkat *</label><input type="text" id="req_lok_asal" value="${valLokAsal}" oninput="this.value = this.value.toUpperCase(); saveOrderDraft();" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-[10px] focus:outline-none focus:border-cyan-500" placeholder="Titik muat..." required></div>
                 <div><label class="block text-[10px] font-bold text-slate-600 mb-0.5">Lokasi Tujuan *</label><input type="text" id="req_lok_tujuan" value="${valLokTujuan}" oninput="this.value = this.value.toUpperCase(); saveOrderDraft();" class="w-full border border-slate-300 rounded-sm px-2 py-1.5 text-[10px] focus:outline-none focus:border-cyan-500" placeholder="Titik bongkar..." required></div>
@@ -2977,7 +2990,7 @@ function getJobOperationalShift(j) {
         const hasDraftContent = d && (d.deskripsi || d.lok_asal || d.lok_tujuan || d.durasi);
 
         return `
-        <div class="max-w-2xl mx-auto bg-white rounded-md shadow-sm border border-slate-200 overflow-hidden mt-2 mb-6">
+        <div class="max-w-md mx-auto bg-white rounded-md shadow-sm border border-slate-200 overflow-hidden mt-2 mb-6">
             <div class="p-2 border-b border-slate-100 flex items-center justify-between">
                 <div class="flex items-center gap-2">
                     <button onclick="userOrderFleetMode=null; renderApp(false);" class="w-6 h-6 rounded-sm border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50" title="Kembali pilih armada"><i class="fa-solid fa-arrow-left text-[10px]"></i></button>
