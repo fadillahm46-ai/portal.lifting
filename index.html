@@ -533,7 +533,7 @@
         
         let userFormat = `*DETAIL JOB LIFTING*\n- *NO WO :* ${job.no_wo}\n- *ORDER UNIT :* ${job.kategori} ${job.unit ? '('+job.unit+')' : ''}\n- *STATUS :* ${statusEmoji}\n- *PEMOHON :* ${job.nama_pemohon}\n- *PERUSAHAAN :* ${job.perusahaan}\n- *DEPARTEMEN :* ${job.departemen}\n- *SECTION :* ${job.section}\n- *KONTAK WA :* ${job.no_wa}\n- *TANGGAL :* ${job.tgl_pelaksanaan} ${job.jam_pelaksanaan ? '| Jam : '+job.jam_pelaksanaan : ''}\n- *LOKASI :* ${job.lokasi_angkat || '-'} ➔ ${job.lokasi_tujuan || '-'}\n- *DESKRIPSI :* ${job.deskripsi}`;
 
-        let mpFormat = `*PELAPORAN PROGRES JOB LIFTING*\n- *STATUS :* ${statusEmoji}\n- *NAMA JOB :* ${job.deskripsi}\n- *JAM START :* ${job.jam_start_aktual || '-'}\n- *JAM FINISH :* ${job.jam_end_aktual || '-'}\n- *NO. UNIT :* ${job.unit || '-'}\n- *NAMA OPERATOR :* ${job.operator || '-'}\n- *NAMA RIGGER :* ${job.rigger || '-'}${job.rigger2 ? ', ' + job.rigger2 : ''}\n- *FINAL INSPEKSI :* ${job.final_inspeksi || '-'}\n- *KENDALA :* ${job.alasan_telat ? 'Telat : ' + job.alasan_telat + ' ' : ''}${job.alasan_overtime ? 'Over : ' + job.alasan_overtime : ''}${(!job.alasan_telat && !job.alasan_overtime) ? '-' : ''}`;
+        let mpFormat = `*PELAPORAN PROGRES JOB LIFTING*\n- *NO WO :* ${job.no_wo}\n- *STATUS :* ${statusEmoji}\n- *NAMA JOB :* ${job.deskripsi}\n- *JAM START :* ${job.jam_start_aktual || '-'}\n- *JAM FINISH :* ${job.jam_end_aktual || '-'}\n- *NO. UNIT :* ${job.unit || '-'}\n- *NAMA OPERATOR :* ${job.operator || '-'}\n- *NAMA RIGGER :* ${job.rigger || '-'}${job.rigger2 ? ', ' + job.rigger2 : ''}\n- *FINAL INSPEKSI :* ${job.final_inspeksi || '-'}\n- *KENDALA :* ${job.alasan_telat ? 'Telat : ' + job.alasan_telat + ' ' : ''}${job.alasan_overtime ? 'Over : ' + job.alasan_overtime : ''}${(!job.alasan_telat && !job.alasan_overtime) ? '-' : ''}`;
 
         if (currentUser && currentUser.role === 'USER') {
             waText = userFormat;
@@ -1634,7 +1634,7 @@
         let pieStyle = `background: conic-gradient(#0d9488 0deg ${degCT}deg, #4ade80 ${degCT}deg ${degBC}deg, #a7f3d0 ${degBC}deg 360deg);`;
 
         return `
-        <div class="max-w-6xl space-y-3 relative z-10">
+        <div class="max-w-6xl w-full mx-auto space-y-3 relative z-10">
             <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-2">
                 <div class="flex items-center gap-2">
                     <h2 class="text-sm font-bold text-slate-800 shrink-0"><i class="fa-solid fa-chart-pie mr-1.5 text-cyan-600"></i>Dashboard Analytics</h2>
