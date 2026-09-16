@@ -26,9 +26,13 @@
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        html, body {
+            overscroll-behavior-y: contain;
+            overscroll-behavior: none;
+            -webkit-overflow-scrolling: touch;
+        }
         body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #334155; }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
-        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         .pwd-toggle:hover { color: #0891b2; }
         .chart-bar { transition: width 0.8s ease-out; }
         
@@ -591,6 +595,45 @@
 
     function clearOrderSearch() {
         orderSearchQuery = '';
+        renderApp(true);
+    }
+
+    function resetMonitoringFilter() {
+        const elStart = document.getElementById('filter_tgl_mulai');
+        const elEnd = document.getElementById('filter_tgl_selesai');
+        if (elStart) elStart.value = '';
+        if (elEnd) elEnd.value = '';
+        const elShift = document.getElementById('filter_shift');
+        if (elShift) elShift.value = 'ALL';
+        const elCat = document.getElementById('filter_admin_kategori');
+        if (elCat) elCat.value = 'ALL';
+        orderSearchQuery = '';
+        const elSearch = document.getElementById('orderSearchInput');
+        if (elSearch) elSearch.value = '';
+        renderApp(true);
+    }
+
+    function resetDashFilter() {
+        const defWeek = getWeekRangeSundayToSaturday();
+        const elStart = document.getElementById('dash_tgl_mulai');
+        const elEnd = document.getElementById('dash_tgl_selesai');
+        if (elStart) elStart.value = defWeek.start;
+        if (elEnd) elEnd.value = defWeek.end;
+        const elShift = document.getElementById('dash_shift');
+        if (elShift) elShift.value = 'ALL';
+        const elUnit = document.getElementById('dash_unit');
+        if (elUnit) elUnit.value = 'ALL';
+        renderApp(true);
+    }
+
+    function resetMpDateFilter() {
+        const shiftDate = getShiftDateString();
+        const elStart = document.getElementById('mp_filter_mulai');
+        const elEnd = document.getElementById('mp_filter_selesai');
+        if (elStart) elStart.value = shiftDate;
+        if (elEnd) elEnd.value = shiftDate;
+        const elUnit = document.getElementById('mp_filter_unit');
+        if (elUnit) elUnit.value = 'ALL';
         renderApp(true);
     }
     
@@ -1761,24 +1804,30 @@
                     </button>
                 </div>
                 
-                <div class="flex items-center text-[10px] bg-white border border-slate-200 rounded-lg px-2 py-0.5 shadow-2xs flex-wrap gap-y-1">
-                    <div class="flex items-center shrink-0 pr-1">
-                        <i class="fa-regular fa-calendar mx-1 text-slate-400"></i>
-                        <input type="date" id="dash_tgl_mulai" class="bg-transparent px-1 py-0.5 text-slate-700 font-semibold focus:outline-none" value="${tglMulai}" onchange="renderApp(true)">
-                        <span class="text-slate-400 mx-0.5">-</span>
-                        <input type="date" id="dash_tgl_selesai" class="bg-transparent px-1 py-0.5 text-slate-700 font-semibold focus:outline-none" value="${tglSelesai}" onchange="renderApp(true)">
+                <div class="flex items-center text-[10px] gap-1.5 flex-wrap">
+                    <!-- Filter Rentang Tanggal Bentuk Pill: Dari & Ke -->
+                    <div class="flex items-center bg-white border border-slate-200 rounded-full px-3 py-1 shadow-2xs shrink-0">
+                        <span class="text-[10px] text-slate-500 font-medium mr-1.5 select-none">Dari:</span>
+                        <input type="date" id="dash_tgl_mulai" class="bg-transparent text-slate-700 font-semibold focus:outline-none text-[10px] cursor-pointer" value="${tglMulai}" onchange="renderApp(true)">
                     </div>
+                    <div class="flex items-center bg-white border border-slate-200 rounded-full px-3 py-1 shadow-2xs shrink-0">
+                        <span class="text-[10px] text-slate-500 font-medium mr-1.5 select-none">Ke:</span>
+                        <input type="date" id="dash_tgl_selesai" class="bg-transparent text-slate-700 font-semibold focus:outline-none text-[10px] cursor-pointer" value="${tglSelesai}" onchange="renderApp(true)">
+                    </div>
+                    <button type="button" onclick="resetDashFilter()" class="w-7 h-7 rounded-full bg-white border border-slate-200 hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-700 transition-colors shadow-2xs shrink-0 cursor-pointer" title="Reset Filter Tanggal">
+                        <i class="fa-solid fa-rotate-left text-[10px]"></i>
+                    </button>
                     
-                    <div class="flex items-center border-l border-slate-200 pl-1.5">
-                        <select id="dash_shift" class="bg-transparent text-slate-700 font-semibold focus:outline-none cursor-pointer" onchange="renderApp(true)">
+                    <div class="flex items-center">
+                        <select id="dash_shift" class="bg-white border border-slate-200 rounded-full px-3 py-1 text-slate-700 font-semibold focus:outline-none cursor-pointer shadow-2xs" onchange="renderApp(true)">
                             <option value="ALL" ${dashShift==='ALL'?'selected':''}>All Shift</option>
                             <option value="Shift 1" ${dashShift==='Shift 1'?'selected':''}>Shift 1</option>
                             <option value="Shift 2" ${dashShift==='Shift 2'?'selected':''}>Shift 2</option>
                         </select>
                     </div>
                     
-                    <div class="flex items-center border-l border-slate-200 pl-1.5">
-                        <select id="dash_unit" class="bg-transparent text-slate-700 font-semibold focus:outline-none cursor-pointer" onchange="renderApp(true)">
+                    <div class="flex items-center">
+                        <select id="dash_unit" class="bg-white border border-slate-200 rounded-full px-3 py-1 text-slate-700 font-semibold focus:outline-none cursor-pointer shadow-2xs" onchange="renderApp(true)">
                             <option value="ALL" ${dashUnit==='ALL'?'selected':''}>Semua Armada</option>
                             <option value="Crane Truck" ${dashUnit==='Crane Truck'?'selected':''}>Crane Truck</option>
                             <option value="Big Crane" ${dashUnit==='Big Crane'?'selected':''}>Big Crane</option>
@@ -2369,33 +2418,33 @@
 
                         <!-- Sisi Kanan / Center: Filter Tanggal, Shift, dan Armada -->
                         <div class="w-full md:w-auto flex items-center justify-start md:justify-end gap-1.5 overflow-x-auto hide-scrollbar text-[10px] pb-0.5 md:pb-0">
-                            <!-- Filter Rentang Tanggal -->
-                            <div class="flex items-center bg-slate-50 border border-slate-300 rounded-md px-1.5 py-0.5 shadow-2xs shrink-0">
-                                <i class="fa-regular fa-calendar text-slate-400 mr-1 text-[10px]"></i>
-                                <input type="date" id="filter_tgl_mulai" class="bg-transparent text-slate-700 font-semibold focus:outline-none text-[10px]" value="${tglMulai}" onchange="renderApp(true)">
-                                <span class="text-slate-400 mx-1">-</span>
-                                <input type="date" id="filter_tgl_selesai" class="bg-transparent text-slate-700 font-semibold focus:outline-none text-[10px]" value="${tglSelesai}" onchange="renderApp(true)">
+                            <!-- Filter Rentang Tanggal Bentuk Pill: Dari & Ke -->
+                            <div class="flex items-center bg-white border border-slate-200 rounded-full px-3 py-1 shadow-2xs shrink-0">
+                                <span class="text-[10px] text-slate-500 font-medium mr-1.5 select-none">Dari:</span>
+                                <input type="date" id="filter_tgl_mulai" class="bg-transparent text-slate-700 font-semibold focus:outline-none text-[10px] cursor-pointer" value="${tglMulai}" onchange="renderApp(true)">
                             </div>
+                            <div class="flex items-center bg-white border border-slate-200 rounded-full px-3 py-1 shadow-2xs shrink-0">
+                                <span class="text-[10px] text-slate-500 font-medium mr-1.5 select-none">Ke:</span>
+                                <input type="date" id="filter_tgl_selesai" class="bg-transparent text-slate-700 font-semibold focus:outline-none text-[10px] cursor-pointer" value="${tglSelesai}" onchange="renderApp(true)">
+                            </div>
+                            <button type="button" onclick="resetMonitoringFilter()" class="w-7 h-7 rounded-full bg-white border border-slate-200 hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-700 transition-colors shadow-2xs shrink-0 cursor-pointer" title="Reset Filter">
+                                <i class="fa-solid fa-rotate-left text-[10px]"></i>
+                            </button>
 
                             <!-- Filter Shift Kerja -->
-                            <select id="filter_shift" class="bg-slate-50 border border-slate-300 text-slate-700 font-semibold rounded-md px-2 py-1 focus:outline-none focus:border-teal-600 cursor-pointer shadow-2xs shrink-0" onchange="renderApp(true)">
+                            <select id="filter_shift" class="bg-white border border-slate-200 text-slate-700 font-semibold rounded-full px-3 py-1 focus:outline-none focus:border-teal-600 cursor-pointer shadow-2xs shrink-0" onchange="renderApp(true)">
                                 <option value="ALL" ${filterShift === 'ALL' ? 'selected' : ''}>Semua Shift</option>
                                 <option value="Shift 1" ${filterShift === 'Shift 1' ? 'selected' : ''}>Shift 1</option>
                                 <option value="Shift 2" ${filterShift === 'Shift 2' ? 'selected' : ''}>Shift 2</option>
                             </select>
 
                             <!-- Filter Armada -->
-                            <select id="filter_admin_kategori" class="bg-slate-50 border border-slate-300 text-slate-700 font-semibold rounded-md px-2 py-1 focus:outline-none focus:border-teal-600 cursor-pointer shadow-2xs shrink-0" onchange="renderApp(true)">
+                            <select id="filter_admin_kategori" class="bg-white border border-slate-200 text-slate-700 font-semibold rounded-full px-3 py-1 focus:outline-none focus:border-teal-600 cursor-pointer shadow-2xs shrink-0" onchange="renderApp(true)">
                                 <option value="ALL" ${filterKategori === 'ALL' ? 'selected' : ''}>Semua Armada</option>
                                 <option value="Crane Truck" ${filterKategori === 'Crane Truck' ? 'selected' : ''}>Crane Truck</option>
                                 <option value="Big Crane" ${filterKategori === 'Big Crane' ? 'selected' : ''}>Big Crane</option>
                                 <option value="Lowboy" ${filterKategori === 'Lowboy' ? 'selected' : ''}>Lowboy</option>
                             </select>
-
-                            ${orderSearchQuery ? `
-                            <button onclick="clearOrderSearch()" class="text-red-500 hover:text-red-700 text-[10px] font-bold px-1.5 py-0.5 bg-red-50 border border-red-200 rounded shrink-0">
-                                <i class="fa-solid fa-rotate-left mr-0.5"></i> Reset
-                            </button>` : ''}
                         </div>
                     </div>
                 </div>
@@ -2528,11 +2577,18 @@
         let html = `
         <div class="flex items-center gap-2 mb-2 mt-2"><button onclick="mpFleetMode=null; renderApp(false);" class="w-6 h-6 rounded-sm border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 bg-white shadow-sm"><i class="fa-solid fa-arrow-left text-[10px]"></i></button><h2 class="text-xs font-bold text-slate-800">Tugas: <span class="text-cyan-600">${mpFleetMode}</span></h2></div>
         
-        <div class="flex items-center border border-slate-200 bg-white rounded-md p-1 shadow-sm mb-2 w-full sm:w-auto mx-auto justify-center text-[10px] text-slate-600">
-            <i class="fa-regular fa-calendar ml-1 mr-2 text-slate-400"></i>
-            <input type="date" id="mp_filter_mulai" class="bg-transparent focus:outline-none" value="${tglMulai}" onchange="renderApp(true)">
-            <span class="mx-1 font-semibold text-slate-400">s/d</span>
-            <input type="date" id="mp_filter_selesai" class="bg-transparent focus:outline-none" value="${tglSelesai}" onchange="renderApp(true)">
+        <div class="flex items-center gap-1.5 mb-2 w-full sm:w-auto mx-auto justify-center text-[10px]">
+            <div class="flex items-center bg-white border border-slate-200 rounded-full px-3 py-1 shadow-2xs shrink-0">
+                <span class="text-[10px] text-slate-500 font-medium mr-1.5 select-none">Dari:</span>
+                <input type="date" id="mp_filter_mulai" class="bg-transparent text-slate-700 font-semibold focus:outline-none text-[10px] cursor-pointer" value="${tglMulai}" onchange="renderApp(true)">
+            </div>
+            <div class="flex items-center bg-white border border-slate-200 rounded-full px-3 py-1 shadow-2xs shrink-0">
+                <span class="text-[10px] text-slate-500 font-medium mr-1.5 select-none">Ke:</span>
+                <input type="date" id="mp_filter_selesai" class="bg-transparent text-slate-700 font-semibold focus:outline-none text-[10px] cursor-pointer" value="${tglSelesai}" onchange="renderApp(true)">
+            </div>
+            <button type="button" onclick="resetMpDateFilter()" class="w-7 h-7 rounded-full bg-white border border-slate-200 hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-700 transition-colors shadow-2xs shrink-0 cursor-pointer" title="Reset Filter Tanggal">
+                <i class="fa-solid fa-rotate-left text-[10px]"></i>
+            </button>
         </div>
 
         <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
@@ -3819,6 +3875,38 @@
             });
         });
     }
+
+    // Blokir Pull-to-Refresh di Mobile & Shortcut Refresh di Desktop
+    window.addEventListener('keydown', function(e) {
+        if (e.key === 'F5' || e.keyCode === 116) {
+            e.preventDefault();
+            showToast('Aplikasi sudah realtime otomatis.', 'success');
+            return false;
+        }
+        if ((e.ctrlKey || e.metaKey) && (e.key === 'r' || e.key === 'R' || e.keyCode === 82)) {
+            e.preventDefault();
+            showToast('Aplikasi sudah realtime otomatis.', 'success');
+            return false;
+        }
+    });
+
+    let mobileTouchStartY = 0;
+    window.addEventListener('touchstart', function(e) {
+        if (e.touches.length === 1) {
+            mobileTouchStartY = e.touches[0].clientY;
+        }
+    }, { passive: false });
+
+    window.addEventListener('touchmove', function(e) {
+        const touchCurrentY = e.touches[0].clientY;
+        const diffY = touchCurrentY - mobileTouchStartY;
+        // Cegah gesture pull-down reload browser saat posisi scroll berada di paling atas
+        if ((window.scrollY === 0 || document.documentElement.scrollTop === 0) && diffY > 0) {
+            if (e.cancelable) {
+                e.preventDefault();
+            }
+        }
+    }, { passive: false });
 </script>
 </body>
 </html>
