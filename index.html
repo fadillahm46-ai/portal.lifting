@@ -28,7 +28,6 @@
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
         html, body {
             overscroll-behavior-y: contain;
-            overscroll-behavior: none;
             -webkit-overflow-scrolling: touch;
         }
         body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #334155; }
@@ -56,11 +55,24 @@
         }
         .animate-pop-in { animation: popIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
 
+        /* Matikan splash screen di Web PC/Desktop */
+        @media (min-width: 768px) {
+            #custom-splash {
+                display: none !important;
+            }
+        }
+
         #custom-splash {
-            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-            background-color: #00569c; background-image: none; 
-            background-size: cover; background-position: center;
-            z-index: 9999; transition: opacity 0.8s ease-out;
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100vw; 
+            height: 100vh;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            z-index: 9999; 
+            transition: opacity 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
         }
 
         /* FullCalendar Custom Theme */
@@ -179,20 +191,20 @@
 </head>
 <body class="antialiased text-[11px] sm:text-xs">
 
-    <div id="custom-splash">
-        <div style="position: absolute; bottom: 12%; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 8px;">
-            <i class="fa-solid fa-circle-notch fa-spin text-white text-4xl" style="filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.5));"></i>
-            <span class="text-white text-xs font-bold tracking-widest uppercase" style="filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.8));">Memuat Data...</span>
+    <!-- INTRO ANIMASI KHUSUS HP DENGAN LATAR BELAKANG FOTO ASLI UNIT -->
+    <div id="custom-splash" class="md:hidden fixed inset-0 z-[9999] flex flex-col justify-end p-6 select-none overflow-hidden" style="background-image: url('https://lh3.googleusercontent.com/d/1RlxQL5Vdkq1XF3ZhjW4i0KsYnuXLg-aw');">
+        <!-- Overlay transparan lembut di bagian bawah agar teks loading tetap kontras tanpa menutupi foto asli -->
+        <div class="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none"></div>
+
+        <!-- BAGIAN BAWAH: SPINNER PUTAR + TEKS "MEMUAT DATA..." -->
+        <div class="relative z-10 flex flex-col items-center justify-center pb-10">
+            <!-- Spinner lingkaran putih putar -->
+            <i class="fa-solid fa-circle-notch fa-spin text-white text-3xl drop-shadow-md mb-2.5"></i>
+            <span class="text-white text-[11px] font-black tracking-[0.25em] drop-shadow-md uppercase">
+                MEMUAT DATA...
+            </span>
         </div>
     </div>
-    
-    <script>
-        if (window.innerWidth <= 768) {
-            const splashImages = ['https://lh3.googleusercontent.com/d/1RlxQL5Vdkq1XF3ZhjW4i0KsYnuXLg-aw', 'https://lh3.googleusercontent.com/d/1wwl4IRJggVH1EBW54ANXb2Mi3dnUejEU'];
-            const randomImg = splashImages[Math.floor(Math.random() * splashImages.length)];
-            document.getElementById('custom-splash').style.backgroundImage = "url('" + randomImg + "')";
-        }
-    </script>
 
     <!-- Main Container -->
     <div id="app" class="min-h-screen"></div>
@@ -203,20 +215,47 @@
     const supabaseClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
     const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwioh3MCzAz6QIxsrfUKruiqq2STeONkkO5o0dcYLu0_JcsdTp2yiHxWrqQi8nUJdrI3Q/exec'; 
 
+    /* ========================================================
+       ROTASI FOTO UNIT UNTUK BACKGROUND ANIMASI HP
+       ======================================================== */
+    const UNIT_SPLASH_IMAGES = [
+        'https://lh3.googleusercontent.com/d/1RlxQL5Vdkq1XF3ZhjW4i0KsYnuXLg-aw', // Foto 1 Unit Crane
+        'https://lh3.googleusercontent.com/d/1wwl4IRJggVH1EBW54ANXb2Mi3dnUejEU'  // Foto 2 Unit Crane
+    ];
+
+    let splashClosed = false;
     function hideSplashScreen() {
+        if (splashClosed) return;
+        splashClosed = true;
         var splash = document.getElementById('custom-splash');
         if (splash && splash.style.display !== 'none') {
             splash.style.opacity = '0';
-            setTimeout(function() { splash.style.display = 'none'; }, 600); 
+            setTimeout(function() { splash.style.display = 'none'; }, 500); 
         }
     }
 
-    // Pengaman: Splash screen PASTI tertutup maksimal dalam 1.5 detik
-    setTimeout(hideSplashScreen, 1500);
+    // Terapkan foto unit: rotasi bergantian antara Foto 1 dan Foto 2
+    (function initMobileUnitSplash() {
+        if (window.innerWidth < 768) {
+            try {
+                const splashEl = document.getElementById('custom-splash');
+                if (splashEl) {
+                    let lastIdx = parseInt(localStorage.getItem('lifting_last_splash_idx') || '-1', 10);
+                    let nextIdx = (lastIdx + 1) % UNIT_SPLASH_IMAGES.length;
+                    localStorage.setItem('lifting_last_splash_idx', nextIdx);
+                    splashEl.style.backgroundImage = `url('${UNIT_SPLASH_IMAGES[nextIdx]}')`;
+                }
+            } catch(e) {}
+        }
+    })();
 
-    window.addEventListener('load', function() {
-        setTimeout(hideSplashScreen, 800); 
-    });
+    // Di Web PC / Desktop: Matikan seketika tanpa loading (0 ms)
+    if (window.innerWidth >= 768) {
+        hideSplashScreen();
+    } else {
+        // Di HP: Tampilkan animasi visual ~2.3 detik lalu transisi memudar (fade-out)
+        setTimeout(hideSplashScreen, 2300);
+    }
 
     const defaultUsers = [
         { nrp: 'ADMIN', nama_lengkap: 'BUDI ADMIN', jabatan: 'DISPATCHER', perusahaan: 'PPA', departemen: 'OPERATION', section: 'CONTROL', no_wa: '081111111', password_hash: 'admin', role: 'ADMIN', status_akun: 'ACTIVE' },
@@ -245,6 +284,123 @@
     if (!localStorage.getItem('lifting_settings')) localStorage.setItem('lifting_settings', JSON.stringify(defaultSettings));
     
     function getSettings() { return JSON.parse(localStorage.getItem('lifting_settings')) || defaultSettings; }
+
+    /* ========================================================
+       SISTEM STATUS UNIT & KETERANGAN NON-AKTIF (OFF/BREAKDOWN)
+       ======================================================== */
+    function getUnitStatusMap() {
+        const m = getMasterData();
+        if (m.unit_status_map && typeof m.unit_status_map === 'object') {
+            return m.unit_status_map;
+        }
+        try {
+            return JSON.parse(localStorage.getItem('lifting_unit_status')) || {};
+        } catch(e) { return {}; }
+    }
+
+    function getUnitStatus(unitName) {
+        if (!unitName) return { status: 'ACTIVE', reason: '' };
+        const map = getUnitStatusMap();
+        return map[unitName] || { status: 'ACTIVE', reason: '' };
+    }
+
+    function saveUnitStatus(unitName, status, reason) {
+        if (!unitName) return;
+        const m = getMasterData();
+        if (!m.unit_status_map) m.unit_status_map = {};
+        m.unit_status_map[unitName] = { status, reason, updated_at: new Date().toISOString() };
+        localStorage.setItem('lifting_unit_status', JSON.stringify(m.unit_status_map));
+        saveMasterData(m);
+    }
+
+    /* ========================================================
+       SISTEM NOTIFIKASI SUARA (WEB AUDIO API) & REALTIME BANNER
+       ======================================================== */
+    function playNotificationSound(type = 'gl') {
+        try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return;
+            const ctx = new AudioCtx();
+            if (ctx.state === 'suspended') ctx.resume();
+            const now = ctx.currentTime;
+
+            if (type === 'gl') {
+                // Suara notifikasi lembut ganda untuk GL & Admin saat ada order baru
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(587.33, now); // D5
+                osc.frequency.setValueAtTime(880, now + 0.15); // A5
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.7);
+            } else {
+                // Nada ceria berurutan (3 nada) untuk Operator & Rigger saat ditugaskan
+                const freqs = [523.25, 659.25, 783.99]; // C5, E5, G5
+                freqs.forEach((freq, idx) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(freq, now + idx * 0.12);
+                    gain.gain.setValueAtTime(0.35, now + idx * 0.12);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.12 + 0.35);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(now + idx * 0.12);
+                    osc.stop(now + idx * 0.12 + 0.35);
+                });
+            }
+        } catch (e) {
+            console.warn("Audio notifikasi:", e);
+        }
+    }
+
+    function requestNotificationAccess() {
+        if ("Notification" in window && Notification.permission === "default") {
+            Notification.requestPermission();
+        }
+    }
+
+    function triggerAppNotification(title, message, soundType = 'gl') {
+        playNotificationSound(soundType);
+        showToast(`${title}: ${message}`, soundType === 'gl' ? 'success' : 'success');
+        
+        // Getar perangkat HP jika didukung
+        if ("vibrate" in navigator) {
+            try { navigator.vibrate([200, 100, 200]); } catch(e) {}
+        }
+
+        // Tampilkan notifikasi sistem level OS (dapat tembus status bar / lockscreen HP Android)
+        if ("Notification" in window && Notification.permission === "granted") {
+            try {
+                if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+                    navigator.serviceWorker.ready.then(reg => {
+                        reg.showNotification(title, {
+                            body: message,
+                            icon: "https://lh3.googleusercontent.com/d/1hQZopiZU-_bQC9aRmyZndlmEF--k4h5U",
+                            badge: "https://lh3.googleusercontent.com/d/1hQZopiZU-_bQC9aRmyZndlmEF--k4h5U",
+                            vibrate: [200, 100, 200],
+                            tag: 'lifting-job-alert',
+                            renotify: true
+                        });
+                    }).catch(() => {
+                        new Notification(title, {
+                            body: message,
+                            icon: "https://lh3.googleusercontent.com/d/1hQZopiZU-_bQC9aRmyZndlmEF--k4h5U"
+                        });
+                    });
+                } else {
+                    new Notification(title, {
+                        body: message,
+                        icon: "https://lh3.googleusercontent.com/d/1hQZopiZU-_bQC9aRmyZndlmEF--k4h5U"
+                    });
+                }
+            } catch(e) {}
+        }
+    }
 
     function getShiftDateString(ref = new Date()) {
         const d = new Date(ref);
@@ -282,6 +438,15 @@
         if (h > 0 && m > 0) return `${h} Jam ${m} Menit`;
         if (h > 0) return `${h} Jam`;
         return `${m} Menit`;
+    }
+
+    // Pembersih string kendala agar tidak terjadi duplikasi "Telat : Telat" atau "Over : Over"
+    function cleanKendalaText(text) {
+        if (!text) return '';
+        let clean = String(text).trim();
+        clean = clean.replace(/^Telat\s*:\s*Telat\b/gi, 'Telat');
+        clean = clean.replace(/^Over\s*:\s*Over\b/gi, 'Over');
+        return clean.trim();
     }
 
     function getJobOperationalDate(j) {
@@ -338,16 +503,20 @@
             let orders = getOrders();
             const { eventType, new: newRecord, old: oldRecord } = payload;
             let changed = false;
+            const currentUser = JSON.parse(localStorage.getItem('lifting_user'));
 
             if (eventType === 'INSERT' && newRecord && newRecord.no_wo) {
                 const existingIdx = orders.findIndex(o => o.no_wo === newRecord.no_wo);
                 if (existingIdx === -1) {
                     orders.unshift(newRecord);
                     changed = true;
-                    // Beri notifikasi instan ke Admin/GL/MP saat ada order masuk
-                    const currentUser = JSON.parse(localStorage.getItem('lifting_user'));
-                    if (currentUser && (currentUser.role === 'ADMIN' || currentUser.role === 'GL' || currentUser.role === 'MANPOWER')) {
-                        showToast(`Job baru masuk: ${newRecord.no_wo}`, 'success');
+                    // Notifikasi khusus Admin & GL saat ada order baru masuk
+                    if (currentUser && (currentUser.role === 'ADMIN' || currentUser.role === 'GL')) {
+                        triggerAppNotification(
+                            "Ada Orderan Masuk!",
+                            `Order ${newRecord.no_wo} dari ${newRecord.nama_pemohon || 'User'} siap divalidasi.`,
+                            'gl'
+                        );
                     }
                 } else {
                     orders[existingIdx] = newRecord;
@@ -361,6 +530,32 @@
                 } else {
                     orders.unshift(newRecord);
                     changed = true;
+                }
+
+                // Notifikasi khusus Operator & Rigger saat akun mereka ditugaskan
+                if (currentUser && (currentUser.role === 'MANPOWER' || currentUser.role === 'USER')) {
+                    const currentName = (currentUser.nama_lengkap || '').trim().toUpperCase();
+                    const newOp = (newRecord.operator || '').trim().toUpperCase();
+                    const newRig1 = (newRecord.rigger || '').trim().toUpperCase();
+                    const newRig2 = (newRecord.rigger2 || '').trim().toUpperCase();
+
+                    const oldOp = oldRecord ? (oldRecord.operator || '').trim().toUpperCase() : '';
+                    const oldRig1 = oldRecord ? (oldRecord.rigger || '').trim().toUpperCase() : '';
+                    const oldRig2 = oldRecord ? (oldRecord.rigger2 || '').trim().toUpperCase() : '';
+
+                    const newlyAssigned = (newOp === currentName && newOp !== oldOp) ||
+                                          (newRig1 === currentName && newRig1 !== oldRig1) ||
+                                          (newRig2 === currentName && newRig2 !== oldRig2);
+
+                    if (newlyAssigned) {
+                        triggerAppNotification(
+                            "Penugasan Job Baru!",
+                            "Anda mendapatkan job baru, segera selesaikan. Terimakasih.",
+                            'mp'
+                        );
+                        // Buka pop-up peringatan job baru untuk kru yang bersangkutan
+                        openAssignedJobAlert(newRecord);
+                    }
                 }
             } else if (eventType === 'DELETE' && oldRecord) {
                 const targetWo = oldRecord.no_wo;
@@ -380,6 +575,19 @@
         } catch (err) {
             console.warn("Gagal memproses realtime order:", err);
         }
+    }
+
+    function openAssignedJobAlert(job) {
+        const m = document.getElementById('assignedJobModal');
+        if (!m || !job) return;
+        document.getElementById('assignModalWo').innerText = job.no_wo || '';
+        document.getElementById('assignModalUnit').innerText = job.unit || '-';
+        document.getElementById('assignModalDeskripsi').innerText = job.deskripsi || '-';
+        document.getElementById('assignModalBtnDetail').onclick = () => {
+            m.classList.add('hidden');
+            viewJobDetail(job.no_wo);
+        };
+        m.classList.remove('hidden');
     }
 
     function handleRealtimeSettingsChange(payload) {
@@ -740,7 +948,16 @@
         
         let userFormat = `*DETAIL JOB LIFTING*\n- *NO WO :* ${job.no_wo}\n- *TIMESTAMP :* ${formatLocalTimestamp(job.timestamp)}\n- *ORDER UNIT :* ${job.kategori} ${job.unit ? '('+job.unit+')' : ''}\n- *STATUS :* ${statusEmoji}\n- *PEMOHON :* ${job.nama_pemohon}\n- *PERUSAHAAN :* ${job.perusahaan}\n- *DEPARTEMEN :* ${job.departemen}\n- *SECTION :* ${job.section}\n- *KONTAK WA :* ${job.no_wa}\n- *TANGGAL :* ${job.tgl_pelaksanaan} ${job.jam_pelaksanaan ? '| Jam : '+job.jam_pelaksanaan : ''}\n- *LOKASI :* ${job.lokasi_angkat || '-'} ➔ ${job.lokasi_tujuan || '-'}\n- *DESKRIPSI :* ${job.deskripsi}`;
 
-        let mpFormat = `*PELAPORAN PROGRES JOB LIFTING*\n- *NO WO :* ${job.no_wo}\n- *STATUS :* ${statusEmoji}\n- *NAMA JOB :* ${job.deskripsi}\n- *JAM START :* ${job.jam_start_aktual || '-'}\n- *JAM FINISH :* ${job.jam_end_aktual || '-'}\n- *NO. UNIT :* ${job.unit || '-'}\n- *NAMA OPERATOR :* ${job.operator || '-'}\n- *NAMA RIGGER :* ${job.rigger || '-'}${job.rigger2 ? ', ' + job.rigger2 : ''}\n- *FINAL INSPEKSI :* ${job.final_inspeksi || '-'}\n- *KENDALA :* ${job.alasan_telat ? 'Telat : ' + job.alasan_telat + ' ' : ''}${job.alasan_overtime ? 'Over : ' + job.alasan_overtime : ''}${(!job.alasan_telat && !job.alasan_overtime) ? '-' : ''}`;
+        // Pembersihan presisi: Mencegah timbulnya teks ganda "Telat : Telat" atau "Over : Over"
+        let telatClean = cleanKendalaText(job.alasan_telat || '');
+        let overClean = cleanKendalaText(job.alasan_overtime || '');
+        let kendalaStr = '';
+        if (telatClean && overClean) kendalaStr = `${telatClean} | ${overClean}`;
+        else if (telatClean) kendalaStr = telatClean;
+        else if (overClean) kendalaStr = overClean;
+        else kendalaStr = '-';
+
+        let mpFormat = `*PELAPORAN PROGRES JOB LIFTING*\n- *NO WO :* ${job.no_wo}\n- *STATUS :* ${statusEmoji}\n- *NAMA JOB :* ${job.deskripsi}\n- *JAM START :* ${job.jam_start_aktual || '-'}\n- *JAM FINISH :* ${job.jam_end_aktual || '-'}\n- *NO. UNIT :* ${job.unit || '-'}\n- *NAMA OPERATOR :* ${job.operator || '-'}\n- *NAMA RIGGER :* ${job.rigger || '-'}${job.rigger2 ? ', ' + job.rigger2 : ''}\n- *FINAL INSPEKSI :* ${job.final_inspeksi || '-'}\n- *KENDALA :* ${kendalaStr}`;
 
         if (currentUser && currentUser.role === 'USER') {
             waText = userFormat;
@@ -836,6 +1053,58 @@
             <div id="imageViewerModal" class="fixed inset-0 bg-black/95 z-[150] hidden flex items-center justify-center p-2" onclick="this.classList.add('hidden')">
                 <img id="viewerImage" src="" class="max-w-full max-h-[90vh] object-contain cursor-zoom-out rounded-sm shadow-2xl transition-transform duration-300" onclick="event.stopPropagation()">
                 <button class="absolute top-4 right-4 text-white text-3xl opacity-70 hover:opacity-100 transition-opacity"><i class="fa-solid fa-times"></i></button>
+            </div>
+
+            <!-- MODAL UBAH STATUS OPERASIONAL UNIT (ADMIN / GL) -->
+            <div id="unitStatusModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[140] hidden p-3">
+                <div class="bg-white rounded-xl shadow-2xl w-full max-w-[320px] overflow-hidden flex flex-col">
+                    <div class="p-3.5 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
+                        <h3 class="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                            <i class="fa-solid fa-truck-pickup text-cyan-600"></i>
+                            <span id="unitStatusModalTitle">Status Unit: -</span>
+                        </h3>
+                        <button onclick="document.getElementById('unitStatusModal').classList.add('hidden')" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-sm"></i></button>
+                    </div>
+                    <form onsubmit="submitUnitStatusChange(event)" class="p-4 space-y-3">
+                        <input type="hidden" id="targetUnitName">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-600 mb-1">Status Operasi</label>
+                            <select id="unitStatusSelect" class="w-full border border-slate-300 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-cyan-500 font-semibold bg-white cursor-pointer" onchange="toggleUnitReasonField()">
+                                <option value="ACTIVE">Aktif (Siap Beroperasi)</option>
+                                <option value="INACTIVE">Non-Aktif / Breakdown</option>
+                            </select>
+                        </div>
+                        <div id="unitReasonWrapper">
+                            <label class="block text-[10px] font-bold text-red-600 mb-1">Keterangan / Alasan Non-Aktif *</label>
+                            <textarea id="unitStatusReason" class="w-full border border-red-300 bg-red-50/20 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-red-500 h-16" placeholder="Ketik alasan (contoh: Breakdown boom, servis berkala, dll)..."></textarea>
+                        </div>
+                        <div class="flex gap-2 pt-1">
+                            <button type="button" onclick="document.getElementById('unitStatusModal').classList.add('hidden')" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 rounded-md text-xs transition-colors">Batal</button>
+                            <button type="submit" class="flex-1 bg-[#0891b2] hover:bg-cyan-700 text-white font-bold py-2 rounded-md text-xs transition-colors shadow">Simpan Status</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- MODAL ALERT PENUGASAN BARU KHUSUS KRU MP (OPERATOR & RIGGER) -->
+            <div id="assignedJobModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex justify-center items-center z-[160] hidden p-4">
+                <div class="bg-white rounded-2xl shadow-2xl w-full max-w-[320px] p-5 text-center animate-pop-in flex flex-col items-center border border-cyan-100">
+                    <div class="w-14 h-14 rounded-full bg-cyan-100 text-cyan-600 flex items-center justify-center text-2xl mb-3 shadow-inner">
+                        <i class="fa-solid fa-bell animate-bounce"></i>
+                    </div>
+                    <h3 class="text-sm font-black text-slate-800 uppercase tracking-tight">Penugasan Job Baru!</h3>
+                    <p class="text-[11px] text-slate-600 mt-1 font-medium leading-relaxed">
+                        Anda mendapatkan job baru, segera selesaikan. Terimakasih.
+                    </p>
+                    <div class="w-full bg-cyan-50/80 border border-cyan-200 rounded-lg p-2.5 my-3 text-left">
+                        <div class="text-[10px] text-slate-500 font-bold">NO WO: <span id="assignModalWo" class="font-mono text-cyan-700 font-black"></span></div>
+                        <div class="text-[10px] text-slate-700 font-bold mt-0.5">Unit: <span id="assignModalUnit" class="text-cyan-800"></span></div>
+                        <div class="text-[9px] text-slate-500 truncate mt-0.5" id="assignModalDeskripsi"></div>
+                    </div>
+                    <button id="assignModalBtnDetail" class="w-full bg-[#0891b2] hover:bg-cyan-700 text-white font-bold py-2 rounded-lg text-xs transition-colors shadow-md flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-eye text-xs"></i> Buka Rincian Job
+                    </button>
+                </div>
             </div>
 
             <div id="dayJobsModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[130] hidden p-3">
@@ -1278,6 +1547,7 @@
 
     function handleLogin(e) {
         e.preventDefault();
+        requestNotificationAccess();
         const nrp = document.getElementById('loginNrp').value.trim().toUpperCase(); const pwd = document.getElementById('loginPwd').value;
         const users = getUsers(); const user = users.find(u => (u.nrp || '').toUpperCase() === nrp && u.password_hash === pwd && u.status_akun === 'ACTIVE');
         const errorMsg = document.getElementById('loginErrorMsg');
@@ -2240,98 +2510,86 @@
                 if (comparison > 0) return sortDirection === 'asc' ? 1 : -1; 
                 return 0;
             });
-        } else if (currentUser && currentUser.role === 'USER') {
-            jobs = jobs.filter(j => j.nrp_pemohon === currentUser.nrp);
-            const filterCat = document.getElementById('filter_kategori') ? document.getElementById('filter_kategori').value : 'ALL';
-            if (filterCat !== 'ALL') {
-                jobs = jobs.filter(j => j.kategori === filterCat);
-            }
         }
-
-        if (jobs.length === 0) {
-            return showToast('Tidak ada data sesuai filter untuk diexport!', 'error');
-        }
-
-        const tglMulaiVal = document.getElementById('filter_tgl_mulai')?.value;
-        const tglSelesaiVal = document.getElementById('filter_tgl_selesai')?.value;
-        const dateRangeLabel = (tglMulaiVal && tglSelesaiVal) ? `${tglMulaiVal}_sd_${tglSelesaiVal}` : getShiftDateString();
-        const fileName = `Order_Lifting_${dateRangeLabel}.xlsx`;
-
-        // Definisi Header Kolom Excel
-        const headers = [
-            'No WO', 'Waktu Pengajuan', 'Kategori Unit', 'Nama Pemohon', 'Perusahaan', 
-            'Departemen', 'Section', 'No WhatsApp', 'Tgl Pelaksanaan', 'Shift', 
-            'Durasi Request', 'Lokasi Muat (Asal)', 'Lokasi Bongkar (Tujuan)', 'Deskripsi Tugas / Muatan', 
-            'Status', 'Group Leader', 'Unit Ditugaskan', 'Operator', 'Rigger 1', 'Rigger 2', 
-            'Start Aktual', 'End Aktual', 'Durasi Aktual (Jam)', 'Final Inspeksi', 
-            'Alasan Telat', 'Alasan Overtime'
-        ];
-
-        // Format Baris Data
-        const rows = jobs.map(j => [
-            j.no_wo || '',
-            formatLocalTimestamp(j.timestamp) || '',
-            j.kategori || '',
-            j.nama_pemohon || '',
-            j.perusahaan || '',
-            j.departemen || '',
-            j.section || '',
-            j.no_wa ? String(j.no_wa) : '',
-            j.tgl_pelaksanaan || '',
-            j.shift || '',
-            j.durasi_request || '',
-            j.lokasi_angkat || '',
-            j.lokasi_tujuan || '',
-            j.deskripsi || '',
-            j.status || '',
-            j.gl || '',
-            j.unit || '',
-            j.operator || '',
-            j.rigger || '',
-            j.rigger2 || '',
-            j.jam_start_aktual || '',
-            j.jam_end_aktual || '',
-            j.durasi_aktual ? (Number(j.durasi_aktual) || j.durasi_aktual) : '',
-            j.final_inspeksi || '',
-            j.alasan_telat || '',
-            j.alasan_overtime || ''
-        ]);
 
         if (typeof XLSX !== 'undefined') {
-            const worksheetData = [headers, ...rows];
-            const ws = XLSX.utils.aoa_to_sheet(worksheetData);
+            const excelData = jobs.map((j, index) => ({
+                "No": index + 1,
+                "No WO": j.no_wo || '',
+                "Timestamp": formatLocalTimestamp(j.timestamp),
+                "Kategori": j.kategori || '',
+                "NRP Pemohon": j.nrp_pemohon || '',
+                "Nama Pemohon": j.nama_pemohon || '',
+                "Perusahaan": j.perusahaan || '',
+                "Departemen": j.departemen || '',
+                "Section": j.section || '',
+                "No WA": j.no_wa || '',
+                "Tgl Pelaksanaan": j.tgl_pelaksanaan || '',
+                "Jam Pelaksanaan": j.jam_pelaksanaan || '',
+                "Shift": j.shift || '',
+                "Durasi Request": j.durasi_request || '',
+                "Lokasi Asal": j.lokasi_angkat || '',
+                "Lokasi Tujuan": j.lokasi_tujuan || '',
+                "Deskripsi": j.deskripsi || '',
+                "Status": j.status || '',
+                "GL": j.gl || '',
+                "Unit": j.unit || '',
+                "Operator": j.operator || '',
+                "Rigger 1": j.rigger || '',
+                "Rigger 2": j.rigger2 || '',
+                "Jam Start Aktual": j.jam_start_aktual || '',
+                "Jam End Aktual": j.jam_end_aktual || '',
+                "Durasi Aktual": j.durasi_aktual || '',
+                "Final Inspeksi": j.final_inspeksi || '',
+                "Kendala Lapangan": cleanKendalaText((j.alasan_telat || '') + ' ' + (j.alasan_overtime || ''))
+            }));
 
-            // Pengaturan otomatis lebar kolom agar pas dan rapi
-            const colWidths = headers.map((h, i) => {
-                let maxLen = h.length;
-                rows.forEach(r => {
-                    const cellVal = r[i] ? String(r[i]) : '';
-                    if (cellVal.length > maxLen) maxLen = cellVal.length;
-                });
-                return { wch: Math.min(Math.max(maxLen + 3, 12), 50) };
-            });
-            ws['!cols'] = colWidths;
-
+            const ws = XLSX.utils.json_to_sheet(excelData);
             const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Data Order");
-            XLSX.writeFile(wb, fileName);
-            showToast(`${jobs.length} data berhasil diexport ke Excel (.xlsx)!`);
+            XLSX.utils.book_append_sheet(wb, ws, "Data Orders");
+            XLSX.writeFile(wb, `Data_Order_Lifting_${getShiftDateString()}.xlsx`);
+            showToast("Data Excel berhasil diekspor!", "success");
         } else {
-            // Fallback CSV dengan UTF-8 BOM dan penegasan separator titik koma agar Excel langsung membagi kolom
-            let csvRows = [headers.join(';')];
-            rows.forEach(r => {
-                csvRows.push(r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';'));
-            });
-            const blob = new Blob(['\uFEFF' + csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.setAttribute('href', url);
-            link.setAttribute('download', `Order_Lifting_${dateRangeLabel}.csv`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            showToast(`${jobs.length} data diexport!`);
+            showToast("Library SheetJS belum siap", "error");
         }
+    }
+
+    function openUnitStatusModal(unitName) {
+        const uStatus = getUnitStatus(unitName);
+        document.getElementById('unitStatusModalTitle').innerText = `Status Unit: ${unitName}`;
+        document.getElementById('targetUnitName').value = unitName;
+        document.getElementById('unitStatusSelect').value = uStatus.status || 'ACTIVE';
+        document.getElementById('unitStatusReason').value = uStatus.reason || '';
+        toggleUnitReasonField();
+        document.getElementById('unitStatusModal').classList.remove('hidden');
+    }
+
+    function toggleUnitReasonField() {
+        const status = document.getElementById('unitStatusSelect')?.value;
+        const wrapper = document.getElementById('unitReasonWrapper');
+        if (wrapper) {
+            if (status === 'INACTIVE') {
+                wrapper.classList.remove('hidden');
+            } else {
+                wrapper.classList.add('hidden');
+            }
+        }
+    }
+
+    function submitUnitStatusChange(e) {
+        e.preventDefault();
+        const unitName = document.getElementById('targetUnitName').value;
+        const status = document.getElementById('unitStatusSelect').value;
+        const reason = document.getElementById('unitStatusReason').value.trim();
+
+        if (status === 'INACTIVE' && !reason) {
+            return showToast('Mohon isi keterangan alasan non-aktif!', 'error');
+        }
+
+        saveUnitStatus(unitName, status, reason);
+        showToast(`Status unit ${unitName} berhasil diperbarui!`);
+        document.getElementById('unitStatusModal').classList.add('hidden');
+        renderApp(true);
     }
 
     function getMonitoringView() {
@@ -2409,9 +2667,19 @@
 
             let pendingCount = jobs.filter(j => j.status === 'SCHEDULED' || j.status === 'UNSCHEDULED' || (j.status === 'PENDING' && (!j.operator || !j.rigger))).length;
 
+            // Daftar unit armada master
+            const m = getMasterData();
+            let allUnitsList = [];
+            if (filterKategori === 'Crane Truck') allUnitsList = m.unit_ct || [];
+            else if (filterKategori === 'Big Crane') allUnitsList = m.unit_big_crane || [];
+            else if (filterKategori === 'Lowboy') allUnitsList = m.unit_lowboy || [];
+            else allUnitsList = [...(m.unit_ct || []), ...(m.unit_big_crane || []), ...(m.unit_lowboy || [])];
+
+            const allOrdersNow = getOrders();
+
             return `
             <div class="bg-white rounded-md shadow-sm border border-slate-200 flex-1 flex flex-col min-h-0 h-full">
-                <!-- Sticky Header Container: Baris 1 & Baris 2 menempel saat di-scroll -->
+                <!-- Sticky Header Container: Baris 1, Baris 2, & Baris 3 menempel saat di-scroll -->
                 <div class="sticky top-0 z-30 bg-white border-b border-slate-200 shadow-xs">
                     <!-- BARIS 1: Header Utama (Kiri: Judul & Sync, Kanan: Validasi & Export) -->
                     <div class="px-3 py-2 flex items-center justify-between bg-slate-50/70 border-b border-slate-100">
@@ -2492,6 +2760,53 @@
                                 <option value="Big Crane" ${filterKategori === 'Big Crane' ? 'selected' : ''}>Big Crane</option>
                                 <option value="Lowboy" ${filterKategori === 'Lowboy' ? 'selected' : ''}>Lowboy</option>
                             </select>
+                        </div>
+                    </div>
+
+                    <!-- BARIS 3: Ketersediaan Unit & Beban Job On Progress (Admin / GL Clickable) -->
+                    <div class="px-3 py-1.5 bg-slate-50/70 border-t border-slate-100 flex flex-col gap-1">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[9px] sm:text-[10px] font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
+                                <i class="fa-solid fa-truck-pickup text-cyan-600 text-[10px]"></i> Ketersediaan Unit & Beban Job:
+                                <span class="text-[8px] text-slate-400 font-normal hidden sm:inline">(Klik kartu unit untuk ubah status)</span>
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-1.5 overflow-x-auto hide-scrollbar pb-0.5">
+                            ${allUnitsList.map(u => {
+                                const uStatus = getUnitStatus(u);
+                                const isActive = uStatus.status === 'ACTIVE';
+                                const progCount = allOrdersNow.filter(j => j.unit === u && j.status === 'ON PROGRESS').length;
+
+                                if (isActive) {
+                                    return `
+                                    <div onclick="openUnitStatusModal('${u}')" class="bg-emerald-50/50 border border-emerald-200 hover:border-emerald-400 text-slate-800 rounded-md px-2 py-1 shadow-2xs flex flex-col justify-center shrink-0 cursor-pointer active:scale-95 transition-all group select-none min-w-[76px]" title="Klik untuk ubah status ${u}">
+                                        <div class="flex items-center justify-between gap-1">
+                                            <span class="font-bold text-[10px] text-slate-800 tracking-tight leading-none">${u}</span>
+                                            <i class="fa-solid fa-pen-to-square text-[7px] text-emerald-500 group-hover:text-emerald-700"></i>
+                                        </div>
+                                        <div class="flex items-center gap-1 mt-1">
+                                            <span class="relative flex h-1.5 w-1.5 shrink-0">
+                                                ${progCount > 0 ? '<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>' : ''}
+                                                <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                                            </span>
+                                            <span class="text-[8px] font-bold ${progCount > 0 ? 'text-emerald-700' : 'text-slate-500'} whitespace-nowrap leading-none">
+                                                ${progCount} Job Progres
+                                            </span>
+                                        </div>
+                                    </div>`;
+                                } else {
+                                    return `
+                                    <div onclick="openUnitStatusModal('${u}')" class="bg-slate-100 border border-slate-300 hover:border-slate-400 text-slate-400 rounded-md px-2 py-1 shadow-2xs flex flex-col justify-center shrink-0 cursor-pointer active:scale-95 transition-all select-none min-w-[76px]" title="Unit Non-Aktif: ${uStatus.reason || 'Off'}">
+                                        <div class="flex items-center justify-between gap-1">
+                                            <span class="font-bold text-[10px] text-slate-400 line-through tracking-tight leading-none">${u}</span>
+                                            <span class="text-[7px] bg-red-100 text-red-600 font-extrabold px-1 rounded leading-none">OFF</span>
+                                        </div>
+                                        <div class="text-[8px] text-slate-400 truncate max-w-[76px] mt-1 leading-none font-medium" title="${uStatus.reason}">
+                                            ${uStatus.reason || 'Non-Aktif'}
+                                        </div>
+                                    </div>`;
+                                }
+                            }).join('')}
                         </div>
                     </div>
                 </div>
@@ -3146,21 +3461,28 @@
 
         const cat = userOrderFleetMode;
         const d = (draft && draft.fleetMode === cat) ? draft : null;
-
-        const valTgl = (d && d.tgl) ? d.tgl : shiftDate;
-        const valShift = (d && d.shift) ? d.shift : initialShift;
-        const valJam = (d && d.jam !== undefined) ? d.jam : currentJam;
-        const valDurasi = (d && d.durasi !== undefined) ? d.durasi : '';
-        const valSatuan = (d && d.satuan) ? d.satuan : 'JAM';
-        const valLokAsal = (d && d.lok_asal !== undefined) ? d.lok_asal : '';
-        const valLokTujuan = (d && d.lok_tujuan !== undefined) ? d.lok_tujuan : '';
-        const valDeskripsi = (d && d.deskripsi !== undefined) ? d.deskripsi : '';
+        let valTgl = (d && d.tgl !== undefined) ? d.tgl : shiftDate;
+        let valShift = (d && d.shift !== undefined) ? d.shift : initialShift;
+        let valJam = (d && d.jam !== undefined) ? d.jam : currentJam;
+        let valDurasi = (d && d.durasi !== undefined) ? d.durasi : '';
+        let valSatuan = (d && d.satuan !== undefined) ? d.satuan : 'JAM';
+        let valLokAsal = (d && d.lok_asal !== undefined) ? d.lok_asal : '';
+        let valLokTujuan = (d && d.lok_tujuan !== undefined) ? d.lok_tujuan : '';
+        let valDeskripsi = (d && d.deskripsi !== undefined) ? d.deskripsi : '';
 
         const valDelNama = (d && d.del_nama !== undefined) ? d.del_nama : user.nama_lengkap;
         const valDelDept = (d && d.del_dept !== undefined) ? d.del_dept : user.departemen;
         const valDelVendor = (d && d.del_vendor !== undefined) ? d.del_vendor : user.perusahaan;
         const valDelWa = (d && d.del_wa !== undefined) ? d.del_wa : user.no_wa;
         const valDelSect = (d && d.del_sect !== undefined) ? d.del_sect : user.section;
+
+        // Daftar unit armada sesuai pilihan kategori untuk ditampilkan ke User
+        let fleetUnits = [];
+        if (cat === 'Crane Truck') fleetUnits = m.unit_ct || [];
+        else if (cat === 'Big Crane') fleetUnits = m.unit_big_crane || [];
+        else if (cat === 'Lowboy') fleetUnits = m.unit_lowboy || [];
+
+        const allOrdersForChips = getOrders();
 
         let formFields = '';
         if (cat === 'Crane Truck') {
@@ -3270,6 +3592,63 @@
                     <span class="text-[9px] text-amber-700 font-bold bg-amber-100/80 px-2 py-0.5 rounded">Tersimpan</span>
                 </div>` : ''}
                 ${requesterHtml}
+
+                <!-- KETERSEDIAAN UNIT KHUSUS TAMPILAN USER (READ-ONLY) -->
+                <div class="bg-slate-50 border border-slate-200 rounded-lg p-2.5 mb-3 shadow-2xs">
+                    <div class="flex flex-wrap items-center justify-between gap-1 mb-1.5">
+                        <span class="text-[9px] sm:text-[10px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                            <i class="fa-solid fa-circle-info text-cyan-600 text-[10px]"></i> Ketersediaan Unit ${cat} Saat Ini:
+                        </span>
+                        <div class="text-[8px] sm:text-[9px] text-slate-500 font-medium flex items-center gap-1.5">
+                            <span class="inline-flex items-center gap-1">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                <span class="text-emerald-700 font-semibold">Hijau:</span> Aktif
+                            </span>
+                            <span class="text-slate-300">|</span>
+                            <span class="inline-flex items-center gap-1">
+                                <span class="line-through text-slate-400 font-semibold">Abu-abu</span>: Non-Aktif
+                            </span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1.5 overflow-x-auto hide-scrollbar pb-0.5">
+                        ${fleetUnits.map(u => {
+                            const uStatus = getUnitStatus(u);
+                            const isActive = uStatus.status === 'ACTIVE';
+                            const progCount = allOrdersForChips.filter(j => j.unit === u && j.status === 'ON PROGRESS').length;
+
+                            if (isActive) {
+                                return `
+                                <div class="bg-emerald-50/50 border border-emerald-200 text-slate-800 rounded-md px-2 py-1 shadow-2xs flex flex-col justify-center shrink-0 min-w-[76px]">
+                                    <div class="flex items-center justify-between gap-1">
+                                        <span class="font-bold text-[10px] text-slate-800 leading-none">${u}</span>
+                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500" title="Siap Beroperasi"></span>
+                                    </div>
+                                    <div class="flex items-center gap-1 mt-1">
+                                        <span class="relative flex h-1.5 w-1.5 shrink-0">
+                                            ${progCount > 0 ? '<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>' : ''}
+                                            <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                                        </span>
+                                        <span class="text-[8px] font-bold ${progCount > 0 ? 'text-emerald-700' : 'text-slate-500'} whitespace-nowrap leading-none">
+                                            ${progCount} Job Progres
+                                        </span>
+                                    </div>
+                                </div>`;
+                            } else {
+                                return `
+                                <div class="bg-slate-100 border border-slate-300 text-slate-400 rounded-md px-2 py-1 shadow-2xs flex flex-col justify-center shrink-0 min-w-[76px]" title="Unit Non-Aktif: ${uStatus.reason || 'Off'}">
+                                    <div class="flex items-center justify-between gap-1">
+                                        <span class="font-bold text-[10px] text-slate-400 line-through leading-none">${u}</span>
+                                        <span class="text-[7px] bg-red-100 text-red-600 font-extrabold px-1 rounded leading-none">OFF</span>
+                                    </div>
+                                    <div class="text-[8px] text-slate-400 truncate max-w-[76px] mt-1 leading-none font-medium" title="${uStatus.reason}">
+                                        ${uStatus.reason || 'Non-Aktif'}
+                                    </div>
+                                </div>`;
+                            }
+                        }).join('')}
+                    </div>
+                </div>
+
                 <form onsubmit="submitOrder(event)" class="space-y-3">
                     ${formFields}
                     <div class="pt-3 mt-4 border-t border-slate-100">
@@ -3832,7 +4211,7 @@
     });
 
     window.addEventListener('load', () => { 
-        hideSplashScreen();
+        if (window.innerWidth >= 768) hideSplashScreen();
         fetchFromSupabase().catch(e => console.warn(e)).finally(() => { 
             const user = JSON.parse(localStorage.getItem('lifting_user'));
             if (user) {
@@ -3852,7 +4231,7 @@
                 }
             }
             renderApp(false); 
-            hideSplashScreen();
+            if (window.innerWidth >= 768) hideSplashScreen();
         }); 
     });
 
@@ -3925,13 +4304,34 @@
         if (e.touches.length === 1) {
             mobileTouchStartY = e.touches[0].clientY;
         }
-    }, { passive: false });
+    }, { passive: true });
 
     window.addEventListener('touchmove', function(e) {
+        if (e.touches.length !== 1) return;
         const touchCurrentY = e.touches[0].clientY;
         const diffY = touchCurrentY - mobileTouchStartY;
-        // Cegah gesture pull-down reload browser saat posisi scroll berada di paling atas
-        if ((window.scrollY === 0 || document.documentElement.scrollTop === 0) && diffY > 0) {
+
+        // Cari elemen scrollable yang sedang disentuh jari user
+        let targetEl = e.target;
+        let scrollableEl = null;
+        while (targetEl && targetEl !== document.body && targetEl !== document.documentElement) {
+            const style = window.getComputedStyle(targetEl);
+            if ((style.overflowY === 'auto' || style.overflowY === 'scroll') && targetEl.scrollHeight > targetEl.clientHeight) {
+                scrollableEl = targetEl;
+                break;
+            }
+            targetEl = targetEl.parentElement;
+        }
+
+        const currentScrollTop = scrollableEl ? scrollableEl.scrollTop : (window.pageYOffset || document.documentElement.scrollTop || 0);
+
+        // Jika user sedang berada di tengah halaman (scrollTop > 0), JANGAN PERNAH cegah sentuhan (biarkan scroll ke atas lancar)
+        if (currentScrollTop > 0) {
+            return;
+        }
+
+        // Hanya cegah gesture reload jika posisi sudah benar-benar mentok di paling atas (scrollTop <= 0) dan ditarik ke bawah
+        if (currentScrollTop <= 0 && diffY > 0) {
             if (e.cancelable) {
                 e.preventDefault();
             }
