@@ -321,6 +321,97 @@
     let currentActionWo = null;
     let currentActionStatus = null;
     let pendingActionData = null;
+    let lastFetchTimestamp = Date.now();
+
+    // Handler Realtime Presisi: Memperbarui data lokal secara instan dari payload tanpa re-query PostgREST
+    function handleRealtimeOrderChange(payload) {
+        try {
+            let orders = getOrders();
+            const { eventType, new: newRecord, old: oldRecord } = payload;
+            let changed = false;
+
+            if (eventType === 'INSERT' && newRecord && newRecord.no_wo) {
+                const existingIdx = orders.findIndex(o => o.no_wo === newRecord.no_wo);
+                if (existingIdx === -1) {
+                    orders.unshift(newRecord);
+                    changed = true;
+                    // Beri notifikasi instan ke Admin/GL/MP saat ada order masuk
+                    const currentUser = JSON.parse(localStorage.getItem('lifting_user'));
+                    if (currentUser && (currentUser.role === 'ADMIN' || currentUser.role === 'GL' || currentUser.role === 'MANPOWER')) {
+                        showToast(`Job baru masuk: ${newRecord.no_wo}`, 'success');
+                    }
+                } else {
+                    orders[existingIdx] = newRecord;
+                    changed = true;
+                }
+            } else if (eventType === 'UPDATE' && newRecord && newRecord.no_wo) {
+                const idx = orders.findIndex(o => o.no_wo === newRecord.no_wo);
+                if (idx !== -1) {
+                    orders[idx] = newRecord;
+                    changed = true;
+                } else {
+                    orders.unshift(newRecord);
+                    changed = true;
+                }
+            } else if (eventType === 'DELETE' && oldRecord) {
+                const targetWo = oldRecord.no_wo;
+                const prevLen = orders.length;
+                orders = orders.filter(o => o.no_wo !== targetWo);
+                if (orders.length !== prevLen) {
+                    changed = true;
+                }
+            }
+
+            if (changed) {
+                localStorage.setItem('lifting_orders', JSON.stringify(orders));
+                if (currentTab !== 'order') {
+                    renderApp(true);
+                }
+            }
+        } catch (err) {
+            console.warn("Gagal memproses realtime order:", err);
+        }
+    }
+
+    function handleRealtimeSettingsChange(payload) {
+        try {
+            if (payload.new && payload.new.id === 1) {
+                localStorage.setItem('lifting_settings', JSON.stringify(payload.new));
+                if (currentTab !== 'order') renderApp(true);
+            }
+        } catch (e) {}
+    }
+
+    function handleRealtimeUsersChange(payload) {
+        try {
+            let users = getUsers();
+            if (payload.eventType === 'INSERT' && payload.new) {
+                if (!users.some(u => u.nrp === payload.new.nrp)) {
+                    users.push(payload.new);
+                    localStorage.setItem('lifting_users', JSON.stringify(users));
+                }
+            } else if (payload.eventType === 'UPDATE' && payload.new) {
+                const idx = users.findIndex(u => u.nrp === payload.new.nrp);
+                if (idx !== -1) {
+                    users[idx] = payload.new;
+                    localStorage.setItem('lifting_users', JSON.stringify(users));
+                }
+            } else if (payload.eventType === 'DELETE' && payload.old) {
+                users = users.filter(u => u.nrp !== payload.old.nrp);
+                localStorage.setItem('lifting_users', JSON.stringify(users));
+            }
+            if (currentTab === 'master') renderApp(true);
+        } catch (e) {}
+    }
+
+    function handleRealtimeMasterChange(payload) {
+        try {
+            if (payload.new && payload.new.id === 1) {
+                localStorage.setItem('lifting_master_data', JSON.stringify(payload.new));
+                if (currentTab === 'master') renderApp(true);
+            }
+        } catch (e) {}
+    }
 
     var isPreviewCanvas = window.self !== window.top || window.location.hostname.includes('usercontent.goog');
 
@@ -335,21 +426,23 @@
             if (!isTyping && !isModalOpen && currentTab !== 'order' && currentTab !== 'master' && currentTab !== 'profile') {
                 fetchFromSupabase(false);
             }
-        }, 30000);
+        }, 60000);
     } else if (supabaseClient) {
+        // Berlangganan Realtime dengan mutasi lokal langsung (tidak memicu HTTP PostgREST ulang)
         supabaseClient.channel('custom-all-channel')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, payload => { if (currentTab !== 'order') fetchFromSupabase(false); })
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, payload => { if (currentTab !== 'order') fetchFromSupabase(false); })
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, payload => { if (currentTab !== 'order') fetchFromSupabase(false); })
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'master_data' }, payload => { if (currentTab !== 'order') fetchFromSupabase(false); })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, handleRealtimeOrderChange)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, handleRealtimeSettingsChange)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, handleRealtimeUsersChange)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'master_data' }, handleRealtimeMasterChange)
             .subscribe();
     }
 
     async function fetchFromSupabase(isManual = false) {
         if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
+        lastFetchTimestamp = Date.now();
         try {
             const [resOrders, resSettings, resUsers, resMaster] = await Promise.all([
-                fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=timestamp.desc&limit=200`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }),
+                fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=timestamp.desc&limit=150`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }),
                 fetch(`${SUPABASE_URL}/rest/v1/settings?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }),
                 fetch(`${SUPABASE_URL}/rest/v1/users?select=*`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }),
                 fetch(`${SUPABASE_URL}/rest/v1/master_data?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } })
@@ -3708,7 +3801,11 @@
                     const el = document.getElementById(id); return el && !el.classList.contains('hidden');
                 });
                 if (isModalOpen) return;
-                fetchFromSupabase().then(() => { renderApp(true); });
+
+                // Batasi pemanggilan fetch ulang: maksimal 1 kali per 5 menit saat tab dibuka kembali
+                if (Date.now() - lastFetchTimestamp > 5 * 60 * 1000) {
+                    fetchFromSupabase(false).then(() => { renderApp(true); });
+                }
             }
         }
     });
