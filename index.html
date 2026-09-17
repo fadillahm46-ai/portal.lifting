@@ -242,39 +242,6 @@
     const memoryPhotoCache = new Map();
 
     /* ========================================================
-       SISTEM TOMBSTONE DATA DIHAPUS (MENCEGAH ZOMBIE DATA)
-       ======================================================== */
-    function getDeletedWos() {
-        try { return JSON.parse(localStorage.getItem('lifting_deleted_wos') || '[]'); }
-        catch(e) { return []; }
-    }
-
-    function markWoDeleted(wo) {
-        if (!wo) return;
-        let list = getDeletedWos();
-        const woStr = String(wo).trim();
-        if (!list.includes(woStr)) {
-            list.push(woStr);
-            localStorage.setItem('lifting_deleted_wos', JSON.stringify(list));
-        }
-    }
-
-    function getDeletedUsers() {
-        try { return JSON.parse(localStorage.getItem('lifting_deleted_users') || '[]'); }
-        catch(e) { return []; }
-    }
-
-    function markUserDeleted(nrp) {
-        if (!nrp) return;
-        let list = getDeletedUsers();
-        const nrpUpper = String(nrp).trim().toUpperCase();
-        if (!list.includes(nrpUpper)) {
-            list.push(nrpUpper);
-            localStorage.setItem('lifting_deleted_users', JSON.stringify(list));
-        }
-    }
-
-    /* ========================================================
        ROTASI FOTO UNIT UNTUK BACKGROUND ANIMASI HP
        ======================================================== */
     const UNIT_SPLASH_IMAGES = [
@@ -931,7 +898,6 @@
                 }
             } else if (eventType === 'DELETE' && oldRecord) {
                 const targetWo = oldRecord.no_wo;
-                markWoDeleted(targetWo);
                 const prevLen = orders.length;
                 orders = orders.filter(o => o.no_wo !== targetWo);
                 if (orders.length !== prevLen) {
@@ -982,8 +948,7 @@
         try {
             let users = getUsers();
             if (payload.eventType === 'INSERT' && payload.new) {
-                const delUsers = getDeletedUsers();
-                if (!delUsers.includes(String(payload.new.nrp).toUpperCase()) && !users.some(u => u.nrp === payload.new.nrp)) {
+                if (!users.some(u => u.nrp === payload.new.nrp)) {
                     users.push(payload.new);
                     localStorage.setItem('lifting_users', JSON.stringify(users));
                 }
@@ -994,9 +959,7 @@
                     localStorage.setItem('lifting_users', JSON.stringify(users));
                 }
             } else if (payload.eventType === 'DELETE' && payload.old) {
-                const delNrp = String(payload.old.nrp || '').toUpperCase();
-                markUserDeleted(delNrp);
-                users = users.filter(u => (u.nrp || '').toUpperCase() !== delNrp);
+                users = users.filter(u => u.nrp !== payload.old.nrp);
                 localStorage.setItem('lifting_users', JSON.stringify(users));
             }
             if (currentTab === 'master') renderApp(true);
@@ -1066,25 +1029,15 @@
             if (resOrders.ok) { 
                 const data = await resOrders.json(); 
                 if(Array.isArray(data)) { 
-                    const deletedWos = getDeletedWos();
-                    // Filter data dari server terhadap daftar WO yang telah dihapus permanen
-                    const validServerOrders = data.filter(item => item && item.no_wo && !deletedWos.includes(String(item.no_wo).trim()));
-                    
-                    let localOrders = getOrders().filter(item => item && item.no_wo && !deletedWos.includes(String(item.no_wo).trim()));
+                    // Safe merge: pertahankan foto_url & has_photo lokal agar tidak terhapus oleh sinkronisasi Supabase
+                    let localOrders = getOrders();
                     let orderMap = new Map();
-                    validServerOrders.forEach(item => { orderMap.set(item.no_wo, item); });
-
-                    // Hanya pertahankan local order jika dibuat sangat baru (< 2 menit) untuk toleransi offline
-                    // JANGAN membangkitkan kembali order yang sudah dihapus dari server!
-                    const now = Date.now();
+                    data.forEach(item => { if (item && item.no_wo) orderMap.set(item.no_wo, item); });
                     localOrders.forEach(lo => {
-                        if (lo && lo.no_wo && !deletedWos.includes(String(lo.no_wo).trim())) {
+                        if (lo && lo.no_wo) {
                             if (!orderMap.has(lo.no_wo)) {
-                                const orderAge = lo.timestamp ? (now - new Date(lo.timestamp).getTime()) : 999999999;
-                                if (orderAge < 2 * 60 * 1000) {
-                                    orderMap.set(lo.no_wo, lo);
-                                    syncToSupabase([lo]);
-                                }
+                                orderMap.set(lo.no_wo, lo);
+                                syncToSupabase([lo]);
                             } else {
                                 const serverItem = orderMap.get(lo.no_wo);
                                 if (lo.has_photo !== undefined && serverItem.has_photo === undefined) {
@@ -1107,18 +1060,7 @@
                 } 
             }
             if (resSettings.ok) { const data = await resSettings.json(); if(data && data.length > 0) { let ds = JSON.stringify(data[0]); if(localStorage.getItem('lifting_settings') !== ds) { localStorage.setItem('lifting_settings', ds); shouldRender = true; } } }
-            if (resUsers.ok) { 
-                const data = await resUsers.json(); 
-                if(Array.isArray(data) && data.length > 0) { 
-                    const delUsers = getDeletedUsers();
-                    const validUsers = data.filter(u => u && u.nrp && !delUsers.includes(String(u.nrp).toUpperCase()));
-                    let ds = JSON.stringify(validUsers); 
-                    if(localStorage.getItem('lifting_users') !== ds) { 
-                        localStorage.setItem('lifting_users', ds); 
-                        shouldRender = true; 
-                    } 
-                } 
-            }
+            if (resUsers.ok) { const data = await resUsers.json(); if(Array.isArray(data) && data.length > 0) { let ds = JSON.stringify(data); if(localStorage.getItem('lifting_users') !== ds) { localStorage.setItem('lifting_users', ds); shouldRender = true; } } }
             if (resMaster.ok) { const data = await resMaster.json(); if(data && data.length > 0) { let ds = JSON.stringify(data[0]); if(localStorage.getItem('lifting_master_data') !== ds) { localStorage.setItem('lifting_master_data', ds); shouldRender = true; } } }
             
             if(isManual) { showToast("Data berhasil disinkronkan!", "success"); renderApp(false); }
@@ -1187,38 +1129,121 @@
         if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
         try {
             if (!data) return;
-            // 1. Prioritas perbarui via Supabase Client
-            if (supabaseClient) {
-                try {
-                    await supabaseClient.from('master_data').update(data).eq('id', 1);
-                } catch(e) {}
-            }
-            // 2. Kirim update PATCH ke Supabase REST
-            const res = await fetch(`${SUPABASE_URL}/rest/v1/master_data?id=eq.1`, {
-                method: 'PATCH',
+            await fetch(`${SUPABASE_URL}/rest/v1/master_data?id=eq.1`, {
+                method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'apikey': SUPABASE_KEY,
                     'Authorization': `Bearer ${SUPABASE_KEY}`,
-                    'Prefer': 'return=minimal'
+                    'Prefer': 'resolution=merge-duplicates'
                 },
-                body: JSON.stringify(data)
+                body: JSON.stringify({ id: 1, ...data })
             });
-            // 3. Fallback upsert jika baris belum ada
-            if (!res.ok) {
-                await fetch(`${SUPABASE_URL}/rest/v1/master_data?on_conflict=id`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'apikey': SUPABASE_KEY,
-                        'Authorization': `Bearer ${SUPABASE_KEY}`,
-                        'Prefer': 'resolution=merge-duplicates'
-                    },
-                    body: JSON.stringify({ id: 1, ...data })
-                });
-            }
-        } catch (e) {
-            console.warn("Gagal simpan master data ke server:", e);
+        } catch (e) {}
+    }
+
+    function getOrders() { 
+        let raw = localStorage.getItem('lifting_orders');
+        let orders = [];
+        try { orders = Array.isArray(JSON.parse(raw)) ? JSON.parse(raw) : []; } catch(e) { orders = []; }
+        return orders; 
+    }
+    function saveOrders(orders) { localStorage.setItem('lifting_orders', JSON.stringify(orders)); syncToSupabase(orders); }
+    
+    function getCurrentUserNrp() {
+        try {
+            const u = JSON.parse(localStorage.getItem('lifting_user'));
+            return u && u.nrp ? String(u.nrp).trim().toUpperCase() : null;
+        } catch(e) { return null; }
+    }
+
+    function getOrderDraftKey() {
+        const nrp = getCurrentUserNrp();
+        return nrp ? `lifting_order_draft_${nrp}` : null;
+    }
+
+    function getOrderDraft() {
+        try {
+            const key = getOrderDraftKey();
+            if (!key) return null;
+            const d = localStorage.getItem(key);
+            return d ? JSON.parse(d) : null;
+        } catch(e) { return null; }
+    }
+
+    function clearOrderDraft() {
+        const key = getOrderDraftKey();
+        if (key) localStorage.removeItem(key);
+        localStorage.removeItem('lifting_order_draft');
+    }
+
+    function backToFleetSelection() {
+        userOrderFleetMode = null;
+        const key = getOrderDraftKey();
+        if (key) {
+            try {
+                const d = JSON.parse(localStorage.getItem(key));
+                if (d) {
+                    d.fleetMode = null;
+                    localStorage.setItem(key, JSON.stringify(d));
+                }
+            } catch(e) {}
+        }
+        renderApp(false);
+    }
+
+    function saveOrderDraft() {
+        const key = getOrderDraftKey();
+        if (!key || currentTab !== 'order' || !userOrderFleetMode) return;
+        const draft = {
+            fleetMode: userOrderFleetMode,
+            tgl: document.getElementById('req_tgl')?.value,
+            shift: document.getElementById('req_shift')?.value,
+            jam: document.getElementById('req_jam')?.value,
+            durasi: document.getElementById('req_durasi')?.value,
+            satuan: document.getElementById('req_satuan')?.value,
+            lok_asal: document.getElementById('req_lok_asal')?.value,
+            lok_tujuan: document.getElementById('req_lok_tujuan')?.value,
+            deskripsi: document.getElementById('req_deskripsi')?.value,
+            del_nama: document.getElementById('del_nama')?.value,
+            del_dept: document.getElementById('del_dept')?.value,
+            del_vendor: document.getElementById('del_vendor')?.value,
+            del_wa: document.getElementById('del_wa')?.value,
+            del_sect: document.getElementById('del_sect')?.value
+        };
+        localStorage.setItem(key, JSON.stringify(draft));
+    }
+
+    function getUsers() { 
+        let data = JSON.parse(localStorage.getItem('lifting_users'));
+        return Array.isArray(data) && data.length > 0 ? data : defaultUsers; 
+    }
+    function saveUsers(users) { localStorage.setItem('lifting_users', JSON.stringify(users)); syncUsersToSupabase(users); }
+    function getMasterData() { 
+        let data = JSON.parse(localStorage.getItem('lifting_master_data'));
+        if (!data) return defaultMasterData;
+        let safeData = { ...defaultMasterData };
+        for (let key in defaultMasterData) { if (data[key] && Array.isArray(data[key])) { safeData[key] = data[key]; } }
+        return safeData;
+    }
+    function saveMasterData(data) { localStorage.setItem('lifting_master_data', JSON.stringify(data)); syncMasterToSupabase(data); }
+
+    function handleSort(col) {
+        if (sortColumn === col) { sortDirection = sortDirection === 'asc' ? 'desc' : 'asc'; } 
+        else { sortColumn = col; sortDirection = 'asc'; }
+        renderApp(true); 
+    }
+
+    function getSortIcon(col) {
+        if (sortColumn !== col) return '<i class="fa-solid fa-sort text-slate-300 ml-1"></i>';
+        return sortDirection === 'asc' ? '<i class="fa-solid fa-sort-up text-cyan-600 ml-1"></i>' : '<i class="fa-solid fa-sort-down text-cyan-600 ml-1"></i>';
+    }
+
+    function executeOrderSearch() {
+        const input = document.getElementById('orderSearchInput');
+        if (input) {
+            orderSearchQuery = input.value.trim();
+            renderApp(true);
         }
     }
 
@@ -2820,31 +2845,9 @@
     }
 
     function deleteUserAccount(nrp) {
-        const nrpUpper = String(nrp).trim().toUpperCase();
-        openCustomConfirm('Hapus Akun', `Hapus pengguna ${nrpUpper} dari sistem?`, async () => {
-            let users = getUsers().filter(u => (u.nrp || '').toUpperCase() !== nrpUpper);
-            localStorage.setItem('lifting_users', JSON.stringify(users));
-            markUserDeleted(nrpUpper);
-
-            // Hapus dari Supabase secara permanen
-            if (supabaseClient) {
-                try {
-                    await supabaseClient.from('users').delete().eq('nrp', nrpUpper);
-                } catch(e) {}
-            }
-            if (SUPABASE_KEY && !SUPABASE_KEY.includes('PASTE_KUNCI')) {
-                try {
-                    await fetch(`${SUPABASE_URL}/rest/v1/users?nrp=eq.${encodeURIComponent(nrpUpper)}`, {
-                        method: 'DELETE',
-                        headers: {
-                            'apikey': SUPABASE_KEY,
-                            'Authorization': `Bearer ${SUPABASE_KEY}`
-                        }
-                    });
-                } catch(e) {
-                    console.warn("Gagal hapus user di server:", e);
-                }
-            }
+        openCustomConfirm('Hapus Akun', `Hapus pengguna ${nrp} dari sistem?`, () => {
+            let users = getUsers().filter(u => u.nrp !== nrp);
+            saveUsers(users);
             showToast('Pengguna dihapus');
             renderApp(true);
         });
@@ -2975,29 +2978,28 @@
                     <div class="lg:col-span-4 flex flex-col justify-center">
                         <div class="flex justify-between text-[9px] font-bold text-slate-400 uppercase border-b border-slate-100 pb-1.5 mb-2">
                             <span class="w-1/2 text-left">PERUSAHAAN</span>
-    function saveBrandingSettings(e) {
-        e.preventDefault();
-        const s = getSettings();
-        s.logo_url = document.getElementById('sett_logo_url').value.trim();
-        s.bg_url = document.getElementById('sett_bg_url').value.trim();
-        s.icon_ct_url = document.getElementById('sett_ct_url').value.trim();
-        s.icon_bc_url = document.getElementById('sett_bc_url').value.trim();
-        s.icon_lb_url = document.getElementById('sett_lb_url').value.trim();
-        localStorage.setItem('lifting_settings', JSON.stringify(s));
-        
-        if (supabaseClient) {
-            try { supabaseClient.from('settings').update(s).eq('id', 1); } catch(e) {}
-        }
-        if (SUPABASE_KEY && !SUPABASE_KEY.includes('PASTE_KUNCI')) {
-            fetch(`${SUPABASE_URL}/rest/v1/settings?id=eq.1`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` },
-                body: JSON.stringify(s)
-            }).catch(e => console.warn(e));
-        }
-        showToast('Pengaturan branding tersimpan!');
-        renderApp(false);
-    }
+                            <span class="w-1/4 text-center">PERSENTASE</span>
+                            <span class="w-1/4 text-right">T. JAM | JOB</span>
+                        </div>
+                        <div class="flex flex-col gap-1.5 hide-scrollbar overflow-y-auto max-h-40" id="legendCompanyContainer"></div>
+                    </div>
+                    
+                    <!-- Kolom 3: Rincian Dept Plant Bergaris Pemisah -->
+                    <div class="lg:col-span-4 lg:border-l border-slate-100 lg:pl-6 flex flex-col justify-center">
+                        <div class="flex justify-between items-center text-[9px] font-bold text-blue-600 border-b border-slate-100 pb-1.5 mb-2 uppercase tracking-wider">
+                            <span>DEPT PLANT</span>
+                            <span class="text-slate-400 text-[8px]">TOTAL JAM | JOB</span>
+                        </div>
+                        <div class="flex flex-col gap-1.5 hide-scrollbar overflow-y-auto max-h-40">
+                            ${(() => {
+                                let plantStats = {};
+                                filteredJobs.forEach(j => {
+                                    if((j.departemen || '').toUpperCase() === 'PLANT') {
+                                        let sec = j.section || 'N/A';
+                                        if(!plantStats[sec]) plantStats[sec] = { count: 0, hours: 0 };
+                                        plantStats[sec].count++;
+                                        if(j.status === 'COMPLETED' && j.durasi_aktual) plantStats[sec].hours += parseFloat(j.durasi_aktual);
+                                    }
                                 });
                                 let plantArray = Object.entries(plantStats).sort((a,b) => b[1].count - a[1].count);
                                 if(plantArray.length === 0) return '<div class="text-[10px] text-slate-400 italic py-2">Tidak ada order dari Dept Plant hari ini.</div>';
@@ -5130,33 +5132,14 @@
 
     function confirmHapusOrder(wo) {
         openCustomConfirm('Hapus Data', `Apakah Anda yakin ingin menghapus order ${wo}?`, async () => {
-            const woClean = String(wo).trim();
-            markWoDeleted(woClean);
-
-            let jobs = getOrders().filter(j => String(j.no_wo).trim() !== woClean);
+            let jobs = getOrders().filter(j => j.no_wo !== wo);
             localStorage.setItem('lifting_orders', JSON.stringify(jobs));
             
-            // Hapus dari Supabase secara permanen via Client & REST DELETE
-            if (supabaseClient) {
-                try {
-                    await supabaseClient.from('orders').delete().eq('no_wo', woClean);
-                } catch(e) {}
-            }
-
             if (SUPABASE_KEY && !SUPABASE_KEY.includes('PASTE_KUNCI')) {
-                try { 
-                    await fetch(`${SUPABASE_URL}/rest/v1/orders?no_wo=eq.${encodeURIComponent(woClean)}`, { 
-                        method: 'DELETE', 
-                        headers: { 
-                            'apikey': SUPABASE_KEY, 
-                            'Authorization': `Bearer ${SUPABASE_KEY}` 
-                        } 
-                    }); 
-                } catch(e) { 
-                    console.warn("Gagal hapus order di server:", e); 
-                }
+                try { await fetch(`${SUPABASE_URL}/rest/v1/orders?no_wo=eq.${wo}`, { method: 'DELETE', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }); } 
+                catch(e) { console.warn(e); }
             }
-            showToast('Data dihapus permanen!'); 
+            showToast('Data dihapus!'); 
             document.getElementById('editJobModal').classList.add('hidden'); 
             renderApp(true);
         });
