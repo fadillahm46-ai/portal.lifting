@@ -213,7 +213,7 @@
     const SUPABASE_URL = 'https://dtcxhpwownzgxzmurtkr.supabase.co';
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR0Y3hocHdvd256Z3h6bXVydGtyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkxMzkwMDQsImV4cCI6MjEwNDcxNTAwNH0.U8HkMTbP6zAoWcLFs0BNE9seO6Ja8jHDvTi8YVQLQao';
     const supabaseClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
-    const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxBJ2iMEIl7W-3wp7k-tDPnbd-_3olr4EV69HDkKYUJIYMJ_1Dgz0kDLzRsD8lfcWGOpg/exec'; 
+    const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbBJ2iMEIl7W-3wp7k-tDPnbd-_3olr4EV69HDkKYUJIYMJ_1Dgz0kDLzRsD8lfcWGOpg/exec'; 
 
     /* ========================================================
        ROTASI FOTO UNIT UNTUK BACKGROUND ANIMASI HP
@@ -331,6 +331,64 @@
         return map[unitName] || { status: 'ACTIVE', reason: '' };
     }
 
+    function getUnitWorkload(unitName, ordersList) {
+        const jobs = (ordersList || getOrders()).filter(j => 
+            (j.unit || '').trim().toUpperCase() === (unitName || '').trim().toUpperCase() &&
+            j.status !== 'COMPLETED' && j.status !== 'CANCELED'
+        );
+        const count = jobs.length;
+        let totalHours = 0;
+        jobs.forEach(j => {
+            let durStr = String(j.durasi_request || '');
+            let match = durStr.match(/([\d.]+)/);
+            if (match) {
+                let val = parseFloat(match[1]) || 0;
+                if (durStr.toUpperCase().includes('HARI')) {
+                    totalHours += val * 24;
+                } else {
+                    totalHours += val;
+                }
+            }
+        });
+        const isCrowded = (count >= 5) || (totalHours > 8);
+        return { count, totalHours, isCrowded };
+    }
+
+    async function syncUnitStatusToSupabase(unitName, status, reason) {
+        if (!unitName) return;
+        const isActive = (status === 'ACTIVE');
+        const currentUser = JSON.parse(localStorage.getItem('lifting_user')) || {};
+        const payload = {
+            unit_code: unitName,
+            is_active: isActive,
+            alasan_off: isActive ? null : (reason || 'Non-Aktif'),
+            updated_by: currentUser.nama_lengkap || currentUser.nrp || 'ADMIN',
+            updated_at: new Date().toISOString()
+        };
+
+        if (supabaseClient) {
+            try {
+                const { error } = await supabaseClient.from('unit_status').upsert(payload, { onConflict: 'unit_code' });
+                if (!error) return;
+            } catch(e) { console.warn("Supabase SDK unit_status upsert notice:", e); }
+        }
+
+        if (SUPABASE_KEY && !SUPABASE_KEY.includes('PASTE_KUNCI')) {
+            try {
+                await fetch(`${SUPABASE_URL}/rest/v1/unit_status?on_conflict=unit_code`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Prefer': 'resolution=merge-duplicates'
+                    },
+                    body: JSON.stringify(payload)
+                });
+            } catch(e) { console.warn("REST unit_status upsert error:", e); }
+        }
+    }
+
     function saveUnitStatus(unitName, status, reason) {
         if (!unitName) return;
         const m = getMasterData();
@@ -338,16 +396,35 @@
         m.unit_status_map[unitName] = { status, reason, updated_at: new Date().toISOString() };
         localStorage.setItem('lifting_unit_status', JSON.stringify(m.unit_status_map));
         saveMasterData(m);
+        syncUnitStatusToSupabase(unitName, status, reason);
     }
 
     /* ========================================================
        SISTEM NOTIFIKASI SUARA (WEB AUDIO API) & REALTIME BANNER
        ======================================================== */
+    function normalizeName(str) {
+        return String(str || '').trim().toUpperCase().replace(/\s+/g, ' ');
+    }
+
+    function ensureAudioUnlocked() {
+        try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return;
+            if (!window._appAudioCtx) window._appAudioCtx = new AudioCtx();
+            if (window._appAudioCtx.state === 'suspended') {
+                window._appAudioCtx.resume();
+            }
+        } catch(e) {}
+    }
+    window.addEventListener('pointerdown', ensureAudioUnlocked, { once: true });
+    window.addEventListener('keydown', ensureAudioUnlocked, { once: true });
+
     function playNotificationSound(type = 'gl') {
         try {
             const AudioCtx = window.AudioContext || window.webkitAudioContext;
             if (!AudioCtx) return;
-            const ctx = new AudioCtx();
+            if (!window._appAudioCtx) window._appAudioCtx = new AudioCtx();
+            const ctx = window._appAudioCtx;
             if (ctx.state === 'suspended') ctx.resume();
             const now = ctx.currentTime;
 
@@ -531,24 +608,58 @@
             const { eventType, new: newRecord, old: oldRecord } = payload;
             let changed = false;
             const currentUser = JSON.parse(localStorage.getItem('lifting_user'));
+            if (!currentUser) return;
+
+            const roleUpper = String(currentUser.role || '').trim().toUpperCase();
+            const isGlOrAdmin = (roleUpper === 'ADMIN' || roleUpper === 'GL' || roleUpper === 'GROUP LEADER' || roleUpper === 'LEADER');
+            const isManpower = (roleUpper === 'MANPOWER' || roleUpper === 'MP' || roleUpper === 'USER');
+            const myName = normalizeName(currentUser.nama_lengkap);
+
+            const existingOrder = orders.find(o => o.no_wo === (newRecord ? newRecord.no_wo : (oldRecord ? oldRecord.no_wo : '')));
+            const prevOp = existingOrder ? normalizeName(existingOrder.operator) : '';
+            const prevRig1 = existingOrder ? normalizeName(existingOrder.rigger) : '';
+            const prevRig2 = existingOrder ? normalizeName(existingOrder.rigger2) : '';
+            const prevStatus = existingOrder ? normalizeName(existingOrder.status) : '';
+            const wasAssignedBefore = (prevOp === myName || prevRig1 === myName || prevRig2 === myName);
 
             if (eventType === 'INSERT' && newRecord && newRecord.no_wo) {
                 const existingIdx = orders.findIndex(o => o.no_wo === newRecord.no_wo);
                 if (existingIdx === -1) {
                     orders.unshift(newRecord);
                     changed = true;
-                    // Notifikasi khusus Admin & GL saat ada order baru masuk
-                    if (currentUser && (currentUser.role === 'ADMIN' || currentUser.role === 'GL')) {
-                        triggerAppNotification(
-                            "Ada Orderan Masuk!",
-                            `Order ${newRecord.no_wo} dari ${newRecord.nama_pemohon || 'User'} siap divalidasi.`,
-                            'gl'
-                        );
-                    }
                 } else {
                     orders[existingIdx] = newRecord;
                     changed = true;
                 }
+
+                // Notifikasi khusus Admin & semua GL saat ada order baru masuk
+                if (isGlOrAdmin) {
+                    const isSelf = currentUser.nrp && newRecord.nrp_pemohon && (String(currentUser.nrp).trim().toUpperCase() === String(newRecord.nrp_pemohon).trim().toUpperCase());
+                    if (!isSelf) {
+                        triggerAppNotification(
+                            "Ada Orderan Masuk!",
+                            `Order ${newRecord.no_wo} dari ${newRecord.nama_pemohon || 'User'} (${newRecord.kategori || 'Unit'}) siap divalidasi.`,
+                            'gl'
+                        );
+                    }
+                }
+
+                // Notifikasi untuk MP jika order baru langsung ditugaskan ke namanya
+                if (isManpower) {
+                    const newOp = normalizeName(newRecord.operator);
+                    const newRig1 = normalizeName(newRecord.rigger);
+                    const newRig2 = normalizeName(newRecord.rigger2);
+                    const isAssignedNow = (newOp === myName || newRig1 === myName || newRig2 === myName);
+                    if (isAssignedNow && (newRecord.status === 'ON PROGRESS' || newRecord.status === 'SCHEDULED')) {
+                        triggerAppNotification(
+                            "Penugasan Job Baru!",
+                            `Job ${newRecord.no_wo} (${newRecord.unit || 'Unit'}) ditugaskan kepada Anda. Segera selesaikan.`,
+                            'mp'
+                        );
+                        openAssignedJobAlert(newRecord);
+                    }
+                }
+
             } else if (eventType === 'UPDATE' && newRecord && newRecord.no_wo) {
                 const idx = orders.findIndex(o => o.no_wo === newRecord.no_wo);
                 if (idx !== -1) {
@@ -559,31 +670,43 @@
                     changed = true;
                 }
 
-                // Notifikasi khusus Operator & Rigger saat akun mereka ditugaskan
-                if (currentUser && (currentUser.role === 'MANPOWER' || currentUser.role === 'USER')) {
-                    const currentName = (currentUser.nama_lengkap || '').trim().toUpperCase();
-                    const newOp = (newRecord.operator || '').trim().toUpperCase();
-                    const newRig1 = (newRecord.rigger || '').trim().toUpperCase();
-                    const newRig2 = (newRecord.rigger2 || '').trim().toUpperCase();
+                const newStatus = normalizeName(newRecord.status);
+                const newOp = normalizeName(newRecord.operator);
+                const newRig1 = normalizeName(newRecord.rigger);
+                const newRig2 = normalizeName(newRecord.rigger2);
+                const isAssignedNow = (newOp === myName || newRig1 === myName || newRig2 === myName);
 
-                    const oldOp = oldRecord ? (oldRecord.operator || '').trim().toUpperCase() : '';
-                    const oldRig1 = oldRecord ? (oldRecord.rigger || '').trim().toUpperCase() : '';
-                    const oldRig2 = oldRecord ? (oldRecord.rigger2 || '').trim().toUpperCase() : '';
+                // 1. Notifikasi untuk Admin & Semua GL jika ada order baru/pending rollover yang memerlukan validasi
+                if (isGlOrAdmin) {
+                    const isOrderNeedingValidation = (prevStatus !== newStatus) && (newStatus === 'SCHEDULED' || newStatus === 'UNSCHEDULED' || (newStatus === 'PENDING' && !newRecord.gl));
+                    const isSelf = currentUser.nrp && newRecord.nrp_pemohon && (String(currentUser.nrp).trim().toUpperCase() === String(newRecord.nrp_pemohon).trim().toUpperCase());
+                    if (isOrderNeedingValidation && !isSelf) {
+                        triggerAppNotification(
+                            "Order Perlu Validasi!",
+                            `Order ${newRecord.no_wo} (${newRecord.status}) perlu divalidasi oleh GL.`,
+                            'gl'
+                        );
+                    }
+                }
 
-                    const newlyAssigned = (newOp === currentName && newOp !== oldOp) ||
-                                          (newRig1 === currentName && newRig1 !== oldRig1) ||
-                                          (newRig2 === currentName && newRig2 !== oldRig2);
+                // 2. Notifikasi khusus Operator & Rigger saat GL memvalidasi dan menugaskan job ke nama MP
+                if (isManpower && isAssignedNow) {
+                    const isNewlyAssignedToMe = (!wasAssignedBefore) || 
+                        (prevStatus !== 'ON PROGRESS' && newStatus === 'ON PROGRESS') ||
+                        (prevOp !== newOp && newOp === myName) ||
+                        (prevRig1 !== newRig1 && newRig1 === myName) ||
+                        (prevRig2 !== newRig2 && newRig2 === myName);
 
-                    if (newlyAssigned) {
+                    if (isNewlyAssignedToMe) {
                         triggerAppNotification(
                             "Penugasan Job Baru!",
-                            "Anda mendapatkan job baru, segera selesaikan. Terimakasih.",
+                            `Halo ${currentUser.nama_lengkap}, Anda mendapatkan tugas No WO: ${newRecord.no_wo} (Unit: ${newRecord.unit || '-'}). Segera selesaikan.`,
                             'mp'
                         );
-                        // Buka pop-up peringatan job baru untuk kru yang bersangkutan
                         openAssignedJobAlert(newRecord);
                     }
                 }
+
             } else if (eventType === 'DELETE' && oldRecord) {
                 const targetWo = oldRecord.no_wo;
                 const prevLen = orders.length;
@@ -657,6 +780,23 @@
         } catch (e) {}
     }
 
+    function handleRealtimeUnitStatusChange(payload) {
+        try {
+            if (payload.new && payload.new.unit_code) {
+                const uCode = payload.new.unit_code;
+                const statusStr = payload.new.is_active ? 'ACTIVE' : 'INACTIVE';
+                const reasonStr = payload.new.alasan_off || '';
+                const m = getMasterData();
+                if (!m.unit_status_map) m.unit_status_map = {};
+                m.unit_status_map[uCode] = { status: statusStr, reason: reasonStr, updated_at: payload.new.updated_at || new Date().toISOString() };
+                localStorage.setItem('lifting_unit_status', JSON.stringify(m.unit_status_map));
+                renderApp(true);
+            }
+        } catch (err) {
+            console.warn("Gagal proses realtime unit_status:", err);
+        }
+    }
+
     var isPreviewCanvas = window.self !== window.top || window.location.hostname.includes('usercontent.goog');
 
     if (isPreviewCanvas) {
@@ -678,6 +818,7 @@
             .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, handleRealtimeSettingsChange)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, handleRealtimeUsersChange)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'master_data' }, handleRealtimeMasterChange)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'unit_status' }, handleRealtimeUnitStatusChange)
             .subscribe();
     }
 
@@ -685,11 +826,12 @@
         if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
         lastFetchTimestamp = Date.now();
         try {
-            const [resOrders, resSettings, resUsers, resMaster] = await Promise.all([
+            const [resOrders, resSettings, resUsers, resMaster, resUnitStatus] = await Promise.all([
                 fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=timestamp.desc&limit=150`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }),
                 fetch(`${SUPABASE_URL}/rest/v1/settings?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }),
                 fetch(`${SUPABASE_URL}/rest/v1/users?select=*`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }),
-                fetch(`${SUPABASE_URL}/rest/v1/master_data?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } })
+                fetch(`${SUPABASE_URL}/rest/v1/master_data?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }),
+                fetch(`${SUPABASE_URL}/rest/v1/unit_status?select=*`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } })
             ]);
 
             let shouldRender = false;
@@ -710,6 +852,25 @@
             if (resUsers.ok) { const data = await resUsers.json(); if(Array.isArray(data) && data.length > 0) { let ds = JSON.stringify(data); if(localStorage.getItem('lifting_users') !== ds) { localStorage.setItem('lifting_users', ds); shouldRender = true; } } }
             if (resMaster.ok) { const data = await resMaster.json(); if(data && data.length > 0) { let ds = JSON.stringify(data[0]); if(localStorage.getItem('lifting_master_data') !== ds) { localStorage.setItem('lifting_master_data', ds); shouldRender = true; } } }
             
+            if (resUnitStatus && resUnitStatus.ok) {
+                const uData = await resUnitStatus.json();
+                if (Array.isArray(uData) && uData.length > 0) {
+                    const m = getMasterData();
+                    if (!m.unit_status_map) m.unit_status_map = {};
+                    uData.forEach(row => {
+                        if (row.unit_code) {
+                            m.unit_status_map[row.unit_code] = {
+                                status: row.is_active ? 'ACTIVE' : 'INACTIVE',
+                                reason: row.alasan_off || '',
+                                updated_at: row.updated_at
+                            };
+                        }
+                    });
+                    localStorage.setItem('lifting_unit_status', JSON.stringify(m.unit_status_map));
+                    shouldRender = true;
+                }
+            }
+
             if(isManual) { showToast("Data berhasil disinkronkan!", "success"); renderApp(false); }
             else if(shouldRender) { 
                 // Jangan me-render ulang saat pengguna sedang mengisi form order agar input tidak ter-reset
@@ -741,6 +902,31 @@
                 body: JSON.stringify(cleanOrders) 
             });
         } catch (e) {}
+    }
+
+    // Mengirim satu baris order secara instan ke Supabase agar siaran Realtime WebSocket terpicu cepat
+    async function syncSingleOrderToSupabase(order) {
+        if (!order || !SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
+        try {
+            const clean = { ...order };
+            delete clean.foto_evidence;
+            if (supabaseClient) {
+                await supabaseClient.from('orders').upsert(clean, { onConflict: 'no_wo' });
+                return;
+            }
+            await fetch(`${SUPABASE_URL}/rest/v1/orders?on_conflict=no_wo`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': SUPABASE_KEY,
+                    'Authorization': `Bearer ${SUPABASE_KEY}`,
+                    'Prefer': 'resolution=merge-duplicates'
+                },
+                body: JSON.stringify(clean)
+            });
+        } catch(err) {
+            console.warn("Gagal sync single order:", err);
+        }
     }
 
     async function syncUsersToSupabase(users) {
@@ -1078,7 +1264,7 @@
 
             <!-- ALL GLOBAL MODALS -->
             <div id="imageViewerModal" class="fixed inset-0 bg-black/95 z-[150] hidden flex items-center justify-center p-2" onclick="this.classList.add('hidden')">
-                <img id="viewerImage" src="" referrerpolicy="no-referrer" class="max-w-full max-h-[90vh] object-contain cursor-zoom-out rounded-sm shadow-2xl transition-transform duration-300" onclick="event.stopPropagation()">
+                <img id="viewerImage" src="" class="max-w-full max-h-[90vh] object-contain cursor-zoom-out rounded-sm shadow-2xl transition-transform duration-300" onclick="event.stopPropagation()">
                 <button class="absolute top-4 right-4 text-white text-3xl opacity-70 hover:opacity-100 transition-opacity"><i class="fa-solid fa-times"></i></button>
             </div>
 
@@ -1115,7 +1301,8 @@
 
             <!-- MODAL ALERT PENUGASAN BARU KHUSUS KRU MP (OPERATOR & RIGGER) -->
             <div id="assignedJobModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex justify-center items-center z-[160] hidden p-4">
-                <div class="bg-white rounded-2xl shadow-2xl w-full max-w-[320px] p-5 text-center animate-pop-in flex flex-col items-center border border-cyan-100">
+                <div class="bg-white rounded-2xl shadow-2xl w-full max-w-[320px] p-5 text-center animate-pop-in flex flex-col items-center border border-cyan-100 relative">
+                    <button type="button" onclick="document.getElementById('assignedJobModal').classList.add('hidden')" class="absolute top-3 right-3 text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-sm"></i></button>
                     <div class="w-14 h-14 rounded-full bg-cyan-100 text-cyan-600 flex items-center justify-center text-2xl mb-3 shadow-inner">
                         <i class="fa-solid fa-bell animate-bounce"></i>
                     </div>
@@ -1243,6 +1430,10 @@
                                     <label class="block text-[10px] font-bold text-slate-500 mb-1">Nama Lengkap</label>
                                     <input type="text" id="profName" value="${user.nama_lengkap || ''}" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-md px-3 py-2 text-[10px] focus:outline-none focus:border-cyan-500" required>
                                 </div>
+                            </div>
+                            <div id="profMpNotice" class="hidden bg-amber-50 border border-amber-200 rounded-md p-2 text-[9px] text-amber-700 font-semibold flex items-center gap-1.5">
+                                <i class="fa-solid fa-lock text-amber-600"></i>
+                                <span>Nama Lengkap & NRP terkunci untuk sinkronisasi penugasan job Manpower dari Master Data.</span>
                             </div>
                             
                             <div class="grid grid-cols-2 gap-2">
@@ -1697,6 +1888,8 @@
     function openProfileBiodata() {
         const user = JSON.parse(localStorage.getItem('lifting_user')) || {};
         const m = getMasterData();
+        const roleUpper = String(user.role || '').trim().toUpperCase();
+        const isMP = roleUpper === 'MANPOWER' || roleUpper === 'MP';
 
         const inputNrp = document.getElementById('profNrp');
         const inputName = document.getElementById('profName');
@@ -1704,9 +1897,26 @@
         const inputWa = document.getElementById('profWa');
 
         if (inputNrp) inputNrp.value = user.nrp || '';
-        if (inputName) inputName.value = user.nama_lengkap || '';
+        if (inputName) {
+            inputName.value = user.nama_lengkap || '';
+            if (isMP) {
+                inputName.readOnly = true;
+                inputName.classList.add('bg-slate-100', 'cursor-not-allowed', 'text-slate-500');
+                inputName.classList.remove('focus:border-cyan-500');
+            } else {
+                inputName.readOnly = false;
+                inputName.classList.remove('bg-slate-100', 'cursor-not-allowed', 'text-slate-500');
+                inputName.classList.add('focus:border-cyan-500');
+            }
+        }
         if (inputJabatan) inputJabatan.value = user.jabatan || '';
         if (inputWa) inputWa.value = user.no_wa || '';
+
+        const noticeEl = document.getElementById('profMpNotice');
+        if (noticeEl) {
+            if (isMP) noticeEl.classList.remove('hidden');
+            else noticeEl.classList.add('hidden');
+        }
 
         const selPerusahaan = document.getElementById('profPerusahaan');
         const selDept = document.getElementById('profDepartemen');
@@ -1825,8 +2035,13 @@
         let user = JSON.parse(localStorage.getItem('lifting_user')); 
         let users = getUsers(); 
         let idx = users.findIndex(u => (u.nrp || '').toUpperCase() === (user.nrp || '').toUpperCase()); 
+        const roleUpper = String(user.role || '').trim().toUpperCase();
+        const isMP = roleUpper === 'MANPOWER' || roleUpper === 'MP';
         
-        user.nama_lengkap = document.getElementById('profName').value.trim().toUpperCase(); 
+        // Khusus role MANPOWER, nama lengkap tidak boleh diubah agar tetap identik dengan master data
+        if (!isMP) {
+            user.nama_lengkap = document.getElementById('profName').value.trim().toUpperCase(); 
+        }
         user.jabatan = document.getElementById('profJabatan').value.trim().toUpperCase(); 
         user.perusahaan = document.getElementById('profPerusahaan').value; 
         user.departemen = document.getElementById('profDepartemen').value; 
@@ -2614,7 +2829,7 @@
         }
 
         saveUnitStatus(unitName, status, reason);
-        showToast(`Status unit ${unitName} berhasil diperbarui!`);
+        showToast(`Status unit ${unitName} (${status}) tersimpan ke cloud!`);
         document.getElementById('unitStatusModal').classList.add('hidden');
         renderApp(true);
     }
@@ -2797,14 +3012,44 @@
                                 <i class="fa-solid fa-truck-pickup text-cyan-600 text-[10px]"></i> Ketersediaan Unit & Beban Job:
                                 <span class="text-[8px] text-slate-400 font-normal hidden sm:inline">(Klik kartu unit untuk ubah status)</span>
                             </span>
+                            <div class="flex items-center gap-2 text-[8px] sm:text-[9px] font-semibold">
+                                <span class="inline-flex items-center gap-1 text-emerald-700">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Aktif
+                                </span>
+                                <span class="inline-flex items-center gap-1 text-rose-700">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span> Crowded
+                                </span>
+                                <span class="inline-flex items-center gap-1 text-slate-500">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span> Non-Aktif
+                                </span>
+                            </div>
                         </div>
                         <div class="flex items-center gap-1.5 overflow-x-auto hide-scrollbar pb-0.5">
                             ${allUnitsList.map(u => {
                                 const uStatus = getUnitStatus(u);
                                 const isActive = uStatus.status === 'ACTIVE';
-                                const progCount = allOrdersNow.filter(j => j.unit === u && j.status === 'ON PROGRESS').length;
+                                const workload = getUnitWorkload(u, allOrdersNow);
+                                const isCrowded = isActive && workload.isCrowded;
 
                                 if (isActive) {
+                                    if (isCrowded) {
+                                        return `
+                                        <div onclick="openUnitStatusModal('${u}')" class="bg-rose-50 border border-rose-300 hover:border-rose-400 text-rose-900 ring-1 ring-rose-300 rounded-md px-2 py-1 shadow-2xs flex flex-col justify-center shrink-0 cursor-pointer active:scale-95 transition-all group select-none min-w-[76px]" title="Unit Crowded: Lebih dari 5 job atau total > 8 jam request">
+                                            <div class="flex items-center justify-between gap-1">
+                                                <span class="font-bold text-[10px] text-rose-900 tracking-tight leading-none">${u}</span>
+                                                <span class="text-[7px] bg-rose-200 text-rose-800 font-black px-1 rounded leading-none">CROWDED</span>
+                                            </div>
+                                            <div class="flex items-center gap-1 mt-1">
+                                                <span class="relative flex h-1.5 w-1.5 shrink-0">
+                                                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                                                    <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-rose-500"></span>
+                                                </span>
+                                                <span class="text-[8px] font-black text-rose-700 whitespace-nowrap leading-none">
+                                                    ${workload.count} Job (${workload.totalHours.toFixed(1)}J)
+                                                </span>
+                                            </div>
+                                        </div>`;
+                                    }
                                     return `
                                     <div onclick="openUnitStatusModal('${u}')" class="bg-emerald-50/50 border border-emerald-200 hover:border-emerald-400 text-slate-800 rounded-md px-2 py-1 shadow-2xs flex flex-col justify-center shrink-0 cursor-pointer active:scale-95 transition-all group select-none min-w-[76px]" title="Klik untuk ubah status ${u}">
                                         <div class="flex items-center justify-between gap-1">
@@ -2813,11 +3058,11 @@
                                         </div>
                                         <div class="flex items-center gap-1 mt-1">
                                             <span class="relative flex h-1.5 w-1.5 shrink-0">
-                                                ${progCount > 0 ? '<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>' : ''}
+                                                ${workload.count > 0 ? '<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>' : ''}
                                                 <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
                                             </span>
-                                            <span class="text-[8px] font-bold ${progCount > 0 ? 'text-emerald-700' : 'text-slate-500'} whitespace-nowrap leading-none">
-                                                ${progCount} Job Progres
+                                            <span class="text-[8px] font-bold ${workload.count > 0 ? 'text-emerald-700' : 'text-slate-500'} whitespace-nowrap leading-none">
+                                                ${workload.count} Job Progres
                                             </span>
                                         </div>
                                     </div>`;
@@ -3010,6 +3255,11 @@
                     ` : ''}
                     ${job.status === 'PENDING' ? `
                         <div class="text-[10px] text-orange-600 font-bold w-full text-center bg-orange-50 py-1.5 rounded-sm border border-orange-200 shadow-sm"><i class="fa-solid fa-clock mr-1"></i> Job Pending - Menunggu Validasi Lanjutan dari GL</div>
+                    ` : ''}
+                    ${job.status === 'COMPLETED' ? `
+                        <button onclick="copyJobToWA('${job.no_wo}')" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1.5 rounded-sm text-[10px] shadow-sm flex items-center justify-center gap-1.5">
+                            <i class="fa-brands fa-whatsapp"></i> Salin Laporan Selesai
+                        </button>
                     ` : ''}
                 </div>
             </div>`;
@@ -3366,10 +3616,13 @@
             // Masukkan tiket lanjutan ke daftar order
             jobs.unshift(rolloverJob);
             saveOrders(jobs);
+            syncSingleOrderToSupabase(jobs[idx]);
+            syncSingleOrderToSupabase(rolloverJob);
             showToast(`Job ${jobs[idx].no_wo} selesai. Dibuat tiket lanjutan ${newWo} (Status: PENDING) untuk validasi GL.`);
         } else {
             jobs[idx].status = pendingActionData.status;
             saveOrders(jobs);
+            syncSingleOrderToSupabase(jobs[idx]);
             showToast('Pekerjaan berhasil diselesaikan!');
         }
 
@@ -3477,6 +3730,7 @@
 
             jobs[idx].alasan_telat = (jobs[idx].alasan_telat ? jobs[idx].alasan_telat + ' | ' : '') + 'Batal: ' + reason;
             saveOrders(jobs);
+            syncSingleOrderToSupabase(jobs[idx]);
             showToast('Job ' + pendingCancelWo + ' berhasil dibatalkan');
             document.getElementById('cancelPromptModal').classList.add('hidden');
             renderApp(true);
@@ -3674,6 +3928,11 @@
                             </span>
                             <span class="text-slate-300">|</span>
                             <span class="inline-flex items-center gap-1">
+                                <span class="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
+                                <span class="text-rose-700 font-semibold">Merah:</span> Crowded
+                            </span>
+                            <span class="text-slate-300">|</span>
+                            <span class="inline-flex items-center gap-1">
                                 <span class="line-through text-slate-400 font-semibold">Abu-abu</span>: Non-Aktif
                             </span>
                         </div>
@@ -3682,9 +3941,28 @@
                         ${fleetUnits.map(u => {
                             const uStatus = getUnitStatus(u);
                             const isActive = uStatus.status === 'ACTIVE';
-                            const progCount = allOrdersForChips.filter(j => j.unit === u && j.status === 'ON PROGRESS').length;
+                            const workload = getUnitWorkload(u, allOrdersForChips);
+                            const isCrowded = isActive && workload.isCrowded;
 
                             if (isActive) {
+                                if (isCrowded) {
+                                    return `
+                                    <div class="bg-rose-50 border border-rose-300 text-rose-900 ring-1 ring-rose-300 rounded-md px-2 py-1 shadow-2xs flex flex-col justify-center shrink-0 min-w-[76px]" title="Unit Crowded (Beban padat: >=5 job atau >8 jam)">
+                                        <div class="flex items-center justify-between gap-1">
+                                            <span class="font-bold text-[10px] text-rose-900 leading-none">${u}</span>
+                                            <span class="text-[7px] bg-rose-200 text-rose-800 font-black px-1 rounded leading-none">CROWDED</span>
+                                        </div>
+                                        <div class="flex items-center gap-1 mt-1">
+                                            <span class="relative flex h-1.5 w-1.5 shrink-0">
+                                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                                                <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-rose-500"></span>
+                                            </span>
+                                            <span class="text-[8px] font-black text-rose-700 whitespace-nowrap leading-none">
+                                                ${workload.count} Job (${workload.totalHours.toFixed(1)}J)
+                                            </span>
+                                        </div>
+                                    </div>`;
+                                }
                                 return `
                                 <div class="bg-emerald-50/50 border border-emerald-200 text-slate-800 rounded-md px-2 py-1 shadow-2xs flex flex-col justify-center shrink-0 min-w-[76px]">
                                     <div class="flex items-center justify-between gap-1">
@@ -3693,11 +3971,11 @@
                                     </div>
                                     <div class="flex items-center gap-1 mt-1">
                                         <span class="relative flex h-1.5 w-1.5 shrink-0">
-                                            ${progCount > 0 ? '<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>' : ''}
+                                            ${workload.count > 0 ? '<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>' : ''}
                                             <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
                                         </span>
-                                        <span class="text-[8px] font-bold ${progCount > 0 ? 'text-emerald-700' : 'text-slate-500'} whitespace-nowrap leading-none">
-                                            ${progCount} Job Progres
+                                        <span class="text-[8px] font-bold ${workload.count > 0 ? 'text-emerald-700' : 'text-slate-500'} whitespace-nowrap leading-none">
+                                            ${workload.count} Job Progres
                                         </span>
                                     </div>
                                 </div>`;
@@ -3848,6 +4126,7 @@
         const orders = getOrders();
         orders.unshift(newOrder);
         saveOrders(orders);
+        syncSingleOrderToSupabase(newOrder);
         
         const homeTab = (user.role === 'ADMIN' || user.role === 'GL') ? 'dashboard' : 'monitoring';
         currentTab = homeTab;
@@ -3931,17 +4210,6 @@
     /* ========================================================
        SISTEM SMART PHOTO CACHE (LOAD INSTAN 0 DETIK)
        ======================================================== */
-    function normalizeDriveImageUrl(url) {
-        if (!url) return '';
-        if (url.startsWith('data:image')) return url;
-        // Normalisasi format URL Google Drive agar kompatibel penuh dengan browser mobile HP
-        const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
-        if (match && match[1]) {
-            return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w1000`;
-        }
-        return url;
-    }
-
     function getPhotoCache() {
         try {
             return JSON.parse(localStorage.getItem('lifting_photo_cache')) || {};
@@ -3953,10 +4221,10 @@
         try {
             let cache = getPhotoCache();
             const keys = Object.keys(cache);
-            if (keys.length > 25) {
-                delete cache[keys[0]]; // Batasi maksimal 25 item terbaru
+            if (keys.length > 50) {
+                delete cache[keys[0]]; // Hapus item terlama jika cache melebihi 50 item
             }
-            cache[no_wo] = normalizeDriveImageUrl(url);
+            cache[no_wo] = url;
             localStorage.setItem('lifting_photo_cache', JSON.stringify(cache));
         } catch(e) {}
     }
@@ -3967,17 +4235,18 @@
             badge.className = 'text-[8px] text-emerald-600 font-bold';
         }
         const isBase64 = url.startsWith('data:image');
-        const displayUrl = normalizeDriveImageUrl(url);
+        const displayUrl = isBase64 ? url : (url.includes('id=') ? url : `https://drive.google.com/thumbnail?id=${(url.match(/[-\w]{25,}/)||[''])[0]}&sz=w1000`);
+
         container.innerHTML = `
             <div class="flex flex-col items-center gap-1.5 w-full">
-                <img src="${displayUrl}" alt="Foto ${no_wo}" referrerpolicy="no-referrer" class="max-h-48 max-w-full rounded border border-slate-200 object-contain shadow-xs cursor-zoom-in hover:opacity-95 transition-opacity" onclick="openImageViewer('${displayUrl}')">
+                <img src="${displayUrl}" referrerpolicy="no-referrer" alt="Foto ${no_wo}" class="max-h-48 max-w-full rounded border border-slate-200 object-contain shadow-xs cursor-zoom-in hover:opacity-95 transition-opacity" onclick="openImageViewer('${displayUrl}')">
                 <div class="flex gap-2">
                     <button type="button" onclick="openImageViewer('${displayUrl}')" class="text-[9px] text-cyan-600 hover:text-cyan-800 font-semibold underline flex items-center gap-1">
                         <i class="fa-solid fa-magnifying-glass-plus"></i> Perbesar
                     </button>
                     ${!isBase64 ? `
                     <span class="text-slate-300">|</span>
-                    <a href="${displayUrl}" target="_blank" rel="noopener noreferrer" class="text-[9px] text-blue-600 hover:text-blue-800 font-semibold underline flex items-center gap-1">
+                    <a href="${url}" target="_blank" rel="noopener noreferrer" class="text-[9px] text-blue-600 hover:text-blue-800 font-semibold underline flex items-center gap-1">
                         <i class="fa-solid fa-arrow-up-right-from-square"></i> Buka Foto Asli
                     </a>` : ''}
                 </div>
@@ -3985,37 +4254,15 @@
         `;
     }
 
-    async function syncDrivePhotoInBackground(no_wo) {
-        if (!GOOGLE_SCRIPT_URL || !GOOGLE_SCRIPT_URL.startsWith('http')) return;
-        try {
-            const res = await fetch(`${GOOGLE_SCRIPT_URL}?no_wo=${encodeURIComponent(no_wo)}`);
-            if (!res.ok) return;
-            const data = await res.json();
-            if (data && data.found && data.url) {
-                const normUrl = normalizeDriveImageUrl(data.url);
-                setPhotoCache(no_wo, normUrl);
-                const container = document.getElementById('detailPhotoContainer');
-                const badge = document.getElementById('photoStatusBadge');
-                if (container && document.getElementById('detailJobModal') && !document.getElementById('detailJobModal').classList.contains('hidden')) {
-                    renderPhotoHtml(normUrl, no_wo, container, badge);
-                }
-            }
-        } catch(e) {}
-    }
-
     async function fetchOrderPhotoFromDrive(no_wo) {
         const container = document.getElementById('detailPhotoContainer');
         const badge = document.getElementById('photoStatusBadge');
         if (!container) return;
 
-        // 1. CEK CACHE LOKAL TERLEBIH DAHULU: Langsung tampil dalam 0 detik jika diunggah dari perangkat ini
+        // 1. CEK CACHE LOKAL TERLEBIH DAHULU: Langsung tampilkan dalam 0 detik jika sudah ada
         const cache = getPhotoCache();
         if (cache[no_wo]) {
             renderPhotoHtml(cache[no_wo], no_wo, container, badge);
-            // Jika foto di cache masih berupa preview data:image lokal, lakukan verifikasi tautan permanen Drive di latar belakang
-            if (cache[no_wo].startsWith('data:image')) {
-                syncDrivePhotoInBackground(no_wo);
-            }
             return;
         }
 
@@ -4026,9 +4273,9 @@
         }
 
         try {
-            // Berikan timeout 20 detik agar tidak putus saat cold start Google Apps Script
+            // Batas waktu timeout dipersingkat menjadi 7 detik
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 20000);
+            const timeoutId = setTimeout(() => controller.abort(), 7000);
             
             const res = await fetch(`${GOOGLE_SCRIPT_URL}?no_wo=${encodeURIComponent(no_wo)}`, {
                 signal: controller.signal
@@ -4039,10 +4286,9 @@
             const data = await res.json();
 
             if (data && data.found && data.url) {
-                // Simpan ke cache permanen dengan format yang dinormalisasi untuk HP
-                const normUrl = normalizeDriveImageUrl(data.url);
-                setPhotoCache(no_wo, normUrl);
-                renderPhotoHtml(normUrl, no_wo, container, badge);
+                // Simpan ke cache agar pemanggilan berikutnya 0 detik instan
+                setPhotoCache(no_wo, data.url);
+                renderPhotoHtml(data.url, no_wo, container, badge);
             } else {
                 if (badge) {
                     badge.innerText = 'Tidak Ada';
@@ -4060,14 +4306,10 @@
                 badge.innerText = 'Gagal Muat';
                 badge.className = 'text-[8px] text-amber-600 font-medium';
             }
-            const isTimeout = err.name === 'AbortError';
-            const errMsg = isTimeout 
-                ? 'Waktu tunggu habis (server Apps Script sedang bersiap). Silakan klik coba lagi.'
-                : 'Foto belum dapat dimuat. Pastikan deployment Apps Script disetel ke "Anyone".';
             container.innerHTML = `
                 <div class="flex flex-col items-center gap-1 py-1">
-                    <span class="text-[9px] text-slate-500 text-center leading-relaxed">
-                        ${errMsg}
+                    <span class="text-[9px] text-slate-500">
+                        Foto tidak dapat dimuat (Waktu tunggu habis atau server sibuk).
                     </span>
                     <button type="button" onclick="fetchOrderPhotoFromDrive('${no_wo}')" class="text-[9px] text-cyan-600 hover:underline font-bold mt-1 flex items-center gap-1">
                         <i class="fa-solid fa-rotate-right"></i> Coba Muat Ulang
@@ -4224,6 +4466,7 @@
         }
 
         saveOrders(jobs);
+        syncSingleOrderToSupabase(jobs[idx]);
         document.getElementById('editJobModal').classList.add('hidden');
         renderApp(true); 
     }
