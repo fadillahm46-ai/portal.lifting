@@ -1301,6 +1301,9 @@
                     const copy = { ...o };
                     delete copy.foto_evidence;
                     delete copy.has_photo;
+                    delete copy.operator_nrp;
+                    delete copy.rigger_nrp;
+                    delete copy.rigger2_nrp;
                     return copy;
                 });
             if (cleanOrders.length === 0) return;
@@ -4843,13 +4846,17 @@
     async function submitOrder(e) {
         e.preventDefault();
         const user = JSON.parse(localStorage.getItem('lifting_user')); 
-        const cat = userOrderFleetMode; 
+        if (!user) return;
+
+        const cat = userOrderFleetMode || 'Crane Truck'; 
         const isAdminGL = user.role === 'ADMIN' || user.role === 'GL';
         const fotoInput = document.getElementById('req_foto');
 
         const btnSubmit = document.getElementById('btnSubmitOrder'); 
-        btnSubmit.disabled = true; 
-        btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Sedang diproses...';
+        if (btnSubmit) {
+            btnSubmit.disabled = true; 
+            btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i> Sedang di proses...';
+        }
         
         let tgl = document.getElementById('req_tgl')?.value || ''; 
         let jam = document.getElementById('req_jam')?.value || ''; 
@@ -4869,7 +4876,7 @@
                 let diffHours = (reqTime - new Date()) / (1000 * 60 * 60); 
                 if (diffHours < 6) statusTag = 'UNSCHEDULED'; 
                 
-                let h = parseInt(jam.split(':')[0]);
+                let h = parseInt(jam.split(':')[0], 10);
                 shiftVal = (h >= 5 && h < 17) ? 'Shift 1' : 'Shift 2';
             }
         }
@@ -4877,23 +4884,23 @@
         let durasiVal = document.getElementById('req_durasi')?.value || ''; 
         let satuan = document.getElementById('req_satuan')?.value || 'JAM';
         
-        const hasPhotoUploaded = (fotoInput && fotoInput.files.length > 0);
+        const hasPhotoUploaded = !!(fotoInput && fotoInput.files && fotoInput.files.length > 0);
 
         const baseOrder = {
             no_wo: generateWO(cat), 
             timestamp: new Date().toISOString(), 
             kategori: cat, 
             has_photo: hasPhotoUploaded,
-            nrp_pemohon: user.nrp, 
-            nama_pemohon: isAdminGL ? document.getElementById('del_nama').value : user.nama_lengkap, 
-            perusahaan: isAdminGL ? document.getElementById('del_vendor').value : user.perusahaan, 
-            departemen: isAdminGL ? document.getElementById('del_dept').value : user.departemen, 
-            section: isAdminGL ? document.getElementById('del_sect').value : user.section,
-            no_wa: isAdminGL ? document.getElementById('del_wa').value : user.no_wa,
+            nrp_pemohon: user.nrp || '', 
+            nama_pemohon: (isAdminGL ? document.getElementById('del_nama')?.value : null) || user.nama_lengkap || '', 
+            perusahaan: (isAdminGL ? document.getElementById('del_vendor')?.value : null) || user.perusahaan || '', 
+            departemen: (isAdminGL ? document.getElementById('del_dept')?.value : null) || user.departemen || '', 
+            section: (isAdminGL ? document.getElementById('del_sect')?.value : null) || user.section || '',
+            no_wa: (isAdminGL ? document.getElementById('del_wa')?.value : null) || user.no_wa || '',
             tgl_pelaksanaan: tgl, 
             jam_pelaksanaan: jam, 
             shift: shiftVal, 
-            durasi_request: `${durasiVal} ${satuan}`,
+            durasi_request: `${durasiVal} ${satuan}`.trim(),
             lokasi_angkat: document.getElementById('req_lok_asal')?.value || '', 
             lokasi_tujuan: document.getElementById('req_lok_tujuan')?.value || '', 
             deskripsi: document.getElementById('req_deskripsi')?.value || '',
@@ -4901,63 +4908,63 @@
             gl: '', unit: '', operator: '', rigger: '', rigger2: '', jam_start_aktual: '', jam_end_aktual: '', durasi_aktual: '', final_inspeksi: '', alasan_telat: '', alasan_overtime: ''
         };
 
-        // Tunggu proses upload gambar tuntas (await) agar koneksi tidak terputus di tengah jalan
-        if (fotoInput && fotoInput.files.length > 0) {
-            btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Sedang diproses...';
+        // Jika user memilih file foto, proses kompresi cepat lalu unggah di latar belakang (tanpa menggantung form order)
+        if (hasPhotoUploaded) {
             try {
                 const file = fotoInput.files[0];
-                const base64Data = await new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onload = (event) => {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    try {
                         const img = new Image();
-                        img.onload = () => {
+                        img.onload = function() {
                             try {
                                 const canvas = document.createElement('canvas');
                                 const MAX_DIM = 640;
                                 let w = img.width, h = img.height;
-                                if (w > h) { if (w > MAX_DIM) { h *= MAX_DIM / w; w = MAX_DIM; } }
-                                else { if (h > MAX_DIM) { w *= MAX_DIM / h; h = MAX_DIM; } }
+                                if (w > h) { if (w > MAX_DIM) { h = Math.round(h * MAX_DIM / w); w = MAX_DIM; } }
+                                else { if (h > MAX_DIM) { w = Math.round(w * MAX_DIM / h); h = MAX_DIM; } }
                                 canvas.width = w; canvas.height = h;
                                 const ctx = canvas.getContext('2d');
                                 ctx.drawImage(img, 0, 0, w, h);
                                 const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.55);
                                 setPhotoCache(baseOrder.no_wo, compressedDataUrl);
-                                resolve(compressedDataUrl.split(',')[1]);
-                            } catch (err) { reject(err); }
-                        };
-                        img.onerror = reject;
-                        img.src = event.target.result;
-                    };
-                    reader.onerror = reject;
-                    reader.readAsDataURL(file);
-                });
 
-                if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.startsWith('http')) {
-                    const uploadRes = await fetch(GOOGLE_SCRIPT_URL, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                        body: JSON.stringify({
-                            no_wo: baseOrder.no_wo,
-                            fileName: `FOTO_${baseOrder.no_wo}.jpg`,
-                            mimeType: 'image/jpeg',
-                            base64Data: base64Data
-                        })
-                    });
-                    const resJson = await uploadRes.json();
-                    if (resJson && resJson.url) {
-                        setPhotoCache(baseOrder.no_wo, resJson.url);
-                        // Simpan link foto ke photo_map di master data agar tersinkron ke semua perangkat
-                        const m = getMasterData();
-                        if (!m.photo_map) m.photo_map = {};
-                        m.photo_map[baseOrder.no_wo] = resJson.url;
-                        saveMasterData(m);
-                    }
-                }
-            } catch (err) {
-                console.warn("Upload foto:", err);
+                                const base64Only = compressedDataUrl.split(',')[1];
+                                if (base64Only && GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.startsWith('http')) {
+                                    fetch(GOOGLE_SCRIPT_URL, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                                        body: JSON.stringify({
+                                            no_wo: baseOrder.no_wo,
+                                            fileName: `FOTO_${baseOrder.no_wo}.jpg`,
+                                            mimeType: 'image/jpeg',
+                                            base64Data: base64Only
+                                        })
+                                    })
+                                    .then(r => r.json())
+                                    .then(resJson => {
+                                        if (resJson && resJson.url) {
+                                            setPhotoCache(baseOrder.no_wo, resJson.url);
+                                            const m = getMasterData();
+                                            if (!m.photo_map) m.photo_map = {};
+                                            m.photo_map[baseOrder.no_wo] = resJson.url;
+                                            saveMasterData(m);
+                                        }
+                                    })
+                                    .catch(err => console.warn("Background upload foto:", err));
+                                }
+                            } catch(e) { console.warn(e); }
+                        };
+                        img.src = event.target.result;
+                    } catch(e) { console.warn(e); }
+                };
+                reader.readAsDataURL(file);
+            } catch(err) {
+                console.warn("Reader foto error:", err);
             }
         }
 
+        // SIMPAN ORDER SEKETIKA agar orderan selalu masuk 100% tanpa pernah tertahan oleh koneksi foto
         finishSubmitOrder(baseOrder, user);
     }
 
