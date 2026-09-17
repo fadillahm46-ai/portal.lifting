@@ -1,5 +1,5 @@
 // Nama cache service worker
-const CACHE_NAME = 'portal-lifting-cache-v2';
+const CACHE_NAME = 'portal-lifting-cache-v3';
 
 // 1. Event Install
 self.addEventListener('install', (event) => {
@@ -41,19 +41,25 @@ self.addEventListener('message', (event) => {
     }
   }
 
-  // Handler: Tampilkan Notifikasi Banner di HP
+  // Handler: Tampilkan Notifikasi Banner di HP (Dioptimalkan agar tidak bertumpuk)
   if (data.action === 'SHOW_NOTIFICATION') {
     const title = data.title || 'Portal Lifting';
     const options = {
       body: data.body || 'Ada pembaruan pekerjaan baru.',
-      icon: data.icon || 'icon-192.png',
-      badge: data.badge || 'icon-192.png',
+      icon: data.icon || 'https://i.ibb.co.com/84102c9/logo-ppa.png',
+      badge: data.badge || 'https://i.ibb.co.com/84102c9/logo-ppa.png',
       vibrate: [200, 100, 200],
-      tag: data.tag || 'order-notif',
-      renotify: true,
-      data: data.payload || { url: '/' }
+      
+      // KUNCI UTAMA: Menggunakan tag tunggal statis atau dari data agar notifikasi menimpa yang lama
+      tag: data.tag || 'portal-lifting-single-order-notif', 
+      renotify: true, // Bergetar/berbunyi lagi ketika ada pembaruan order masuk
+      
+      data: data.payload || { url: './index.html' }
     };
-    self.registration.showNotification(title, options);
+
+    event.waitUntil(
+      self.registration.showNotification(title, options)
+    );
   }
 });
 
@@ -63,7 +69,7 @@ self.addEventListener('notificationclick', (event) => {
 
   const targetUrl = (event.notification.data && event.notification.data.url) 
     ? event.notification.data.url 
-    : '/';
+    : './index.html';
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
