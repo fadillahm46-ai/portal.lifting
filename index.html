@@ -516,6 +516,48 @@
         }
     }
 
+    let currentFloatingOrderNo = '';
+    let floatingNotifTimer = null;
+
+    function showFloatingNotification(title, message, orderNo = '') {
+        currentFloatingOrderNo = orderNo;
+        const el = document.getElementById('inAppFloatingNotif');
+        if (!el) return;
+        
+        const titleEl = document.getElementById('floatingNotifTitle');
+        const bodyEl = document.getElementById('floatingNotifBody');
+        if (titleEl) titleEl.innerText = title || "Ada Orderan Masuk!";
+        if (bodyEl) bodyEl.innerText = message || "Order siap divalidasi.";
+        
+        el.classList.remove('hidden');
+        setTimeout(() => {
+            el.classList.remove('-translate-y-full', 'opacity-0');
+            el.classList.add('translate-y-0', 'opacity-100');
+        }, 20);
+
+        if (floatingNotifTimer) clearTimeout(floatingNotifTimer);
+        floatingNotifTimer = setTimeout(() => {
+            closeFloatingNotification();
+        }, 6500);
+    }
+
+    function closeFloatingNotification() {
+        const el = document.getElementById('inAppFloatingNotif');
+        if (!el) return;
+        el.classList.remove('translate-y-0', 'opacity-100');
+        el.classList.add('-translate-y-full', 'opacity-0');
+        setTimeout(() => {
+            el.classList.add('hidden');
+        }, 300);
+    }
+
+    function onFloatingNotifClick() {
+        closeFloatingNotification();
+        if (currentFloatingOrderNo) {
+            viewJobDetail(currentFloatingOrderNo);
+        }
+    }
+
     // Pemicu notifikasi tunggal (Single Notification) agar tidak bertumpuk di HP
     function triggerAppNotification(title, message, soundType = 'gl', orderNo = '') {
         const now = Date.now();
@@ -529,12 +571,15 @@
         playNotificationSound(soundType);
         showToast(`${title}: ${message}`, 'success');
         
+        // Tampilkan Banner Notifikasi Mengambang di atas layar (Web & HP)
+        showFloatingNotification(title, message, orderNo);
+        
         // Getar perangkat HP jika didukung
         if ("vibrate" in navigator) {
             try { navigator.vibrate([200, 100, 200]); } catch(e) {}
         }
 
-        const cleanTitle = "Ada Orderan Masuk!";
+        const cleanTitle = title || "Ada Orderan Masuk!";
         const cleanBody = message || "Order baru siap divalidasi.";
         const singleTag = 'portal-lifting-single-order-notif'; // Tag konsisten agar menimpa notifikasi lama
 
@@ -856,9 +901,10 @@
                         const curRole = String(currentUser.role || '').toUpperCase().trim();
                         const isGlOrAdmin = ['ADMIN', 'GL', 'GROUP LEADER', 'LEADER'].includes(curRole);
                         if (isGlOrAdmin) {
+                            const pemohon = newRecord.nama_pemohon ? ` dari ${newRecord.nama_pemohon}` : '';
                             triggerAppNotification(
                                 "Ada Orderan Masuk!",
-                                `Order ${newRecord.no_wo} siap divalidasi.`,
+                                `Order ${newRecord.no_wo}${pemohon} siap divalidasi.`,
                                 'gl',
                                 newRecord.no_wo
                             );
@@ -1068,6 +1114,7 @@
             let shouldRender = false;
             const deletedWos = getDeletedWos();
             const deletedUsers = getDeletedUsers();
+            const currentUser = JSON.parse(localStorage.getItem('lifting_user'));
             
             if (resOrders.ok) { 
                 let data = await resOrders.json(); 
@@ -1075,10 +1122,31 @@
                     // Filter keluar order yang sudah pernah dihapus agar tidak bangkit lagi
                     data = data.filter(item => !deletedWos.includes(String(item.no_wo || '').trim()));
                     data.forEach(item => { if (item.foto_evidence) delete item.foto_evidence; });
+
+                    // Deteksi jika ada order baru masuk saat sinkronisasi polling
+                    let localOrders = getOrders();
+                    let localWoSet = new Set(localOrders.map(o => String(o.no_wo || '').trim()));
+                    let newlyArrived = data.filter(o => o.no_wo && !localWoSet.has(String(o.no_wo).trim()));
+
                     let ds = JSON.stringify(data); 
                     if(localStorage.getItem('lifting_orders') !== ds) { 
                         localStorage.setItem('lifting_orders', ds); 
                         shouldRender = true; 
+
+                        if (newlyArrived.length > 0 && currentUser) {
+                            const curRole = String(currentUser.role || '').toUpperCase().trim();
+                            const isGlOrAdmin = ['ADMIN', 'GL', 'GROUP LEADER', 'LEADER'].includes(curRole);
+                            if (isGlOrAdmin) {
+                                const newest = newlyArrived[0];
+                                const pemohon = newest.nama_pemohon ? ` dari ${newest.nama_pemohon}` : '';
+                                triggerAppNotification(
+                                    "Ada Orderan Masuk!",
+                                    `Order ${newest.no_wo}${pemohon} siap divalidasi.`,
+                                    'gl',
+                                    newest.no_wo
+                                );
+                            }
+                        }
                     } 
                 } 
             }
@@ -1333,41 +1401,6 @@
         document.body.removeChild(el);
     }
 
-    function getMpReportText(job) {
-        if (!job) return '';
-        let statusEmoji = job.status || '-';
-        if (job.status === 'COMPLETED') statusEmoji += ' ✅';
-        else if (job.status === 'PENDING') statusEmoji += ' ⏸️';
-        else if (job.status === 'CANCELED') statusEmoji += ' ❌';
-        else if (job.status === 'ON PROGRESS') statusEmoji += ' 🔄';
-
-        let telatClean = cleanKendalaText(job.alasan_telat || '');
-        let overClean = cleanKendalaText(job.alasan_overtime || '');
-        let kendalaStr = '';
-        if (telatClean && overClean) kendalaStr = `${telatClean} | ${overClean}`;
-        else if (telatClean) kendalaStr = telatClean;
-        else if (overClean) kendalaStr = overClean;
-        else kendalaStr = '-';
-
-        return `*PELAPORAN PROGRES JOB LIFTING*\n- *NO WO :* ${job.no_wo || '-'}\n- *STATUS :* ${statusEmoji}\n- *NAMA JOB :* ${job.deskripsi || '-'}\n- *JAM START :* ${job.jam_start_aktual || '-'}\n- *JAM FINISH :* ${job.jam_end_aktual || '-'}\n- *NO. UNIT :* ${job.unit || '-'}\n- *NAMA OPERATOR :* ${job.operator || '-'}\n- *NAMA RIGGER :* ${job.rigger || '-'}${job.rigger2 ? ', ' + job.rigger2 : ''}\n- *FINAL INSPEKSI :* ${job.final_inspeksi || '-'}\n- *KENDALA :* ${kendalaStr}`;
-    }
-
-    function copyMpReport(wo) {
-        const job = getOrders().find(j => j.no_wo === wo);
-        if (!job) return;
-        const text = getMpReportText(job);
-        const el = document.createElement('textarea');
-        el.value = text; el.setAttribute('readonly', ''); el.style.position = 'absolute'; el.style.left = '-9999px';
-        document.body.appendChild(el); el.select();
-        try {
-            document.execCommand('copy');
-            showToast('Laporan berhasil disalin!', 'success');
-        } catch (err) {
-            showToast('Gagal menyalin', 'error');
-        }
-        document.body.removeChild(el);
-    }
-
     function openImageViewer(src) {
         const modal = document.getElementById('imageViewerModal');
         const img = document.getElementById('viewerImage');
@@ -1405,14 +1438,23 @@
 
         let detailFormat = `*DETAIL JOB LIFTING*\n• *NO WO :* ${job.no_wo || '-'}\n• *ORDER UNIT :* ${unitText}\n• *STATUS :* ${statusEmoji}\n• *PEMOHON :* ${job.nama_pemohon || '-'}\n• *PERUSAHAAN :* ${job.perusahaan || '-'}\n• *DEPARTEMEN :* ${job.departemen || '-'}\n• *SECTION :* ${job.section || '-'}\n• *KONTAK WA :* ${job.no_wa || '-'}\n• *TANGGAL :* ${job.tgl_pelaksanaan || '-'}\n• *REQ JAM :* ${job.jam_pelaksanaan || '-'}\n• *LOKASI :* ${job.lokasi_angkat || '-'}\n• *TUJUAN :* ${job.lokasi_tujuan || '-'}\n• *DESKRIPSI :* ${job.deskripsi || '-'}`;
 
-        let mpFormat = getMpReportText(job);
+        // Pembersihan presisi: Mencegah timbulnya teks ganda "Telat : Telat" atau "Over : Over"
+        let telatClean = cleanKendalaText(job.alasan_telat || '');
+        let overClean = cleanKendalaText(job.alasan_overtime || '');
+        let kendalaStr = '';
+        if (telatClean && overClean) kendalaStr = `${telatClean} | ${overClean}`;
+        else if (telatClean) kendalaStr = telatClean;
+        else if (overClean) kendalaStr = overClean;
+        else kendalaStr = '-';
+
+        let mpFormat = `*PELAPORAN PROGRES JOB LIFTING*\n• *NO WO :* ${job.no_wo || '-'}\n• *STATUS :* ${statusEmoji}\n• *NAMA JOB :* ${job.deskripsi || '-'}\n• *JAM START :* ${job.jam_start_aktual || '-'}\n• *JAM FINISH :* ${job.jam_end_aktual || '-'}\n• *NO. UNIT :* ${job.unit || '-'}\n• *NAMA OPERATOR :* ${job.operator || '-'}\n• *NAMA RIGGER :* ${job.rigger || '-'}${job.rigger2 ? ', ' + job.rigger2 : ''}\n• *FINAL INSPEKSI :* ${job.final_inspeksi || '-'}\n• *KENDALA :* ${kendalaStr}`;
 
         if (forceDetail || (currentUser && currentUser.role === 'USER') || job.status === 'SCHEDULED' || job.status === 'UNSCHEDULED') {
             waText = detailFormat;
-            copyText(waText, 'Job WA');
         } else {
-            copyMpReport(wo);
+            waText = mpFormat; 
         }
+        copyText(waText, 'Job WA');
     }
 
     function generateWO(kategori) {
@@ -1497,6 +1539,27 @@
                             ${currentTab === 'profile' ? getProfileView() : ''}
                         </div>
                         ${isMobile ? getMobileNav(user) : ''}
+                    </div>
+                </div>
+
+                <!-- BANNER NOTIFIKASI MENGAMBANG (IN-APP FLOATING HEADS-UP CARD) -->
+                <div id="inAppFloatingNotif" class="hidden fixed top-3 left-3 right-3 sm:left-auto sm:right-4 sm:w-96 z-[260] transform -translate-y-full opacity-0 transition-all duration-300 ease-out pointer-events-auto">
+                    <div onclick="onFloatingNotifClick()" class="bg-[#262c33]/95 backdrop-blur-md text-white p-3 rounded-2xl shadow-2xl border border-white/10 flex items-start gap-3 cursor-pointer hover:bg-[#2e353e] transition-colors active:scale-98">
+                        <div class="w-9 h-9 rounded-full bg-red-600 flex items-center justify-center shrink-0 border border-white/20 shadow-md">
+                            <img src="https://lh3.googleusercontent.com/d/1hQZopiZU-_bQC9aRmyZndlmEF--k4h5U" class="w-6 h-6 object-contain" onerror="this.onerror=null; this.innerHTML='<i class=\'fa-solid fa-truck-moving text-white text-xs\'></i>'">
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center justify-between gap-1">
+                                <h4 class="text-xs font-bold text-white tracking-tight" id="floatingNotifTitle">Ada Orderan Masuk!</h4>
+                                <span class="text-[9px] text-slate-400 font-normal shrink-0">Sekarang</span>
+                            </div>
+                            <p class="text-[11px] text-slate-200 mt-0.5 leading-snug line-clamp-2" id="floatingNotifBody">
+                                Order siap divalidasi.
+                            </p>
+                        </div>
+                        <button onclick="event.stopPropagation(); closeFloatingNotification();" class="text-slate-400 hover:text-white p-1 -mr-1 -mt-1 text-xs" title="Tutup">
+                            <i class="fa-solid fa-times"></i>
+                        </button>
                     </div>
                 </div>
 
@@ -3883,13 +3946,7 @@
                         <button onclick="initiateCancelJob('${job.no_wo}')" class="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-1.5 rounded-sm text-[11px] shadow-sm"><i class="fa-solid fa-xmark"></i> Cancel</button>
                     ` : ''}
                     ${job.status === 'PENDING' ? `
-                        <div class="flex flex-col gap-1.5 w-full">
-                            <div class="text-[10px] text-orange-600 font-bold w-full text-center bg-orange-50 py-1.5 rounded-sm border border-orange-200 shadow-sm"><i class="fa-solid fa-clock mr-1"></i> Job Pending - Menunggu Validasi Lanjutan dari GL</div>
-                            <button onclick="copyMpReport('${job.no_wo}')" class="w-full bg-[#0891b2] hover:bg-cyan-700 text-white font-bold py-1.5 rounded-sm text-[11px] shadow-sm flex items-center justify-center gap-1.5 transition-colors"><i class="fa-regular fa-copy"></i> Salin Laporan WA</button>
-                        </div>
-                    ` : ''}
-                    ${job.status === 'COMPLETED' ? `
-                        <button onclick="copyMpReport('${job.no_wo}')" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1.5 rounded-sm text-[11px] shadow-sm flex items-center justify-center gap-1.5 transition-colors"><i class="fa-regular fa-copy"></i> Salin Laporan WA</button>
+                        <div class="text-[10px] text-orange-600 font-bold w-full text-center bg-orange-50 py-1.5 rounded-sm border border-orange-200 shadow-sm"><i class="fa-solid fa-clock mr-1"></i> Job Pending - Menunggu Validasi Lanjutan dari GL</div>
                     ` : ''}
                 </div>
             </div>`;
@@ -4273,13 +4330,11 @@
             // Masukkan tiket lanjutan ke daftar order
             jobs.unshift(rolloverJob);
             saveOrders(jobs);
-            showToast(`Job ${jobs[idx].no_wo} selesai. Tiket lanjutan ${newWo} dibuat.`);
-            copyMpReport(jobs[idx].no_wo);
+            showToast(`Job ${jobs[idx].no_wo} selesai. Dibuat tiket lanjutan ${newWo} (Status: PENDING) untuk validasi GL.`);
         } else {
             jobs[idx].status = pendingActionData.status;
             saveOrders(jobs);
             showToast('Pekerjaan berhasil diselesaikan!');
-            copyMpReport(jobs[idx].no_wo);
         }
 
         document.getElementById('mpActionModal').classList.add('hidden');
@@ -4732,7 +4787,7 @@
 
         // Tunggu proses upload gambar tuntas (await) agar koneksi tidak terputus di tengah jalan
         if (fotoInput && fotoInput.files.length > 0) {
-            btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Mengunggah foto dokumentasi...';
+            btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Sedang diproses...';
             try {
                 const file = fotoInput.files[0];
                 const base64Data = await new Promise((resolve, reject) => {
@@ -4869,9 +4924,8 @@
             ${fotoHtml}
             
             <div class="flex gap-2 mt-2">
-                <button onclick="copyMpReport('${job.no_wo}')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-md text-[11px] flex items-center justify-center gap-1.5 shadow-sm transition-colors"><i class="fa-solid fa-clipboard-check"></i> Salin Laporan MP</button>
-                <button onclick="copyJobToWA('${job.no_wo}', true)" class="flex-1 bg-[#0891b2] hover:bg-cyan-700 text-white font-bold py-2 rounded-md text-[11px] flex items-center justify-center gap-1.5 shadow-sm transition-colors"><i class="fa-regular fa-copy"></i> Detail Order</button>
-                <button onclick="document.getElementById('detailJobModal').classList.add('hidden')" class="px-3 bg-slate-800 hover:bg-slate-900 text-white font-bold py-2 rounded-md text-[11px] shadow-sm transition-colors">Tutup</button>
+                <button onclick="copyJobToWA('${job.no_wo}', true)" class="flex-1 bg-[#0891b2] hover:bg-cyan-700 text-white font-bold py-2 rounded-md text-[11px] flex items-center justify-center gap-1.5 shadow-sm transition-colors"><i class="fa-regular fa-copy"></i> Salin Detail Job</button>
+                <button onclick="document.getElementById('detailJobModal').classList.add('hidden')" class="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-bold py-2 rounded-md text-[11px] shadow-sm transition-colors">Tutup Detail</button>
             </div>
         `;
         document.getElementById('detailJobModal').classList.remove('hidden');
@@ -5421,6 +5475,7 @@
 
     window.addEventListener('load', () => { 
         if (window.innerWidth >= 768) hideSplashScreen();
+        requestNotificationAccess();
         fetchFromSupabase().catch(e => console.warn(e)).finally(() => { 
             const user = JSON.parse(localStorage.getItem('lifting_user'));
             if (user) {
