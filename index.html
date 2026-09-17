@@ -336,20 +336,34 @@
     /* ========================================================
        SISTEM STATUS UNIT & KETERANGAN NON-AKTIF (OFF/BREAKDOWN)
        ======================================================== */
+    function normalizeUnitKey(str) {
+        return String(str || '').toUpperCase().replace(/[\s\-_]/g, '').trim();
+    }
+
     function getUnitStatusMap() {
+        try {
+            const direct = JSON.parse(localStorage.getItem('lifting_unit_status'));
+            if (direct && typeof direct === 'object') return direct;
+        } catch(e) {}
         const m = getMasterData();
         if (m.unit_status_map && typeof m.unit_status_map === 'object') {
             return m.unit_status_map;
         }
-        try {
-            return JSON.parse(localStorage.getItem('lifting_unit_status')) || {};
-        } catch(e) { return {}; }
+        return {};
     }
 
     function getUnitStatus(unitName) {
         if (!unitName) return { status: 'ACTIVE', reason: '' };
         const map = getUnitStatusMap();
-        return map[unitName] || { status: 'ACTIVE', reason: '' };
+        if (map[unitName]) return map[unitName];
+        
+        const norm = normalizeUnitKey(unitName);
+        for (const key of Object.keys(map)) {
+            if (normalizeUnitKey(key) === norm) {
+                return map[key];
+            }
+        }
+        return { status: 'ACTIVE', reason: '' };
     }
 
     function normalizeName(str) {
@@ -387,38 +401,149 @@
     }
 
     async function saveUnitStatus(unitName, status, reason) {
-        if (!unitName) return;
+        if (!unitName) return false;
         const currentUser = JSON.parse(localStorage.getItem('lifting_user')) || {};
+        const isActive = (status === 'ACTIVE');
+        const finalReason = isActive ? null : (reason || 'Non-Aktif');
+        const updatedBy = currentUser.nama_lengkap || currentUser.nrp || 'SYSTEM';
+        const updatedAt = new Date().toISOString();
+
+        // 1. Simpan langsung ke cache lokal agar UI seketika responsif
+        let unitStatusMap = getUnitStatusMap();
+        unitStatusMap[unitName] = { status, reason: isActive ? '' : (reason || 'Non-Aktif'), updated_at: updatedAt };
+        const normName = normalizeUnitKey(unitName);
+        unitStatusMap[normName] = unitStatusMap[unitName];
+        localStorage.setItem('lifting_unit_status', JSON.stringify(unitStatusMap));
+
         const m = getMasterData();
         if (!m.unit_status_map) m.unit_status_map = {};
-        m.unit_status_map[unitName] = { status, reason, updated_at: new Date().toISOString() };
-        localStorage.setItem('lifting_unit_status', JSON.stringify(m.unit_status_map));
-        saveMasterData(m);
+        m.unit_status_map[unitName] = unitStatusMap[unitName];
+        m.unit_status_map[normName] = unitStatusMap[unitName];
+        localStorage.setItem('lifting_master_data', JSON.stringify(m));
 
-        // Sinkronisasi Dua Arah (Two-Way Sync) langsung ke tabel unit_status di Supabase
-        if (SUPABASE_KEY && !SUPABASE_KEY.includes('PASTE_KUNCI')) {
+        if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return true;
+
+        // 2. Ambil cache baris database asli dari Supabase
+        let rawUnits = [];
+        try {
+            rawUnits = JSON.parse(localStorage.getItem('lifting_raw_unit_status')) || [];
+        } catch(e) { rawUnits = []; }
+        if (!Array.isArray(rawUnits) || rawUnits.length === 0) {
+            if (Array.isArray(window._rawSupabaseUnits)) rawUnits = window._rawSupabaseUnits;
+        }
+
+        const normTarget = normalizeUnitKey(unitName);
+        const existingRow = rawUnits.find(r => normalizeUnitKey(r.unit_code || r.unit_name || r.nama_unit || r.name) === normTarget);
+
+        // Gunakan unit_code persis sesuai nama kolom Primary Key di tabel Supabase
+        const targetUnitCode = existingRow ? (existingRow.unit_code || existingRow.unit_name || unitName) : unitName;
+
+        let saveSuccess = false;
+
+        // METODE 1: Gunakan supabaseClient resmi (100% aman untuk unit dengan tanda kurung seperti 'LB5801 (LOWBOY)')
+        if (supabaseClient) {
             try {
-                const payload = {
-                    unit_name: unitName,
-                    is_active: status === 'ACTIVE',
-                    alasan_off: status === 'ACTIVE' ? null : (reason || 'Non-Aktif'),
-                    updated_by: currentUser.nama_lengkap || currentUser.nrp || 'SYSTEM',
-                    updated_at: new Date().toISOString()
-                };
-                await fetch(`${SUPABASE_URL}/rest/v1/unit_status?on_conflict=unit_name`, {
+                const { data, error } = await supabaseClient
+                    .from('unit_status')
+                    .upsert({
+                        unit_code: targetUnitCode,
+                        is_active: isActive,
+                        alasan_off: finalReason,
+                        updated_by: updatedBy,
+                        updated_at: updatedAt
+                    }, { onConflict: 'unit_code' })
+                    .select();
+
+                if (!error && Array.isArray(data) && data.length > 0) {
+                    saveSuccess = true;
+                    const idx = rawUnits.findIndex(r => normalizeUnitKey(r.unit_code) === normTarget);
+                    if (idx !== -1) rawUnits[idx] = data[0];
+                    else rawUnits.push(data[0]);
+                    localStorage.setItem('lifting_raw_unit_status', JSON.stringify(rawUnits));
+                } else if (error) {
+                    console.warn("supabaseClient upsert error:", error);
+                }
+            } catch (err) {
+                console.warn("supabaseClient upsert exception:", err);
+            }
+        }
+
+        // METODE 2: Fallback REST PATCH dengan pelindung tanda kutip ganda pada parameter unit_code
+        if (!saveSuccess) {
+            try {
+                const quotedCode = encodeURIComponent(`"${targetUnitCode.replace(/"/g, '\\"')}"`);
+                let res = await fetch(`${SUPABASE_URL}/rest/v1/unit_status?unit_code=eq.${quotedCode}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Prefer': 'return=representation'
+                    },
+                    body: JSON.stringify({
+                        is_active: isActive,
+                        alasan_off: finalReason,
+                        updated_by: updatedBy,
+                        updated_at: updatedAt
+                    })
+                });
+
+                if (res.ok) {
+                    const data = await res.json().catch(() => []);
+                    if (Array.isArray(data) && data.length > 0) {
+                        saveSuccess = true;
+                        const idx = rawUnits.findIndex(r => normalizeUnitKey(r.unit_code) === normTarget);
+                        if (idx !== -1) rawUnits[idx] = data[0];
+                        else rawUnits.push(data[0]);
+                        localStorage.setItem('lifting_raw_unit_status', JSON.stringify(rawUnits));
+                    }
+                }
+            } catch (err) {
+                console.warn("Fallback PATCH error:", err);
+            }
+        }
+
+        // METODE 3: Fallback REST POST Upsert
+        if (!saveSuccess) {
+            try {
+                let resPost = await fetch(`${SUPABASE_URL}/rest/v1/unit_status?on_conflict=unit_code`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'apikey': SUPABASE_KEY,
                         'Authorization': `Bearer ${SUPABASE_KEY}`,
-                        'Prefer': 'resolution=merge-duplicates'
+                        'Prefer': 'resolution=merge-duplicates,return=representation'
                     },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify({
+                        unit_code: targetUnitCode,
+                        is_active: isActive,
+                        alasan_off: finalReason,
+                        updated_by: updatedBy,
+                        updated_at: updatedAt
+                    })
                 });
-            } catch (err) {
-                console.warn("Gagal simpan unit_status ke Supabase:", err);
+
+                if (resPost.ok) {
+                    saveSuccess = true;
+                    const inserted = await resPost.json().catch(() => []);
+                    if (Array.isArray(inserted) && inserted.length > 0) {
+                        const idx = rawUnits.findIndex(r => normalizeUnitKey(r.unit_code) === normTarget);
+                        if (idx !== -1) rawUnits[idx] = inserted[0];
+                        else rawUnits.push(inserted[0]);
+                        localStorage.setItem('lifting_raw_unit_status', JSON.stringify(rawUnits));
+                    }
+                }
+            } catch(e) {
+                console.warn("Fallback POST upsert error:", e);
             }
         }
+
+        // Sinkronkan juga master_data sebagai backup sekunder
+        try {
+            await syncMasterToSupabase(m);
+        } catch(e) {}
+
+        return saveSuccess;
     }
 
     /* ========================================================
@@ -959,22 +1084,39 @@
 
     function handleRealtimeUnitStatusChange(payload) {
         try {
-            if (payload.new && payload.new.unit_name) {
-                const u = payload.new;
-                const rawIsActive = u.is_active;
-                const isActive = (rawIsActive === true || rawIsActive === 'true' || rawIsActive === 1 || rawIsActive === '1');
-                const reason = isActive ? '' : (u.alasan_off || u.reason || 'Non-Aktif');
-                
-                const m = getMasterData();
-                if (!m.unit_status_map) m.unit_status_map = {};
-                m.unit_status_map[u.unit_name] = {
-                    status: isActive ? 'ACTIVE' : 'INACTIVE',
-                    reason: reason,
-                    updated_at: u.updated_at || new Date().toISOString()
-                };
-                localStorage.setItem('lifting_unit_status', JSON.stringify(m.unit_status_map));
-                saveMasterData(m);
-                renderApp(true);
+            const u = payload.new;
+            if (u) {
+                const uName = u.unit_code || u.unit_name || u.nama_unit || u.name;
+                if (uName) {
+                    const rawIsActive = u.is_active;
+                    const isActive = (rawIsActive === true || rawIsActive === 'true' || rawIsActive === 1 || rawIsActive === '1');
+                    const reason = isActive ? '' : (u.alasan_off || u.alasan || u.reason || 'Non-Aktif');
+                    
+                    let unitStatusMap = getUnitStatusMap();
+                    unitStatusMap[uName] = {
+                        status: isActive ? 'ACTIVE' : 'INACTIVE',
+                        reason: reason,
+                        updated_at: u.updated_at || new Date().toISOString()
+                    };
+                    const norm = normalizeUnitKey(uName);
+                    unitStatusMap[norm] = unitStatusMap[uName];
+                    localStorage.setItem('lifting_unit_status', JSON.stringify(unitStatusMap));
+
+                    const m = getMasterData();
+                    if (!m.unit_status_map) m.unit_status_map = {};
+                    m.unit_status_map[uName] = unitStatusMap[uName];
+                    m.unit_status_map[norm] = unitStatusMap[uName];
+                    localStorage.setItem('lifting_master_data', JSON.stringify(m));
+
+                    // Update juga rawSupabaseUnits
+                    let rawUnits = [];
+                    try { rawUnits = JSON.parse(localStorage.getItem('lifting_raw_unit_status')) || []; } catch(e) {}
+                    const idx = rawUnits.findIndex(r => normalizeUnitKey(r.unit_code || r.unit_name || r.name) === norm);
+                    if (idx !== -1) rawUnits[idx] = u; else rawUnits.push(u);
+                    localStorage.setItem('lifting_raw_unit_status', JSON.stringify(rawUnits));
+
+                    renderApp(true);
+                }
             }
         } catch (e) {}
     }
@@ -1051,22 +1193,33 @@
             if (resUnitStatus && resUnitStatus.ok) {
                 const unitsData = await resUnitStatus.json();
                 if (Array.isArray(unitsData) && unitsData.length > 0) {
-                    const m = getMasterData();
-                    if (!m.unit_status_map) m.unit_status_map = {};
+                    localStorage.setItem('lifting_raw_unit_status', JSON.stringify(unitsData));
+                    window._rawSupabaseUnits = unitsData;
+                    
+                    let unitStatusMap = {};
+                    try {
+                        unitStatusMap = JSON.parse(localStorage.getItem('lifting_unit_status')) || {};
+                    } catch(e) { unitStatusMap = {}; }
+
                     unitsData.forEach(u => {
-                        const uName = u.unit_name || u.name;
+                        const uName = u.unit_code || u.unit_name || u.nama_unit || u.name;
                         if (uName) {
                             const rawIsActive = u.is_active;
                             const isActive = (rawIsActive === true || rawIsActive === 'true' || rawIsActive === 1 || rawIsActive === '1');
-                            const reason = isActive ? '' : (u.alasan_off || u.reason || 'Non-Aktif');
-                            m.unit_status_map[uName] = {
+                            const reason = isActive ? '' : (u.alasan_off || u.alasan || u.reason || 'Non-Aktif');
+                            unitStatusMap[uName] = {
                                 status: isActive ? 'ACTIVE' : 'INACTIVE',
                                 reason: reason,
                                 updated_at: u.updated_at || new Date().toISOString()
                             };
+                            const norm = normalizeUnitKey(uName);
+                            unitStatusMap[norm] = unitStatusMap[uName];
                         }
                     });
-                    localStorage.setItem('lifting_unit_status', JSON.stringify(m.unit_status_map));
+                    localStorage.setItem('lifting_unit_status', JSON.stringify(unitStatusMap));
+                    
+                    const m = getMasterData();
+                    m.unit_status_map = unitStatusMap;
                     localStorage.setItem('lifting_master_data', JSON.stringify(m));
                     shouldRender = true;
                 }
@@ -1213,6 +1366,9 @@
         if (!data) return defaultMasterData;
         let safeData = { ...defaultMasterData };
         for (let key in defaultMasterData) { if (data[key] && Array.isArray(data[key])) { safeData[key] = data[key]; } }
+        if (data.unit_status_map && typeof data.unit_status_map === 'object') {
+            safeData.unit_status_map = data.unit_status_map;
+        }
         return safeData;
     }
     function saveMasterData(data) { localStorage.setItem('lifting_master_data', JSON.stringify(data)); syncMasterToSupabase(data); }
@@ -2749,48 +2905,64 @@
                 </div>
             </div>
 
-            <!-- Kartu Data Perusahaan & Dept Plant: 3 Kolom Simetris (4 - 4 - 4) -->
+            <!-- Kartu Data Perusahaan & Dept Plant Sejajar & Simetris -->
             <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm mt-3.5">
-                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                     <!-- Kolom 1: Donut Chart -->
-                    <div class="lg:col-span-4 flex flex-col items-center justify-center">
+                    <div class="lg:col-span-4 xl:col-span-3 flex flex-col items-center justify-start">
                         <h3 class="text-xs font-bold text-slate-700 mb-2 w-full text-left">Data Perusahaan</h3>
                         <div class="relative h-44 w-44 flex items-center justify-center">
                             <canvas id="companyDonutChart"></canvas>
                         </div>
                     </div>
                     
-                    <!-- Kolom 2: Rincian Perusahaan -->
-                    <div class="lg:col-span-4 flex flex-col justify-center">
-                        <div class="flex justify-between text-[9px] font-bold text-slate-400 uppercase border-b border-slate-100 pb-1.5 mb-2">
-                            <span class="w-1/2 text-left">PERUSAHAAN</span>
-                            <span class="w-1/4 text-center">PERSENTASE</span>
-                            <span class="w-1/4 text-right">T. JAM | JOB</span>
+                    <!-- Kolom 2 & 3: Rincian Perusahaan & Dept Plant Sejajar (50% / 50%) -->
+                    <div class="lg:col-span-8 xl:col-span-9 grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                        <!-- Rincian Perusahaan -->
+                        <div class="flex flex-col justify-start">
+                            <div class="grid grid-cols-12 text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase border-b border-slate-100 pb-1.5 mb-2 select-none tracking-wider">
+                                <span class="col-span-4 text-left">PERUSAHAAN</span>
+                                <span class="col-span-2 text-center">PERSENTASE</span>
+                                <span class="col-span-3 text-right">TOTAL JAM</span>
+                                <span class="col-span-3 text-right">TOTAL ORDER</span>
+                            </div>
+                            <div class="flex flex-col gap-1.5 hide-scrollbar overflow-y-auto max-h-44" id="legendCompanyContainer"></div>
                         </div>
-                        <div class="flex flex-col gap-1.5 hide-scrollbar overflow-y-auto max-h-40" id="legendCompanyContainer"></div>
-                    </div>
-                    
-                    <!-- Kolom 3: Rincian Dept Plant Bergaris Pemisah -->
-                    <div class="lg:col-span-4 lg:border-l border-slate-100 lg:pl-6 flex flex-col justify-center">
-                        <div class="flex justify-between items-center text-[9px] font-bold text-blue-600 border-b border-slate-100 pb-1.5 mb-2 uppercase tracking-wider">
-                            <span>DEPT PLANT</span>
-                            <span class="text-slate-400 text-[8px]">TOTAL JAM | JOB</span>
-                        </div>
-                        <div class="flex flex-col gap-1.5 hide-scrollbar overflow-y-auto max-h-40">
-                            ${(() => {
-                                let plantStats = {};
-                                filteredJobs.forEach(j => {
-                                    if((j.departemen || '').toUpperCase() === 'PLANT') {
-                                        let sec = j.section || 'N/A';
-                                        if(!plantStats[sec]) plantStats[sec] = { count: 0, hours: 0 };
-                                        plantStats[sec].count++;
-                                        if(j.status === 'COMPLETED' && j.durasi_aktual) plantStats[sec].hours += parseFloat(j.durasi_aktual);
-                                    }
-                                });
-                                let plantArray = Object.entries(plantStats).sort((a,b) => b[1].count - a[1].count);
-                                if(plantArray.length === 0) return '<div class="text-[10px] text-slate-400 italic py-2">Tidak ada order dari Dept Plant hari ini.</div>';
-                                return plantArray.map(item => `<div class="flex justify-between text-[10px] text-slate-500 mb-1 border-b border-slate-50 pb-1 items-center"><span class="truncate w-1/2 font-medium">${item[0]}</span><span class="w-1/4 text-center">${item[1].hours.toFixed(1)}J</span><span class="w-1/4 text-right">${item[1].count} Job</span></div>`).join('');
-                            })()}
+                        
+                        <!-- Rincian Dept Plant Bergaris Pemisah Sejajar -->
+                        <div class="md:border-l border-slate-100 md:pl-6 flex flex-col justify-start">
+                            <div class="grid grid-cols-12 text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase border-b border-slate-100 pb-1.5 mb-2 select-none tracking-wider">
+                                <span class="col-span-4 text-left text-blue-600 font-extrabold">DEPT PLANT</span>
+                                <span class="col-span-2 text-center">PERSENTASE</span>
+                                <span class="col-span-3 text-right">TOTAL JAM</span>
+                                <span class="col-span-3 text-right">TOTAL ORDER</span>
+                            </div>
+                            <div class="flex flex-col gap-1.5 hide-scrollbar overflow-y-auto max-h-44">
+                                ${(() => {
+                                    let plantStats = {};
+                                    filteredJobs.forEach(j => {
+                                        if((j.departemen || '').toUpperCase() === 'PLANT') {
+                                            let sec = j.section || 'N/A';
+                                            if(!plantStats[sec]) plantStats[sec] = { count: 0, hours: 0 };
+                                            plantStats[sec].count++;
+                                            if(j.status === 'COMPLETED' && j.durasi_aktual) plantStats[sec].hours += parseFloat(j.durasi_aktual);
+                                        }
+                                    });
+                                    let plantArray = Object.entries(plantStats).sort((a,b) => b[1].count - a[1].count);
+                                    if(plantArray.length === 0) return '<div class="text-[10px] text-slate-400 italic py-2">Tidak ada order dari Dept Plant hari ini.</div>';
+                                    let totalPlantJobs = plantArray.reduce((sum, item) => sum + item[1].count, 0) || 1;
+                                    return plantArray.map(item => {
+                                        let pct = Math.round((item[1].count / totalPlantJobs) * 100);
+                                        return `
+                                        <div class="grid grid-cols-12 text-[10px] items-center py-1 border-b border-slate-50">
+                                            <div class="col-span-4 font-semibold text-slate-700 truncate pr-1" title="${item[0]}">${item[0]}</div>
+                                            <div class="col-span-2 text-slate-500 text-center font-medium">${pct}%</div>
+                                            <div class="col-span-3 text-slate-600 font-semibold text-right pr-1">${item[1].hours.toFixed(1)}J</div>
+                                            <div class="col-span-3 text-slate-600 font-semibold text-right">${item[1].count} Job</div>
+                                        </div>`;
+                                    }).join('');
+                                })()}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -3004,9 +3176,20 @@
                 let cName = item[0]; let cObj = item[1]; let pct = Math.round((cObj.count / totalCompanyJobs) * 100); let color = cColors[cName] || fallbackColors[idxColor % fallbackColors.length];
                 cLabels.push(cName); cDataCount.push(cObj.count); cBgColors.push(color);
                 if(!cColors[cName]) idxColor++;
-                companyLegendHtml += `<div class="flex items-center justify-between text-[10px] mb-1.5"><div class="flex items-center gap-2 w-1/2 truncate"><div class="w-2.5 h-2.5 rounded-sm shrink-0" style="background-color: ${color}"></div><span class="font-semibold text-slate-700 truncate" title="${cName}">${cName}</span></div><div class="w-1/4 text-slate-500 text-center">${pct}%</div><div class="w-1/4 font-semibold text-slate-600 text-right whitespace-nowrap">${cObj.hours.toFixed(1)}J | ${cObj.count}</div></div>`;
+                companyLegendHtml += `
+                    <div class="grid grid-cols-12 text-[10px] items-center py-1 border-b border-slate-50">
+                        <div class="col-span-4 flex items-center gap-1.5 truncate pr-1">
+                            <div class="w-2.5 h-2.5 rounded-sm shrink-0" style="background-color: ${color}"></div>
+                            <span class="font-semibold text-slate-700 truncate" title="${cName}">${cName}</span>
+                        </div>
+                        <div class="col-span-2 text-slate-500 text-center font-medium">${pct}%</div>
+                        <div class="col-span-3 text-slate-600 font-semibold text-right pr-1">${cObj.hours.toFixed(1)}J</div>
+                        <div class="col-span-3 text-slate-600 font-semibold text-right">${cObj.count} Job</div>
+                    </div>`;
             });
-            if(!companyLegendHtml) companyLegendHtml = '<div class="text-[9px] text-slate-400 italic">Data kosong</div>';
+            if(!companyLegendHtml) {
+                companyLegendHtml = '<div class="text-[10px] text-slate-400 italic py-2">Data kosong</div>';
+            }
             document.getElementById('legendCompanyContainer').innerHTML = companyLegendHtml;
 
             if(window.dashCompanyDonut) window.dashCompanyDonut.destroy();
@@ -3142,7 +3325,7 @@
         }
     }
 
-    function submitUnitStatusChange(e) {
+    async function submitUnitStatusChange(e) {
         e.preventDefault();
         const unitName = document.getElementById('targetUnitName').value;
         const status = document.getElementById('unitStatusSelect').value;
@@ -3152,10 +3335,31 @@
             return showToast('Mohon isi keterangan alasan non-aktif!', 'error');
         }
 
-        saveUnitStatus(unitName, status, reason);
-        showToast(`Status unit ${unitName} berhasil diperbarui!`);
-        document.getElementById('unitStatusModal').classList.add('hidden');
-        renderApp(true);
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        const originalBtnHtml = submitBtn ? submitBtn.innerHTML : '';
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Menyimpan...';
+        }
+
+        try {
+            const success = await saveUnitStatus(unitName, status, reason);
+            if (success) {
+                showToast(`Status unit ${unitName} berhasil tersimpan di Supabase!`, 'success');
+            } else {
+                showToast(`Gagal memperbarui ke Supabase. Periksa koneksi jaringan.`, 'error');
+            }
+        } catch(err) {
+            console.error("Gagal simpan status unit:", err);
+            showToast(`Gagal menyimpan ke Supabase: ${err.message || 'Error'}`, 'error');
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnHtml;
+            }
+            document.getElementById('unitStatusModal').classList.add('hidden');
+            renderApp(true);
+        }
     }
 
     function getMonitoringView() {
