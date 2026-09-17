@@ -193,23 +193,23 @@
            ======================================================== */
         html.font-size-small { font-size: 100%; }
 
-        html.font-size-medium { font-size: 112%; }
-        html.font-size-medium .text-\[8px\] { font-size: 9.5px !important; }
-        html.font-size-medium .text-\[9px\] { font-size: 10.5px !important; }
-        html.font-size-medium .text-\[10px\] { font-size: 11.5px !important; }
-        html.font-size-medium .text-\[11px\] { font-size: 12.5px !important; }
-        html.font-size-medium .text-xs { font-size: 13.5px !important; }
-        html.font-size-medium .text-sm { font-size: 15px !important; }
-        html.font-size-medium .text-base { font-size: 17px !important; }
+        html.font-size-medium { font-size: 125%; }
+        html.font-size-medium .text-\[8px\] { font-size: 10px !important; }
+        html.font-size-medium .text-\[9px\] { font-size: 11.25px !important; }
+        html.font-size-medium .text-\[10px\] { font-size: 12.5px !important; }
+        html.font-size-medium .text-\[11px\] { font-size: 13.75px !important; }
+        html.font-size-medium .text-xs { font-size: 15px !important; }
+        html.font-size-medium .text-sm { font-size: 17.5px !important; }
+        html.font-size-medium .text-base { font-size: 20px !important; }
 
-        html.font-size-large { font-size: 125%; }
-        html.font-size-large .text-\[8px\] { font-size: 10.5px !important; }
-        html.font-size-large .text-\[9px\] { font-size: 12px !important; }
-        html.font-size-large .text-\[10px\] { font-size: 13px !important; }
-        html.font-size-large .text-\[11px\] { font-size: 14px !important; }
-        html.font-size-large .text-xs { font-size: 15px !important; }
-        html.font-size-large .text-sm { font-size: 16.5px !important; }
-        html.font-size-large .text-base { font-size: 18.5px !important; }
+        html.font-size-large { font-size: 150%; }
+        html.font-size-large .text-\[8px\] { font-size: 12px !important; }
+        html.font-size-large .text-\[9px\] { font-size: 13.5px !important; }
+        html.font-size-large .text-\[10px\] { font-size: 15px !important; }
+        html.font-size-large .text-\[11px\] { font-size: 16.5px !important; }
+        html.font-size-large .text-xs { font-size: 18px !important; }
+        html.font-size-large .text-sm { font-size: 21px !important; }
+        html.font-size-large .text-base { font-size: 24px !important; }
     </style>
 </head>
 <body class="antialiased text-[11px] sm:text-xs">
@@ -406,10 +406,12 @@
         let mpOperators = getManpowerUsers('OPERATOR');
         if (mpOperators.length === 0) mpOperators = getManpowerUsers('ALL');
         if (mpOperators.length > 0) {
+            // Urutkan nama abjad A-Z agar rapi
+            mpOperators.sort((a, b) => (a.nama_lengkap || '').localeCompare(b.nama_lengkap || ''));
             return mpOperators.map(u => {
                 const isSel = (selectedNrp && (u.nrp || '').toUpperCase() === String(selectedNrp).toUpperCase()) || 
                               (selectedVal && normalizeName(u.nama_lengkap) === normalizeName(selectedVal));
-                return `<option value="${u.nama_lengkap}" data-nrp="${u.nrp}" ${isSel ? 'selected' : ''}>${u.nama_lengkap} (${u.nrp}) - ${u.jabatan || 'OPERATOR'}</option>`;
+                return `<option value="${u.nama_lengkap}" data-nrp="${u.nrp}" ${isSel ? 'selected' : ''}>${u.nama_lengkap}</option>`;
             }).join('');
         }
         const m = getMasterData();
@@ -420,10 +422,12 @@
         let mpRiggers = getManpowerUsers('RIGGER');
         if (mpRiggers.length === 0) mpRiggers = getManpowerUsers('ALL');
         if (mpRiggers.length > 0) {
+            // Urutkan nama abjad A-Z agar rapi
+            mpRiggers.sort((a, b) => (a.nama_lengkap || '').localeCompare(b.nama_lengkap || ''));
             return mpRiggers.map(u => {
                 const isSel = (selectedNrp && (u.nrp || '').toUpperCase() === String(selectedNrp).toUpperCase()) || 
                               (selectedVal && normalizeName(u.nama_lengkap) === normalizeName(selectedVal));
-                return `<option value="${u.nama_lengkap}" data-nrp="${u.nrp}" ${isSel ? 'selected' : ''}>${u.nama_lengkap} (${u.nrp}) - ${u.jabatan || 'RIGGER'}</option>`;
+                return `<option value="${u.nama_lengkap}" data-nrp="${u.nrp}" ${isSel ? 'selected' : ''}>${u.nama_lengkap}</option>`;
             }).join('');
         }
         const m = getMasterData();
@@ -1665,10 +1669,10 @@
                                 </div>
 
                                 <!-- Label Keterangan Ukuran -->
-                                <div class="flex justify-between text-[10px] text-slate-400 font-medium px-6 mt-2 select-none">
+                                <div class="flex justify-between text-[10px] text-slate-400 font-medium px-4 mt-2 select-none">
                                     <span id="fontLabel_0" class="cursor-pointer" onclick="setAppFontSizeByStep(0)">Kecil</span>
-                                    <span id="fontLabel_1" class="cursor-pointer" onclick="setAppFontSizeByStep(1)">Sedang</span>
-                                    <span id="fontLabel_2" class="cursor-pointer" onclick="setAppFontSizeByStep(2)">Besar</span>
+                                    <span id="fontLabel_1" class="cursor-pointer" onclick="setAppFontSizeByStep(1)">Sedang (25%)</span>
+                                    <span id="fontLabel_2" class="cursor-pointer" onclick="setAppFontSizeByStep(2)">Besar (50%)</span>
                                 </div>
                             </div>
 
@@ -2187,7 +2191,7 @@
         localStorage.setItem('lifting_font_size', size);
         applyAppFontSize(size);
         updateFontSizeSliderUI();
-        const label = size === 'small' ? 'Kecil (Bawaan)' : (size === 'medium' ? 'Sedang' : 'Besar');
+        const label = size === 'small' ? 'Kecil (Standar)' : (size === 'medium' ? 'Sedang (+25%)' : 'Besar (+50%)');
         showToast(`Ukuran teks diubah ke: ${label}`);
     }
 
@@ -2236,9 +2240,9 @@
             if (current === 'small') {
                 previewEl.innerText = "Ukuran teks Kecil (Standar bawaan sistem).";
             } else if (current === 'medium') {
-                previewEl.innerText = "Ukuran teks Sedang (+12%), lebih nyaman dibaca.";
+                previewEl.innerText = "Ukuran teks Sedang (+25%), lebih nyaman dibaca.";
             } else {
-                previewEl.innerText = "Ukuran teks Besar (+25%), sangat jelas di layar ponsel.";
+                previewEl.innerText = "Ukuran teks Besar (+50%), sangat jelas di layar.";
             }
         }
     }
