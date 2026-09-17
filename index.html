@@ -357,19 +357,30 @@
        SISTEM STATUS UNIT & KETERANGAN NON-AKTIF (OFF/BREAKDOWN)
        ======================================================== */
     function getUnitStatusMap() {
+        try {
+            const local = JSON.parse(localStorage.getItem('lifting_unit_status'));
+            if (local && typeof local === 'object' && Object.keys(local).length > 0) return local;
+        } catch(e) {}
         const m = getMasterData();
         if (m.unit_status_map && typeof m.unit_status_map === 'object') {
             return m.unit_status_map;
         }
-        try {
-            return JSON.parse(localStorage.getItem('lifting_unit_status')) || {};
-        } catch(e) { return {}; }
+        return {};
     }
 
     function getUnitStatus(unitName) {
         if (!unitName) return { status: 'ACTIVE', reason: '' };
         const map = getUnitStatusMap();
-        return map[unitName] || { status: 'ACTIVE', reason: '' };
+        if (map[unitName]) return map[unitName];
+        
+        // Pencocokan fleksibel jika ada variasi spasi / strip
+        const cleanTarget = String(unitName).replace(/[\s\-_]/g, '').toUpperCase();
+        for (let k in map) {
+            if (String(k).replace(/[\s\-_]/g, '').toUpperCase() === cleanTarget) {
+                return map[k];
+            }
+        }
+        return { status: 'ACTIVE', reason: '' };
     }
 
     function normalizeName(str) {
@@ -453,13 +464,50 @@
         return { count, hours: totalHours, isCrowded };
     }
 
-    function saveUnitStatus(unitName, status, reason) {
+    async function saveUnitStatus(unitName, status, reason) {
         if (!unitName) return;
+        const currentUser = JSON.parse(localStorage.getItem('lifting_user')) || {};
+        const isAct = status === 'ACTIVE';
+        const cleanReason = isAct ? '' : (reason || '');
+        const updatedBy = currentUser.nama_lengkap || currentUser.nrp || 'SYSTEM';
+        const nowIso = new Date().toISOString();
+
+        let map = getUnitStatusMap();
+        map[unitName] = { 
+            status: status, 
+            reason: cleanReason, 
+            updated_by: updatedBy,
+            updated_at: nowIso 
+        };
+        localStorage.setItem('lifting_unit_status', JSON.stringify(map));
+        
         const m = getMasterData();
-        if (!m.unit_status_map) m.unit_status_map = {};
-        m.unit_status_map[unitName] = { status, reason, updated_at: new Date().toISOString() };
-        localStorage.setItem('lifting_unit_status', JSON.stringify(m.unit_status_map));
+        m.unit_status_map = map;
         saveMasterData(m);
+
+        // Sinkronkan langsung ke tabel unit_status di Supabase
+        if (SUPABASE_KEY && !SUPABASE_KEY.includes('PASTE_KUNCI')) {
+            try {
+                await fetch(`${SUPABASE_URL}/rest/v1/unit_status?on_conflict=unit_code`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Prefer': 'resolution=merge-duplicates'
+                    },
+                    body: JSON.stringify([{
+                        unit_code: unitName,
+                        is_active: isAct,
+                        alasan_off: cleanReason || null,
+                        updated_by: updatedBy,
+                        updated_at: nowIso
+                    }])
+                });
+            } catch(err) {
+                console.warn("Gagal sinkronisasi unit_status ke Supabase:", err);
+            }
+        }
     }
 
     /* ========================================================
@@ -1062,6 +1110,41 @@
         } catch (e) {}
     }
 
+    function handleRealtimeUnitStatusChange(payload) {
+        try {
+            const { eventType, new: newRecord, old: oldRecord } = payload;
+            let map = getUnitStatusMap();
+            let changed = false;
+
+            if (newRecord && newRecord.unit_code) {
+                const code = newRecord.unit_code;
+                const isAct = (newRecord.is_active === true || newRecord.is_active === 'true');
+                map[code] = {
+                    status: isAct ? 'ACTIVE' : 'INACTIVE',
+                    reason: isAct ? '' : (newRecord.alasan_off || ''),
+                    updated_by: newRecord.updated_by || '',
+                    updated_at: newRecord.updated_at || new Date().toISOString()
+                };
+                changed = true;
+            } else if (eventType === 'DELETE' && oldRecord && oldRecord.unit_code) {
+                delete map[oldRecord.unit_code];
+                changed = true;
+            }
+
+            if (changed) {
+                localStorage.setItem('lifting_unit_status', JSON.stringify(map));
+                const m = getMasterData();
+                m.unit_status_map = map;
+                localStorage.setItem('lifting_master_data', JSON.stringify(m));
+                if (currentTab !== 'order') {
+                    renderApp(true);
+                }
+            }
+        } catch (err) {
+            console.warn("Gagal memproses realtime unit_status:", err);
+        }
+    }
+
     var isPreviewCanvas = window.self !== window.top || window.location.hostname.includes('usercontent.goog');
 
     let realtimeChannel = null;
@@ -1076,6 +1159,7 @@
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, handleRealtimeSettingsChange)
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, handleRealtimeUsersChange)
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'master_data' }, handleRealtimeMasterChange)
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'unit_status' }, handleRealtimeUnitStatusChange)
                 .subscribe((status) => {
                     console.log("Supabase Realtime Status:", status);
                 });
@@ -1104,11 +1188,12 @@
         if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
         lastFetchTimestamp = Date.now();
         try {
-            const [resOrders, resSettings, resUsers, resMaster] = await Promise.all([
+            const [resOrders, resSettings, resUsers, resMaster, resUnitStatus] = await Promise.all([
                 fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=timestamp.desc&limit=150`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }),
                 fetch(`${SUPABASE_URL}/rest/v1/settings?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }),
                 fetch(`${SUPABASE_URL}/rest/v1/users?select=*`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }),
-                fetch(`${SUPABASE_URL}/rest/v1/master_data?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } })
+                fetch(`${SUPABASE_URL}/rest/v1/master_data?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }),
+                fetch(`${SUPABASE_URL}/rest/v1/unit_status?select=*`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } })
             ]);
 
             let shouldRender = false;
@@ -1165,6 +1250,37 @@
             }
             if (resMaster.ok) { const data = await resMaster.json(); if(data && data.length > 0) { let ds = JSON.stringify(data[0]); if(localStorage.getItem('lifting_master_data') !== ds) { localStorage.setItem('lifting_master_data', ds); shouldRender = true; } } }
             
+            // Sinkronisasi data tabel unit_status dari Supabase
+            if (resUnitStatus && resUnitStatus.ok) {
+                let unitRows = await resUnitStatus.json();
+                if (Array.isArray(unitRows)) {
+                    let map = getUnitStatusMap();
+                    let unitStatusChanged = false;
+                    unitRows.forEach(row => {
+                        const code = row.unit_code;
+                        const isAct = (row.is_active === true || row.is_active === 'true');
+                        const status = isAct ? 'ACTIVE' : 'INACTIVE';
+                        const reason = isAct ? '' : (row.alasan_off || '');
+                        if (!map[code] || map[code].status !== status || map[code].reason !== reason) {
+                            map[code] = {
+                                status: status,
+                                reason: reason,
+                                updated_by: row.updated_by || '',
+                                updated_at: row.updated_at || ''
+                            };
+                            unitStatusChanged = true;
+                        }
+                    });
+                    if (unitStatusChanged) {
+                        localStorage.setItem('lifting_unit_status', JSON.stringify(map));
+                        const m = getMasterData();
+                        m.unit_status_map = map;
+                        localStorage.setItem('lifting_master_data', JSON.stringify(m));
+                        shouldRender = true;
+                    }
+                }
+            }
+
             if(isManual) { showToast("Data berhasil disinkronkan!", "success"); renderApp(false); }
             else if(shouldRender) { 
                 if (currentTab !== 'order') {
@@ -3497,7 +3613,7 @@
         }
     }
 
-    function submitUnitStatusChange(e) {
+    async function submitUnitStatusChange(e) {
         e.preventDefault();
         const unitName = document.getElementById('targetUnitName').value;
         const status = document.getElementById('unitStatusSelect').value;
@@ -3507,7 +3623,7 @@
             return showToast('Mohon isi keterangan alasan non-aktif!', 'error');
         }
 
-        saveUnitStatus(unitName, status, reason);
+        await saveUnitStatus(unitName, status, reason);
         showToast(`Status unit ${unitName} berhasil diperbarui!`);
         document.getElementById('unitStatusModal').classList.add('hidden');
         renderApp(true);
