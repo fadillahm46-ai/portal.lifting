@@ -229,29 +229,6 @@
         </div>
     </div>
 
-    <!-- BANNER NOTIFIKASI MENGAMBANG (IN-APP FLOATING HEADS-UP NOTIFICATION) -->
-    <div id="inAppFloatingNotif" class="fixed top-3 left-1/2 -translate-x-1/2 z-[99999] w-[92%] max-w-md bg-[#2b2b2b]/95 backdrop-blur-md text-white rounded-2xl shadow-2xl px-3.5 py-3 border border-white/10 transition-all duration-300 transform -translate-y-24 opacity-0 pointer-events-none flex items-center justify-between cursor-pointer select-none">
-        <div class="flex items-center gap-3 min-w-0 flex-1">
-            <div class="w-9 h-9 rounded-full bg-red-600 border border-white/40 flex items-center justify-center shrink-0 shadow-md">
-                <i class="fa-solid fa-truck-ramp-box text-white text-base"></i>
-            </div>
-            <div class="min-w-0 flex-1">
-                <div class="flex items-center justify-between gap-2">
-                    <span class="font-bold text-xs text-white truncate tracking-tight">Ada Orderan Masuk!</span>
-                    <span class="text-[9px] text-slate-400 font-medium shrink-0">Sekarang</span>
-                </div>
-                <div id="inAppNotifBody" class="text-[11px] text-slate-300 truncate mt-0.5 leading-snug">
-                    Order baru siap divalidasi.
-                </div>
-            </div>
-        </div>
-        <div class="pl-2.5 ml-1 border-l border-white/10 shrink-0">
-            <div class="w-7 h-7 rounded-full bg-red-600/30 border border-red-500/50 flex items-center justify-center">
-                <i class="fa-solid fa-truck-moving text-red-400 text-xs"></i>
-            </div>
-        </div>
-    </div>
-
     <!-- Main Container -->
     <div id="app" class="min-h-screen"></div>
 
@@ -380,34 +357,19 @@
        SISTEM STATUS UNIT & KETERANGAN NON-AKTIF (OFF/BREAKDOWN)
        ======================================================== */
     function getUnitStatusMap() {
-        try {
-            const raw = localStorage.getItem('lifting_unit_status');
-            if (raw) return JSON.parse(raw);
-        } catch(e) {}
         const m = getMasterData();
         if (m.unit_status_map && typeof m.unit_status_map === 'object') {
             return m.unit_status_map;
         }
-        return {};
+        try {
+            return JSON.parse(localStorage.getItem('lifting_unit_status')) || {};
+        } catch(e) { return {}; }
     }
 
     function getUnitStatus(unitName) {
         if (!unitName) return { status: 'ACTIVE', reason: '' };
         const map = getUnitStatusMap();
-        const item = map[unitName];
-        if (!item) return { status: 'ACTIVE', reason: '' };
-        
-        // Mendukung schema tabel Supabase: is_active (boolean) dan alasan_off (text)
-        if (typeof item.is_active === 'boolean') {
-            return {
-                status: item.is_active ? 'ACTIVE' : 'INACTIVE',
-                reason: item.alasan_off || item.reason || ''
-            };
-        }
-        return {
-            status: item.status || 'ACTIVE',
-            reason: item.reason || item.alasan_off || ''
-        };
+        return map[unitName] || { status: 'ACTIVE', reason: '' };
     }
 
     function normalizeName(str) {
@@ -491,77 +453,21 @@
         return { count, hours: totalHours, isCrowded };
     }
 
-    async function saveUnitStatus(unitName, status, reason) {
+    function saveUnitStatus(unitName, status, reason) {
         if (!unitName) return;
-        const curUser = JSON.parse(localStorage.getItem('lifting_user')) || {};
-        const isActive = (status === 'ACTIVE');
-        const cleanReason = isActive ? null : (reason ? reason.trim() : null);
-        const map = getUnitStatusMap();
-        map[unitName] = {
-            unit_code: unitName,
-            is_active: isActive,
-            status: status,
-            alasan_off: cleanReason || '',
-            reason: cleanReason || '',
-            updated_by: curUser.nama_lengkap || curUser.nrp || 'SYSTEM',
-            updated_at: new Date().toISOString()
-        };
-        localStorage.setItem('lifting_unit_status', JSON.stringify(map));
-
         const m = getMasterData();
         if (!m.unit_status_map) m.unit_status_map = {};
-        m.unit_status_map[unitName] = map[unitName];
-        localStorage.setItem('lifting_master_data', JSON.stringify(m));
-
-        // Sinkronkan langsung ke tabel unit_status di Supabase via PATCH utama & UPSERT fallback
-        if (SUPABASE_KEY && !SUPABASE_KEY.includes('PASTE_KUNCI')) {
-            try {
-                // 1. PATCH langsung ke unit_code (pasti berhasil untuk baris yang sudah ada, tanpa error primary key conflict)
-                const patchRes = await fetch(`${SUPABASE_URL}/rest/v1/unit_status?unit_code=eq.${encodeURIComponent(unitName)}`, {
-                    method: 'PATCH',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'apikey': SUPABASE_KEY,
-                        'Authorization': `Bearer ${SUPABASE_KEY}`,
-                        'Prefer': 'return=representation'
-                    },
-                    body: JSON.stringify({
-                        is_active: isActive,
-                        alasan_off: cleanReason,
-                        updated_by: curUser.nama_lengkap || curUser.nrp || 'SYSTEM',
-                        updated_at: new Date().toISOString()
-                    })
-                });
-
-                // 2. Jika baris belum ada sama sekali di tabel Supabase, lakukan UPSERT dengan ?on_conflict=unit_code
-                const patchData = patchRes.ok ? await patchRes.json() : [];
-                if (!patchRes.ok || !Array.isArray(patchData) || patchData.length === 0) {
-                    await fetch(`${SUPABASE_URL}/rest/v1/unit_status?on_conflict=unit_code`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'apikey': SUPABASE_KEY,
-                            'Authorization': `Bearer ${SUPABASE_KEY}`,
-                            'Prefer': 'resolution=merge-duplicates'
-                        },
-                        body: JSON.stringify([{
-                            unit_code: unitName,
-                            is_active: isActive,
-                            alasan_off: cleanReason,
-                            updated_by: curUser.nama_lengkap || curUser.nrp || 'SYSTEM',
-                            updated_at: new Date().toISOString()
-                        }])
-                    });
-                }
-            } catch(e) {
-                console.warn("Gagal sinkron unit_status ke Supabase:", e);
-            }
-        }
+        m.unit_status_map[unitName] = { status, reason, updated_at: new Date().toISOString() };
+        localStorage.setItem('lifting_unit_status', JSON.stringify(m.unit_status_map));
+        saveMasterData(m);
     }
 
     /* ========================================================
        SISTEM NOTIFIKASI SUARA (WEB AUDIO API) & REALTIME BANNER
        ======================================================== */
+    let lastNotifTime = 0;
+    let lastNotifWo = '';
+
     function playNotificationSound(type = 'gl') {
         try {
             const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -610,74 +516,141 @@
         }
     }
 
+    let currentFloatingOrderNo = '';
     let floatingNotifTimer = null;
-    function showInAppFloatingNotification(title, message, targetWo = '') {
-        const notifEl = document.getElementById('inAppFloatingNotif');
-        const bodyEl = document.getElementById('inAppNotifBody');
-        if (!notifEl) return;
-        if (bodyEl) bodyEl.innerText = message;
 
-        notifEl.classList.remove('-translate-y-24', 'opacity-0', 'pointer-events-none');
-        notifEl.classList.add('translate-y-0', 'opacity-100', 'pointer-events-auto');
-
-        notifEl.onclick = () => {
-            hideInAppFloatingNotification();
-            if (targetWo) {
-                viewJobDetail(targetWo);
-            }
-        };
+    function showFloatingNotification(title, message, orderNo = '') {
+        currentFloatingOrderNo = orderNo;
+        const el = document.getElementById('inAppFloatingNotif');
+        if (!el) return;
+        
+        const titleEl = document.getElementById('floatingNotifTitle');
+        const bodyEl = document.getElementById('floatingNotifBody');
+        if (titleEl) titleEl.innerText = title || "Ada Orderan Masuk!";
+        if (bodyEl) bodyEl.innerText = message || "Order siap divalidasi.";
+        
+        el.classList.remove('hidden');
+        setTimeout(() => {
+            el.classList.remove('-translate-y-full', 'opacity-0');
+            el.classList.add('translate-y-0', 'opacity-100');
+        }, 20);
 
         if (floatingNotifTimer) clearTimeout(floatingNotifTimer);
-        floatingNotifTimer = setTimeout(hideInAppFloatingNotification, 6500);
+        floatingNotifTimer = setTimeout(() => {
+            closeFloatingNotification();
+        }, 6500);
     }
 
-    function hideInAppFloatingNotification() {
-        const notifEl = document.getElementById('inAppFloatingNotif');
-        if (notifEl) {
-            notifEl.classList.add('-translate-y-24', 'opacity-0', 'pointer-events-none');
-            notifEl.classList.remove('translate-y-0', 'opacity-100', 'pointer-events-auto');
+    function closeFloatingNotification() {
+        const el = document.getElementById('inAppFloatingNotif');
+        if (!el) return;
+        el.classList.remove('translate-y-0', 'opacity-100');
+        el.classList.add('-translate-y-full', 'opacity-0');
+        setTimeout(() => {
+            el.classList.add('hidden');
+        }, 300);
+    }
+
+    function onFloatingNotifClick() {
+        closeFloatingNotification();
+        if (currentFloatingOrderNo) {
+            viewJobDetail(currentFloatingOrderNo);
         }
     }
 
-    function triggerAppNotification(title, message, soundType = 'gl', targetWo = '') {
+    // Pemicu notifikasi tunggal (Single Notification) agar tidak bertumpuk di HP
+    function triggerAppNotification(title, message, soundType = 'gl', orderNo = '') {
+        const now = Date.now();
+        // Cegah spam notifikasi ganda untuk order yang sama dalam 5 detik
+        if (orderNo && orderNo === lastNotifWo && (now - lastNotifTime < 5000)) {
+            return;
+        }
+        if (orderNo) lastNotifWo = orderNo;
+        lastNotifTime = now;
+
         playNotificationSound(soundType);
-        showToast(`${title}: ${message}`, soundType === 'gl' ? 'success' : 'success');
-        showInAppFloatingNotification(title, message, targetWo);
+        showToast(`${title}: ${message}`, 'success');
+        
+        // Tampilkan Banner Notifikasi Mengambang di atas layar (Web & HP)
+        showFloatingNotification(title, message, orderNo);
         
         // Getar perangkat HP jika didukung
         if ("vibrate" in navigator) {
             try { navigator.vibrate([200, 100, 200]); } catch(e) {}
         }
 
-        // Tampilkan notifikasi banner di HP melalui Service Worker dengan tag statis tunggal
-        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        const cleanTitle = title || "Ada Orderan Masuk!";
+        const cleanBody = message || "Order baru siap divalidasi.";
+        const singleTag = 'portal-lifting-single-order-notif'; // Tag konsisten agar menimpa notifikasi lama
+
+        // Prioritas utama: Kirim via Service Worker agar diterima HP Android
+        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
             try {
                 navigator.serviceWorker.controller.postMessage({
-                    type: 'SHOW_NOTIFICATION',
                     action: 'SHOW_NOTIFICATION',
-                    title: title,
-                    body: message,
-                    tag: 'portal-lifting-single-order-notif',
-                    payload: {
-                        title: title,
-                        body: message,
-                        url: './'
-                    }
+                    type: 'SHOW_NOTIFICATION',
+                    title: cleanTitle,
+                    body: cleanBody,
+                    tag: singleTag,
+                    payload: { url: '/' }
                 });
+                return;
             } catch(e) {}
         }
 
-        // Tampilkan notifikasi sistem level OS Desktop
-        if ("Notification" in window && Notification.permission === "granted") {
+        // Fallback jika controller belum siap: showNotification via registration
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.ready.then(reg => {
+                if (reg && reg.showNotification && Notification.permission === "granted") {
+                    reg.showNotification(cleanTitle, {
+                        body: cleanBody,
+                        icon: "https://lh3.googleusercontent.com/d/1hQZopiZU-_bQC9aRmyZndlmEF--k4h5U",
+                        badge: "https://lh3.googleusercontent.com/d/1hQZopiZU-_bQC9aRmyZndlmEF--k4h5U",
+                        vibrate: [200, 100, 200],
+                        tag: singleTag,
+                        renotify: true,
+                        data: { url: '/' }
+                    });
+                }
+            }).catch(() => {});
+        } else if ("Notification" in window && Notification.permission === "granted") {
             try {
-                new Notification(title, {
-                    body: message,
-                    icon: "https://lh3.googleusercontent.com/d/1hQZopiZU-_bQC9aRmyZndlmEF--k4h5U",
-                    badge: "https://lh3.googleusercontent.com/d/1hQZopiZU-_bQC9aRmyZndlmEF--k4h5U",
-                    tag: 'portal-lifting-single-order-notif',
-                    renotify: true
+                new Notification(cleanTitle, {
+                    body: cleanBody,
+                    tag: singleTag,
+                    icon: "https://lh3.googleusercontent.com/d/1hQZopiZU-_bQC9aRmyZndlmEF--k4h5U"
                 });
             } catch(e) {}
+        }
+    }
+
+    /* ========================================================
+       SISTEM TOMBSTONE (PENGHAPUSAN PERMANEN AGAR TIDAK MUNCUL LAGI)
+       ======================================================== */
+    function getDeletedWos() {
+        try { return JSON.parse(localStorage.getItem('lifting_deleted_wos') || '[]'); } catch(e) { return []; }
+    }
+    function addDeletedWo(wo) {
+        if (!wo) return;
+        let list = getDeletedWos();
+        const woStr = String(wo).trim();
+        if (!list.includes(woStr)) {
+            list.push(woStr);
+            if (list.length > 250) list.shift();
+            localStorage.setItem('lifting_deleted_wos', JSON.stringify(list));
+        }
+    }
+    function getDeletedUsers() {
+        try { return JSON.parse(localStorage.getItem('lifting_deleted_users') || '[]'); } catch(e) { return []; }
+    }
+    function addDeletedUser(nrp) {
+        if (!nrp) return;
+        let list = getDeletedUsers();
+        const nrpStr = String(nrp).trim().toUpperCase();
+        if (!list.includes(nrpStr)) {
+            list.push(nrpStr);
+            if (list.length > 150) list.shift();
+            localStorage.setItem('lifting_deleted_users', JSON.stringify(list));
         }
     }
 
@@ -912,30 +885,34 @@
             const { eventType, new: newRecord, old: oldRecord } = payload;
             let changed = false;
             const currentUser = JSON.parse(localStorage.getItem('lifting_user'));
+            const deletedWos = getDeletedWos();
 
             if (eventType === 'INSERT' && newRecord && newRecord.no_wo) {
+                // Abaikan jika order ini sudah pernah dihapus oleh pengguna
+                if (deletedWos.includes(String(newRecord.no_wo).trim())) return;
+
                 const existingIdx = orders.findIndex(o => o.no_wo === newRecord.no_wo);
                 if (existingIdx === -1) {
                     orders.unshift(newRecord);
                     changed = true;
                     
-                    // Notifikasi untuk Admin & Group Leader (GL) saat order baru masuk
+                    // Notifikasi TUNGGAL untuk Admin & GL saat ada order masuk
                     if (currentUser) {
                         const curRole = String(currentUser.role || '').toUpperCase().trim();
                         const isGlOrAdmin = ['ADMIN', 'GL', 'GROUP LEADER', 'LEADER'].includes(curRole);
                         if (isGlOrAdmin) {
+                            const pemohon = newRecord.nama_pemohon ? ` dari ${newRecord.nama_pemohon}` : '';
                             triggerAppNotification(
                                 "Ada Orderan Masuk!",
-                                `Order ${newRecord.no_wo} dari ${newRecord.nama_pemohon || 'User'} siap divalidasi.`,
+                                `Order ${newRecord.no_wo}${pemohon} siap divalidasi.`,
                                 'gl',
                                 newRecord.no_wo
                             );
                         } else if (curRole === 'USER' && (newRecord.nrp_pemohon || '').toUpperCase() === (currentUser.nrp || '').toUpperCase()) {
-                            // Notifikasi ke User jika ada order lanjutan baru yang otomatis terbit untuk dirinya
                             if (newRecord.no_wo && newRecord.no_wo.includes('-L')) {
                                 triggerAppNotification(
-                                    "Order Lanjutan Diterbitkan!",
-                                    `Order ${newRecord.no_wo} (Pending) otomatis dibuat untuk melanjutkan pekerjaan Anda.`,
+                                    "Ada Orderan Masuk!",
+                                    `Order lanjutan ${newRecord.no_wo} diterbitkan.`,
                                     'gl',
                                     newRecord.no_wo
                                 );
@@ -947,6 +924,8 @@
                     changed = true;
                 }
             } else if (eventType === 'UPDATE' && newRecord && newRecord.no_wo) {
+                if (deletedWos.includes(String(newRecord.no_wo).trim())) return;
+
                 const idx = orders.findIndex(o => o.no_wo === newRecord.no_wo);
                 if (idx !== -1) {
                     orders[idx] = newRecord;
@@ -958,17 +937,7 @@
 
                 if (currentUser) {
                     const curRole = String(currentUser.role || '').toUpperCase().trim();
-                    const isGlOrAdmin = ['ADMIN', 'GL', 'GROUP LEADER', 'LEADER'].includes(curRole);
                     const isMP = ['MANPOWER', 'MP', 'OPERATOR', 'RIGGER'].includes(curRole);
-
-                    // Notifikasi jika ada order pending/butuh validasi ulang untuk GL & Admin
-                    if (isGlOrAdmin && ['PENDING', 'UNSCHEDULED', 'SCHEDULED'].includes(newRecord.status) && (!oldRecord || oldRecord.status !== newRecord.status)) {
-                        triggerAppNotification(
-                            "Order Butuh Tindakan!",
-                            `Order ${newRecord.no_wo} memerlukan penugasan atau validasi lanjutan.`,
-                            'gl'
-                        );
-                    }
 
                     // Notifikasi khusus Manpower (Operator & Rigger) berbasis NRP akun login
                     if (isMP) {
@@ -991,7 +960,6 @@
                         const oldRig1 = oldRecord ? normalizeName(oldRecord.rigger) : '';
                         const oldRig2 = oldRecord ? normalizeName(oldRecord.rigger2) : '';
 
-                        // Periksa apakah NRP akun kru yang login ditugaskan pada pekerjaan ini
                         const matchByNrp = (newOpNrp === currentNrp && newOpNrp !== oldOpNrp) ||
                                            (newRig1Nrp === currentNrp && newRig1Nrp !== oldRig1Nrp) ||
                                            (newRig2Nrp === currentNrp && newRig2Nrp !== oldRig2Nrp);
@@ -1005,9 +973,10 @@
 
                         if (newlyAssigned && isStatusActive) {
                             triggerAppNotification(
-                                "Penugasan Job Baru!",
-                                `Anda (${currentUser.nama_lengkap}) ditugaskan pada order ${newRecord.no_wo}. Segera selesaikan.`,
-                                'mp'
+                                "Ada Orderan Masuk!",
+                                `Job ${newRecord.no_wo} ditugaskan kepada Anda.`,
+                                'mp',
+                                newRecord.no_wo
                             );
                             openAssignedJobAlert(newRecord);
                         }
@@ -1015,6 +984,7 @@
                 }
             } else if (eventType === 'DELETE' && oldRecord) {
                 const targetWo = oldRecord.no_wo;
+                addDeletedWo(targetWo);
                 const prevLen = orders.length;
                 orders = orders.filter(o => o.no_wo !== targetWo);
                 if (orders.length !== prevLen) {
@@ -1092,36 +1062,6 @@
         } catch (e) {}
     }
 
-    function handleRealtimeUnitStatusChange(payload) {
-        try {
-            const map = getUnitStatusMap();
-            if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-                if (payload.new && payload.new.unit_code) {
-                    const u = payload.new;
-                    map[u.unit_code] = {
-                        unit_code: u.unit_code,
-                        is_active: u.is_active,
-                        status: u.is_active ? 'ACTIVE' : 'INACTIVE',
-                        alasan_off: u.alasan_off || '',
-                        reason: u.alasan_off || '',
-                        updated_by: u.updated_by || '',
-                        updated_at: u.updated_at || new Date().toISOString()
-                    };
-                    localStorage.setItem('lifting_unit_status', JSON.stringify(map));
-                    renderApp(true);
-                }
-            } else if (payload.eventType === 'DELETE') {
-                if (payload.old && payload.old.unit_code) {
-                    delete map[payload.old.unit_code];
-                    localStorage.setItem('lifting_unit_status', JSON.stringify(map));
-                    renderApp(true);
-                }
-            }
-        } catch(e) {
-            console.warn("Realtime unit_status error:", e);
-        }
-    }
-
     var isPreviewCanvas = window.self !== window.top || window.location.hostname.includes('usercontent.goog');
 
     let realtimeChannel = null;
@@ -1136,7 +1076,6 @@
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, handleRealtimeSettingsChange)
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, handleRealtimeUsersChange)
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'master_data' }, handleRealtimeMasterChange)
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'unit_status' }, handleRealtimeUnitStatusChange)
                 .subscribe((status) => {
                     console.log("Supabase Realtime Status:", status);
                 });
@@ -1165,61 +1104,69 @@
         if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
         lastFetchTimestamp = Date.now();
         try {
-            const [resOrders, resSettings, resUsers, resMaster, resUnitStatus] = await Promise.all([
+            const [resOrders, resSettings, resUsers, resMaster] = await Promise.all([
                 fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=timestamp.desc&limit=150`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }),
                 fetch(`${SUPABASE_URL}/rest/v1/settings?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }),
                 fetch(`${SUPABASE_URL}/rest/v1/users?select=*`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }),
-                fetch(`${SUPABASE_URL}/rest/v1/master_data?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }),
-                fetch(`${SUPABASE_URL}/rest/v1/unit_status?select=*`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }).catch(() => null)
+                fetch(`${SUPABASE_URL}/rest/v1/master_data?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } })
             ]);
 
             let shouldRender = false;
+            const deletedWos = getDeletedWos();
+            const deletedUsers = getDeletedUsers();
+            const currentUser = JSON.parse(localStorage.getItem('lifting_user'));
             
             if (resOrders.ok) { 
-                const data = await resOrders.json(); 
+                let data = await resOrders.json(); 
                 if(Array.isArray(data)) { 
-                    // Membersihkan sisa string Base64 foto_evidence lama dari memori
+                    // Filter keluar order yang sudah pernah dihapus agar tidak bangkit lagi
+                    data = data.filter(item => !deletedWos.includes(String(item.no_wo || '').trim()));
                     data.forEach(item => { if (item.foto_evidence) delete item.foto_evidence; });
+
+                    // Deteksi jika ada order baru masuk saat sinkronisasi polling
+                    let localOrders = getOrders();
+                    let localWoSet = new Set(localOrders.map(o => String(o.no_wo || '').trim()));
+                    let newlyArrived = data.filter(o => o.no_wo && !localWoSet.has(String(o.no_wo).trim()));
+
                     let ds = JSON.stringify(data); 
                     if(localStorage.getItem('lifting_orders') !== ds) { 
                         localStorage.setItem('lifting_orders', ds); 
                         shouldRender = true; 
+
+                        if (newlyArrived.length > 0 && currentUser) {
+                            const curRole = String(currentUser.role || '').toUpperCase().trim();
+                            const isGlOrAdmin = ['ADMIN', 'GL', 'GROUP LEADER', 'LEADER'].includes(curRole);
+                            if (isGlOrAdmin) {
+                                const newest = newlyArrived[0];
+                                const pemohon = newest.nama_pemohon ? ` dari ${newest.nama_pemohon}` : '';
+                                triggerAppNotification(
+                                    "Ada Orderan Masuk!",
+                                    `Order ${newest.no_wo}${pemohon} siap divalidasi.`,
+                                    'gl',
+                                    newest.no_wo
+                                );
+                            }
+                        }
                     } 
                 } 
             }
             if (resSettings.ok) { const data = await resSettings.json(); if(data && data.length > 0) { let ds = JSON.stringify(data[0]); if(localStorage.getItem('lifting_settings') !== ds) { localStorage.setItem('lifting_settings', ds); shouldRender = true; } } }
-            if (resUsers.ok) { const data = await resUsers.json(); if(Array.isArray(data) && data.length > 0) { let ds = JSON.stringify(data); if(localStorage.getItem('lifting_users') !== ds) { localStorage.setItem('lifting_users', ds); shouldRender = true; } } }
+            if (resUsers.ok) { 
+                let data = await resUsers.json(); 
+                if(Array.isArray(data) && data.length > 0) { 
+                    // Filter keluar user yang sudah pernah dihapus
+                    data = data.filter(u => !deletedUsers.includes(String(u.nrp || '').trim().toUpperCase()));
+                    let ds = JSON.stringify(data); 
+                    if(localStorage.getItem('lifting_users') !== ds) { 
+                        localStorage.setItem('lifting_users', ds); 
+                        shouldRender = true; 
+                    } 
+                } 
+            }
             if (resMaster.ok) { const data = await resMaster.json(); if(data && data.length > 0) { let ds = JSON.stringify(data[0]); if(localStorage.getItem('lifting_master_data') !== ds) { localStorage.setItem('lifting_master_data', ds); shouldRender = true; } } }
             
-            // Sinkronisasi tabel unit_status dari Supabase
-            if (resUnitStatus && resUnitStatus.ok) {
-                const udata = await resUnitStatus.json();
-                if (Array.isArray(udata)) {
-                    const map = getUnitStatusMap();
-                    udata.forEach(u => {
-                        if (u.unit_code) {
-                            map[u.unit_code] = {
-                                unit_code: u.unit_code,
-                                is_active: u.is_active,
-                                status: u.is_active ? 'ACTIVE' : 'INACTIVE',
-                                alasan_off: u.alasan_off || '',
-                                reason: u.alasan_off || '',
-                                updated_by: u.updated_by || '',
-                                updated_at: u.updated_at || ''
-                            };
-                        }
-                    });
-                    const dsUnit = JSON.stringify(map);
-                    if (localStorage.getItem('lifting_unit_status') !== dsUnit) {
-                        localStorage.setItem('lifting_unit_status', dsUnit);
-                        shouldRender = true;
-                    }
-                }
-            }
-
             if(isManual) { showToast("Data berhasil disinkronkan!", "success"); renderApp(false); }
             else if(shouldRender) { 
-                // Jangan me-render ulang saat pengguna sedang mengisi form order agar input tidak ter-reset
                 if (currentTab !== 'order') {
                     renderApp(true); 
                 }
@@ -1231,12 +1178,17 @@
         if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
         try {
             if (!orders || orders.length === 0) return;
-            // Sanitasi: Pastikan kolom foto_evidence dan string Base64 tidak ikut terkirim ke Supabase
-            const cleanOrders = orders.map(o => {
-                const copy = { ...o };
-                delete copy.foto_evidence;
-                return copy;
-            });
+            const deletedWos = getDeletedWos();
+            const cleanOrders = orders
+                .filter(o => !deletedWos.includes(String(o.no_wo || '').trim()))
+                .map(o => {
+                    const copy = { ...o };
+                    delete copy.foto_evidence;
+                    delete copy.has_photo;
+                    return copy;
+                });
+            if (cleanOrders.length === 0) return;
+
             await fetch(`${SUPABASE_URL}/rest/v1/orders?on_conflict=no_wo`, { 
                 method: 'POST', 
                 headers: { 
@@ -1445,12 +1397,7 @@
         const el = document.createElement('textarea');
         el.value = text; el.setAttribute('readonly', ''); el.style.position = 'absolute'; el.style.left = '-9999px';
         document.body.appendChild(el); el.select();
-        try { 
-            document.execCommand('copy'); 
-            showToast(label === 'Laporan' ? 'Laporan berhasil disalin!' : label + ' disalin!'); 
-        } catch (err) { 
-            showToast('Gagal menyalin', 'error'); 
-        }
+        try { document.execCommand('copy'); showToast(label + ' disalin!'); } catch (err) { showToast('Gagal menyalin', 'error'); }
         document.body.removeChild(el);
     }
 
@@ -1473,26 +1420,6 @@
         shiftEl.value = (h >= 5 && h < 17) ? 'Shift 1' : 'Shift 2';
     }
 
-    // Generator teks pelaporan progres lapangan dengan format strip (-)
-    function generateManpowerReportText(job) {
-        if (!job) return '';
-        let statusEmoji = job.status || '-';
-        if (job.status === 'COMPLETED') statusEmoji += ' ✅';
-        else if (job.status === 'PENDING') statusEmoji += ' ⏸️';
-        else if (job.status === 'CANCELED') statusEmoji += ' ❌';
-        else if (job.status === 'ON PROGRESS') statusEmoji += ' 🔄';
-
-        let telatClean = cleanKendalaText(job.alasan_telat || '');
-        let overClean = cleanKendalaText(job.alasan_overtime || '');
-        let kendalaStr = '';
-        if (telatClean && overClean) kendalaStr = `${telatClean} | ${overClean}`;
-        else if (telatClean) kendalaStr = telatClean;
-        else if (overClean) kendalaStr = overClean;
-        else kendalaStr = '-';
-
-        return `*PELAPORAN PROGRES JOB LIFTING*\n- *NO WO :* ${job.no_wo || '-'}\n- *STATUS :* ${statusEmoji}\n- *NAMA JOB :* ${job.deskripsi || '-'}\n- *JAM START :* ${job.jam_start_aktual || '-'}\n- *JAM FINISH :* ${job.jam_end_aktual || '-'}\n- *NO. UNIT :* ${job.unit || '-'}\n- *NAMA OPERATOR :* ${job.operator || '-'}\n- *NAMA RIGGER :* ${job.rigger || '-'}${job.rigger2 ? ', ' + job.rigger2 : ''}\n- *FINAL INSPEKSI :* ${job.final_inspeksi || '-'}\n- *KENDALA :* ${kendalaStr}`;
-    }
-
     function copyJobToWA(wo, forceDetail = false) {
         let job = getOrders().find(j => j.no_wo === wo);
         if(!job) return;
@@ -1511,15 +1438,23 @@
 
         let detailFormat = `*DETAIL JOB LIFTING*\n• *NO WO :* ${job.no_wo || '-'}\n• *ORDER UNIT :* ${unitText}\n• *STATUS :* ${statusEmoji}\n• *PEMOHON :* ${job.nama_pemohon || '-'}\n• *PERUSAHAAN :* ${job.perusahaan || '-'}\n• *DEPARTEMEN :* ${job.departemen || '-'}\n• *SECTION :* ${job.section || '-'}\n• *KONTAK WA :* ${job.no_wa || '-'}\n• *TANGGAL :* ${job.tgl_pelaksanaan || '-'}\n• *REQ JAM :* ${job.jam_pelaksanaan || '-'}\n• *LOKASI :* ${job.lokasi_angkat || '-'}\n• *TUJUAN :* ${job.lokasi_tujuan || '-'}\n• *DESKRIPSI :* ${job.deskripsi || '-'}`;
 
-        let mpFormat = generateManpowerReportText(job);
+        // Pembersihan presisi: Mencegah timbulnya teks ganda "Telat : Telat" atau "Over : Over"
+        let telatClean = cleanKendalaText(job.alasan_telat || '');
+        let overClean = cleanKendalaText(job.alasan_overtime || '');
+        let kendalaStr = '';
+        if (telatClean && overClean) kendalaStr = `${telatClean} | ${overClean}`;
+        else if (telatClean) kendalaStr = telatClean;
+        else if (overClean) kendalaStr = overClean;
+        else kendalaStr = '-';
+
+        let mpFormat = `*PELAPORAN PROGRES JOB LIFTING*\n• *NO WO :* ${job.no_wo || '-'}\n• *STATUS :* ${statusEmoji}\n• *NAMA JOB :* ${job.deskripsi || '-'}\n• *JAM START :* ${job.jam_start_aktual || '-'}\n• *JAM FINISH :* ${job.jam_end_aktual || '-'}\n• *NO. UNIT :* ${job.unit || '-'}\n• *NAMA OPERATOR :* ${job.operator || '-'}\n• *NAMA RIGGER :* ${job.rigger || '-'}${job.rigger2 ? ', ' + job.rigger2 : ''}\n• *FINAL INSPEKSI :* ${job.final_inspeksi || '-'}\n• *KENDALA :* ${kendalaStr}`;
 
         if (forceDetail || (currentUser && currentUser.role === 'USER') || job.status === 'SCHEDULED' || job.status === 'UNSCHEDULED') {
             waText = detailFormat;
-            copyText(waText, 'Job WA');
         } else {
             waText = mpFormat; 
-            copyText(waText, 'Laporan');
         }
+        copyText(waText, 'Job WA');
     }
 
     function generateWO(kategori) {
@@ -1560,376 +1495,419 @@
     }
 
     function renderApp(isSilentSync = false) {
-        const app = document.getElementById('app');
-        const user = JSON.parse(localStorage.getItem('lifting_user'));
-        const settings = getSettings();
+        try {
+            const app = document.getElementById('app');
+            if (!app) return;
+            const user = JSON.parse(localStorage.getItem('lifting_user'));
+            const settings = getSettings();
 
-        if (!user) { app.innerHTML = getAuthView(); return; }
-        const isMobile = window.innerWidth < 768;
-        
-        const animClass = isSilentSync ? '' : 'page-flip-anim';
-        const logoHtmlMobile = settings.logo_url ? `<img src="${settings.logo_url}" alt="Logo" class="w-8 h-8 sm:w-10 sm:h-10 object-contain">` : `<div class="bg-cyan-600 text-white p-2 rounded-sm flex items-center justify-center shadow-sm"><i class="fa-solid fa-truck-moving text-base"></i></div>`;
+            if (!user) { app.innerHTML = getAuthView(); return; }
+            const isMobile = window.innerWidth < 768;
+            
+            const animClass = isSilentSync ? '' : 'page-flip-anim';
+            const logoHtmlMobile = settings.logo_url ? `<img src="${settings.logo_url}" alt="Logo" class="w-8 h-8 sm:w-10 sm:h-10 object-contain">` : `<div class="bg-cyan-600 text-white p-2 rounded-sm flex items-center justify-center shadow-sm"><i class="fa-solid fa-truck-moving text-base"></i></div>`;
 
-        app.innerHTML = `
-            <div class="flex h-screen bg-slate-50 overflow-hidden">
-                ${!isMobile ? getDesktopSidebar(user, settings) : ''}
-                <div class="flex-1 flex flex-col h-screen overflow-hidden relative">
-                    ${isMobile ? `
-                    <div class="bg-white shadow-sm px-4 py-3 flex items-center justify-between shrink-0 z-10 border-b border-slate-200">
-                        <div class="flex items-center gap-2 text-cyan-700 font-bold text-base sm:text-lg uppercase tracking-tight">
-                            ${logoHtmlMobile}
-                            <div class="flex flex-col leading-none">
-                                <span>${user.role === 'MANPOWER' ? 'PANEL LAPANGAN' : 'SUPPORT EQUIPMENT'}</span>
-                                <span class="text-[9px] text-cyan-500 mt-0.5 font-semibold">PT Putra Perkasa Abadi</span>
-                            </div>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <!-- TOMBOL LONCENG NOTIFIKASI MOBILE -->
-                            <button onclick="toggleNotifDropdown()" class="relative p-1.5 text-slate-600 hover:text-cyan-700 rounded-full hover:bg-slate-100 transition-colors focus:outline-none" title="Notifikasi Pekerjaan">
-                                <i class="fa-solid fa-bell text-base"></i>
-                                <span class="notif-badge-indicator hidden absolute -top-0.5 -right-0.5 bg-rose-600 text-white text-[9px] font-black px-1 min-w-[16px] h-[16px] rounded-full flex items-center justify-center border-2 border-white shadow-xs animate-pulse">0</span>
-                            </button>
-                            <span class="text-[10px] sm:text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200 px-2 py-1 rounded-md">${user.nama_lengkap}</span>
-                        </div>
-                    </div>` : ''}
-                    
-                    <div class="flex-1 overflow-y-auto p-2 sm:p-2.5 pb-24 sm:pb-2 relative w-full flex flex-col min-h-0 hide-scrollbar ${animClass}">
-                        ${currentTab === 'dashboard' && (user.role === 'ADMIN' || user.role === 'GL') ? getDashboardView() : ''}
-                        ${currentTab === 'monitoring' ? (user.role === 'MANPOWER' ? getManpowerWorkflow() : getMonitoringView()) : ''}
-                        ${currentTab === 'order' ? getOrderFormView() : ''}
-                        ${currentTab === 'jadwal' && (user.role === 'ADMIN' || user.role === 'GL') ? getKalenderBcView() : ''}
-                        ${currentTab === 'master' && user.role === 'ADMIN' ? getMasterDataView() : ''}
-                        ${currentTab === 'profile' ? getProfileView() : ''}
-                    </div>
-                    ${isMobile ? getMobileNav(user) : ''}
-                </div>
-            </div>
-
-            <!-- DROPDOWN GLOBAL LONCENG NOTIFIKASI -->
-            <div id="globalNotifDropdown" class="hidden fixed top-14 right-4 w-80 max-w-[90vw] bg-white rounded-xl shadow-2xl border border-slate-200 z-[160] overflow-hidden">
-                <div class="p-3 bg-cyan-700 text-white flex justify-between items-center text-xs font-bold">
-                    <span><i class="fa-solid fa-inbox mr-1"></i> Orderan Belum Dibuka</span>
-                    <button onclick="markAllOrdersOpened()" class="text-[10px] text-cyan-200 hover:underline font-normal cursor-pointer">Tandai sudah dibaca</button>
-                </div>
-                <div id="notifDropdownList" class="max-h-64 overflow-y-auto divide-y divide-slate-100 text-xs">
-                    <div class="p-4 text-center text-slate-400 italic">Semua orderan sudah dibuka</div>
-                </div>
-            </div>
-
-            <!-- ALL GLOBAL MODALS -->
-            <div id="imageViewerModal" class="fixed inset-0 bg-black/95 z-[150] hidden flex items-center justify-center p-2" onclick="this.classList.add('hidden')">
-                <img id="viewerImage" src="" class="max-w-full max-h-[90vh] object-contain cursor-zoom-out rounded-sm shadow-2xl transition-transform duration-300" onclick="event.stopPropagation()">
-                <button class="absolute top-4 right-4 text-white text-3xl opacity-70 hover:opacity-100 transition-opacity"><i class="fa-solid fa-times"></i></button>
-            </div>
-
-            <!-- MODAL UBAH STATUS OPERASIONAL UNIT (ADMIN / GL) -->
-            <div id="unitStatusModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[140] hidden p-3">
-                <div class="bg-white rounded-xl shadow-2xl w-full max-w-[320px] overflow-hidden flex flex-col">
-                    <div class="p-3.5 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
-                        <h3 class="font-bold text-slate-800 text-xs flex items-center gap-1.5">
-                            <i class="fa-solid fa-truck-pickup text-cyan-600"></i>
-                            <span id="unitStatusModalTitle">Status Unit: -</span>
-                        </h3>
-                        <button onclick="document.getElementById('unitStatusModal').classList.add('hidden')" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-sm"></i></button>
-                    </div>
-                    <form onsubmit="submitUnitStatusChange(event)" class="p-4 space-y-3">
-                        <input type="hidden" id="targetUnitName">
-                        <div>
-                            <label class="block text-[10px] font-bold text-slate-600 mb-1">Status Operasi</label>
-                            <select id="unitStatusSelect" class="w-full border border-slate-300 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-cyan-500 font-semibold bg-white cursor-pointer" onchange="toggleUnitReasonField()">
-                                <option value="ACTIVE">Aktif (Siap Beroperasi)</option>
-                                <option value="INACTIVE">Non-Aktif / Breakdown</option>
-                            </select>
-                        </div>
-                        <div id="unitReasonWrapper">
-                            <label class="block text-[10px] font-bold text-red-600 mb-1">Keterangan / Alasan Non-Aktif *</label>
-                            <textarea id="unitStatusReason" class="w-full border border-red-300 bg-red-50/20 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-red-500 h-16" placeholder="Ketik alasan (contoh: Breakdown boom, servis berkala, dll)..."></textarea>
-                        </div>
-                        <div class="flex gap-2 pt-1">
-                            <button type="button" onclick="document.getElementById('unitStatusModal').classList.add('hidden')" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 rounded-md text-xs transition-colors">Batal</button>
-                            <button type="submit" class="flex-1 bg-[#0891b2] hover:bg-cyan-700 text-white font-bold py-2 rounded-md text-xs transition-colors shadow">Simpan Status</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-
-            <!-- MODAL ALERT PENUGASAN BARU KHUSUS KRU MP (OPERATOR & RIGGER) -->
-            <div id="assignedJobModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex justify-center items-center z-[160] hidden p-4">
-                <div class="bg-white rounded-2xl shadow-2xl w-full max-w-[320px] p-5 text-center animate-pop-in flex flex-col items-center border border-cyan-100">
-                    <div class="w-14 h-14 rounded-full bg-cyan-100 text-cyan-600 flex items-center justify-center text-2xl mb-3 shadow-inner">
-                        <i class="fa-solid fa-bell animate-bounce"></i>
-                    </div>
-                    <h3 class="text-sm font-black text-slate-800 uppercase tracking-tight">Penugasan Job Baru!</h3>
-                    <p class="text-[11px] text-slate-600 mt-1 font-medium leading-relaxed">
-                        Anda mendapatkan job baru, segera selesaikan. Terimakasih.
-                    </p>
-                    <div class="w-full bg-cyan-50/80 border border-cyan-200 rounded-lg p-2.5 my-3 text-left">
-                        <div class="text-[10px] text-slate-500 font-bold">NO WO: <span id="assignModalWo" class="font-mono text-cyan-700 font-black"></span></div>
-                        <div class="text-[10px] text-slate-700 font-bold mt-0.5">Unit: <span id="assignModalUnit" class="text-cyan-800"></span></div>
-                        <div class="text-[9px] text-slate-500 truncate mt-0.5" id="assignModalDeskripsi"></div>
-                    </div>
-                    <button id="assignModalBtnDetail" class="w-full bg-[#0891b2] hover:bg-cyan-700 text-white font-bold py-2 rounded-lg text-xs transition-colors shadow-md flex items-center justify-center gap-1.5">
-                        <i class="fa-solid fa-eye text-xs"></i> Buka Rincian Job
-                    </button>
-                </div>
-            </div>
-
-            <div id="dayJobsModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[130] hidden p-3">
-                <div class="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden flex flex-col max-h-[90vh]">
-                    <div class="p-3 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
-                        <h3 class="font-bold text-slate-800 text-xs" id="dayJobsTitle">Jadwal Tanggal</h3>
-                        <button onclick="document.getElementById('dayJobsModal').classList.add('hidden')" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-base"></i></button>
-                    </div>
-                    <div class="p-3 overflow-y-auto hide-scrollbar bg-slate-50/50 min-h-[100px]" id="dayJobsContent"></div>
-                </div>
-            </div>
-
-            <div id="globalConfirmModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[140] hidden p-3">
-                <div class="bg-white rounded-md shadow-xl w-full max-w-[280px] overflow-hidden flex flex-col">
-                    <div class="p-4 text-center border-b border-slate-100 shrink-0">
-                        <div class="w-10 h-10 rounded-full border-[3px] border-orange-200 text-orange-500 flex items-center justify-center mx-auto mb-2 text-xl font-bold"><i class="fa-solid fa-question"></i></div>
-                        <h2 class="text-xs font-bold text-slate-700" id="confirmTitle">Konfirmasi</h2>
-                        <p class="text-[10px] text-slate-500 mt-1" id="confirmMessage">Apakah Anda yakin?</p>
-                    </div>
-                    <div class="flex gap-0" id="confirmButtons"></div>
-                </div>
-            </div>
-
-            <div id="editJobModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[120] hidden p-3">
-                <div class="bg-white rounded-md shadow-xl w-full max-w-sm overflow-hidden flex flex-col max-h-[90vh]">
-                    <div class="p-3 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
-                        <h3 class="font-bold text-slate-800 text-xs"><i class="fa-solid fa-pen-to-square mr-1.5 text-cyan-600"></i>Edit / Validasi Job</h3>
-                        <button onclick="document.getElementById('editJobModal').classList.add('hidden')" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-sm"></i></button>
-                    </div>
-                    <div class="p-3 overflow-y-auto hide-scrollbar" id="editJobContent"></div>
-                </div>
-            </div>
-
-            <div id="detailJobModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[120] hidden p-3">
-                <div class="bg-white rounded-md shadow-xl w-full max-w-sm overflow-hidden flex flex-col max-h-[90vh]">
-                    <div class="p-2 border-b border-slate-200 flex justify-between items-center shrink-0">
-                        <h3 class="font-bold text-slate-800 text-xs">Detail Pekerjaan</h3>
-                        <button onclick="document.getElementById('detailJobModal').classList.add('hidden'); event.stopPropagation();" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-sm"></i></button>
-                    </div>
-                    <div class="p-3 overflow-y-auto hide-scrollbar" id="detailJobContent"></div>
-                </div>
-            </div>
-
-            <div id="mpActionModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[120] hidden p-3">
-                <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm sm:max-w-md overflow-hidden flex flex-col max-h-[92vh]">
-                    <div class="p-3 text-center border-b border-slate-100 shrink-0 relative bg-slate-50">
-                        <button onclick="document.getElementById('mpActionModal').classList.add('hidden')" class="absolute top-3 right-3 text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-sm"></i></button>
-                        <h2 class="text-sm font-bold text-slate-800 tracking-tight mt-0.5" id="mpActionTitle">Progres Pekerjaan</h2>
-                    </div>
-                    <div class="p-3.5 overflow-y-auto hide-scrollbar" id="mpActionContent"></div>
-                </div>
-            </div>
-
-            <div id="kendalaModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex justify-center items-center z-[130] hidden p-3">
-                <div class="bg-white rounded-xl shadow-2xl w-full max-w-[320px] overflow-hidden flex flex-col">
-                    <div class="p-4 border-b border-slate-100 text-center shrink-0">
-                        <h2 class="text-sm font-bold text-slate-800 tracking-tight">Kendala Waktu Terdeteksi!</h2>
-                        <p class="text-[10px] text-slate-500 mt-0.5">Waktu aktual melebihi batas toleransi yang ditentukan.</p>
-                    </div>
-                    <div class="p-4 overflow-y-auto hide-scrollbar" id="kendalaContent"></div>
-                </div>
-            </div>
-
-            <div id="cancelPromptModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex justify-center items-center z-[130] hidden p-3">
-                <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col max-h-[92vh]">
-                    <div class="p-3 text-center border-b border-slate-100 shrink-0 relative bg-slate-50">
-                        <button onclick="document.getElementById('cancelPromptModal').classList.add('hidden')" class="absolute top-3 right-3 text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-sm"></i></button>
-                        <h2 class="text-sm font-bold text-red-600 tracking-tight flex items-center justify-center gap-1.5">
-                            <i class="fa-solid fa-triangle-exclamation"></i> Batalkan Job
-                        </h2>
-                    </div>
-                    <div class="p-3.5 overflow-y-auto hide-scrollbar" id="cancelPromptContent"></div>
-                </div>
-            </div>
-
-            <div id="resetPwdModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[140] hidden p-3">
-                <div class="bg-white rounded-md shadow-xl w-full max-w-[260px] overflow-hidden">
-                    <div class="p-2 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                        <h3 class="font-bold text-slate-800 text-xs">Reset Password Pengguna</h3>
-                        <button onclick="document.getElementById('resetPwdModal').classList.add('hidden')" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-xs"></i></button>
-                    </div>
-                    <form onsubmit="processResetPassword(event)" class="p-3 space-y-2">
-                        <p class="text-[9px] text-slate-500 mb-1">NRP Target: <strong id="resetNrpLabel" class="text-slate-800"></strong></p>
-                        <input type="hidden" id="resetNrpVal">
-                        <div class="relative">
-                            <input type="password" id="resetPwdInput" placeholder="Password Baru" class="w-full border border-slate-300 rounded-sm px-2 py-1 pr-6 text-[10px] focus:outline-none focus:border-cyan-500" required>
-                            <i id="toggleResetPwd" class="fa-regular fa-eye absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer pwd-toggle text-[9px]" onclick="togglePassword('resetPwdInput', 'toggleResetPwd')"></i>
-                        </div>
-                        <button type="submit" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-1.5 rounded-sm text-[10px] mt-1">Simpan Password</button>
-                    </form>
-                </div>
-            </div>
-
-            <!-- Profile Biodata Modal -->
-            <div id="profileBiodataModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[140] hidden p-3">
-                <div class="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden flex flex-col max-h-[90vh]">
-                    <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
-                        <h3 class="font-bold text-slate-800 text-sm"><i class="fa-solid fa-id-card mr-2 text-emerald-600"></i>Identitas Saya</h3>
-                        <button onclick="document.getElementById('profileBiodataModal').classList.add('hidden')" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-base"></i></button>
-                    </div>
-                    <div class="p-4 overflow-y-auto hide-scrollbar">
-                        <form onsubmit="saveProfile(event)" class="space-y-3">
-                            <div class="grid grid-cols-2 gap-2">
-                                <div>
-                                    <label class="block text-[10px] font-bold text-slate-500 mb-1">NRP</label>
-                                    <input type="text" id="profNrp" value="${user.nrp || ''}" class="w-full border border-slate-200 bg-slate-50 rounded-md px-3 py-2 text-[10px] text-slate-500 cursor-not-allowed font-semibold" readonly>
-                                </div>
-                                <div>
-                                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Nama Lengkap</label>
-                                    <input type="text" id="profName" value="${user.nama_lengkap || ''}" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-md px-3 py-2 text-[10px] focus:outline-none focus:border-cyan-500" required>
+            app.innerHTML = `
+                <div class="flex h-screen bg-slate-50 overflow-hidden">
+                    ${!isMobile ? getDesktopSidebar(user, settings) : ''}
+                    <div class="flex-1 flex flex-col h-screen overflow-hidden relative">
+                        ${isMobile ? `
+                        <div class="bg-white shadow-sm px-4 py-3 flex items-center justify-between shrink-0 z-10 border-b border-slate-200">
+                            <div class="flex items-center gap-2 text-cyan-700 font-bold text-base sm:text-lg uppercase tracking-tight">
+                                ${logoHtmlMobile}
+                                <div class="flex flex-col leading-none">
+                                    <span>${user.role === 'MANPOWER' ? 'PANEL LAPANGAN' : 'SUPPORT EQUIPMENT'}</span>
+                                    <span class="text-[9px] text-cyan-500 mt-0.5 font-semibold">PT Putra Perkasa Abadi</span>
                                 </div>
                             </div>
-                            
-                            <div class="grid grid-cols-2 gap-2">
-                                <div>
-                                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Jabatan</label>
-                                    <input type="text" id="profJabatan" value="${user.jabatan || ''}" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-md px-3 py-2 text-[10px] focus:outline-none focus:border-cyan-500" required>
-                                </div>
-                                <div>
-                                    <label class="block text-[10px] font-bold text-slate-500 mb-1">No WhatsApp</label>
-                                    <input type="number" id="profWa" value="${user.no_wa || ''}" class="w-full border border-slate-300 rounded-md px-3 py-2 text-[10px] focus:outline-none focus:border-cyan-500" required>
-                                </div>
+                            <div class="flex items-center gap-2">
+                                <!-- TOMBOL LONCENG NOTIFIKASI MOBILE -->
+                                <button onclick="toggleNotifDropdown()" class="relative p-1.5 text-slate-600 hover:text-cyan-700 rounded-full hover:bg-slate-100 transition-colors focus:outline-none" title="Notifikasi Pekerjaan">
+                                    <i class="fa-solid fa-bell text-base"></i>
+                                    <span class="notif-badge-indicator hidden absolute -top-0.5 -right-0.5 bg-rose-600 text-white text-[9px] font-black px-1 min-w-[16px] h-[16px] rounded-full flex items-center justify-center border-2 border-white shadow-xs animate-pulse">0</span>
+                                </button>
+                                <span class="text-[10px] sm:text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200 px-2 py-1 rounded-md">${user.nama_lengkap}</span>
                             </div>
-                            
-                            <div class="space-y-2">
-                                <div>
-                                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Perusahaan</label>
-                                    <select id="profPerusahaan" class="w-full border border-slate-300 rounded-md px-3 py-2 text-[10px] focus:outline-none focus:border-cyan-500 bg-white cursor-pointer" required></select>
-                                </div>
-                                <div>
-                                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Departemen</label>
-                                    <select id="profDepartemen" class="w-full border border-slate-300 rounded-md px-3 py-2 text-[10px] focus:outline-none focus:border-cyan-500 bg-white cursor-pointer" required></select>
-                                </div>
-                                <div>
-                                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Section</label>
-                                    <select id="profSection" class="w-full border border-slate-300 rounded-md px-3 py-2 text-[10px] focus:outline-none focus:border-cyan-500 bg-white cursor-pointer" required></select>
-                                </div>
+                        </div>` : ''}
+                        
+                        <div class="flex-1 overflow-y-auto p-2 sm:p-2.5 pb-24 sm:pb-2 relative w-full flex flex-col min-h-0 hide-scrollbar ${animClass}">
+                            ${currentTab === 'dashboard' && (user.role === 'ADMIN' || user.role === 'GL') ? getDashboardView() : ''}
+                            ${currentTab === 'monitoring' ? (user.role === 'MANPOWER' ? getManpowerWorkflow() : getMonitoringView()) : ''}
+                            ${currentTab === 'order' ? getOrderFormView() : ''}
+                            ${currentTab === 'jadwal' && (user.role === 'ADMIN' || user.role === 'GL') ? getKalenderBcView() : ''}
+                            ${currentTab === 'master' && user.role === 'ADMIN' ? getMasterDataView() : ''}
+                            ${currentTab === 'profile' ? getProfileView() : ''}
+                        </div>
+                        ${isMobile ? getMobileNav(user) : ''}
+                    </div>
+                </div>
+
+                <!-- BANNER NOTIFIKASI MENGAMBANG (IN-APP FLOATING HEADS-UP CARD) -->
+                <div id="inAppFloatingNotif" class="hidden fixed top-3 left-3 right-3 sm:left-auto sm:right-4 sm:w-96 z-[260] transform -translate-y-full opacity-0 transition-all duration-300 ease-out pointer-events-auto">
+                    <div onclick="onFloatingNotifClick()" class="bg-[#262c33]/95 backdrop-blur-md text-white p-3 rounded-2xl shadow-2xl border border-white/10 flex items-start gap-3 cursor-pointer hover:bg-[#2e353e] transition-colors active:scale-98">
+                        <div class="w-9 h-9 rounded-full bg-red-600 flex items-center justify-center shrink-0 border border-white/20 shadow-md">
+                            <img src="https://lh3.googleusercontent.com/d/1hQZopiZU-_bQC9aRmyZndlmEF--k4h5U" class="w-6 h-6 object-contain" onerror="this.onerror=null; this.innerHTML='<i class=\'fa-solid fa-truck-moving text-white text-xs\'></i>'">
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center justify-between gap-1">
+                                <h4 class="text-xs font-bold text-white tracking-tight" id="floatingNotifTitle">Ada Orderan Masuk!</h4>
+                                <span class="text-[9px] text-slate-400 font-normal shrink-0">Sekarang</span>
                             </div>
-                            
-                            <button type="submit" class="w-full bg-[#0891b2] hover:bg-cyan-700 text-white font-bold py-2.5 rounded-md text-xs mt-4 transition-colors shadow-md">Simpan Perubahan Profil</button>
+                            <p class="text-[11px] text-slate-200 mt-0.5 leading-snug line-clamp-2" id="floatingNotifBody">
+                                Order siap divalidasi.
+                            </p>
+                        </div>
+                        <button onclick="event.stopPropagation(); closeFloatingNotification();" class="text-slate-400 hover:text-white p-1 -mr-1 -mt-1 text-xs" title="Tutup">
+                            <i class="fa-solid fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- DROPDOWN GLOBAL LONCENG NOTIFIKASI -->
+                <div id="globalNotifDropdown" class="hidden fixed top-14 right-4 w-80 max-w-[90vw] bg-white rounded-xl shadow-2xl border border-slate-200 z-[160] overflow-hidden">
+                    <div class="p-3 bg-cyan-700 text-white flex justify-between items-center text-xs font-bold">
+                        <span><i class="fa-solid fa-inbox mr-1"></i> Orderan Belum Dibuka</span>
+                        <button onclick="markAllOrdersOpened()" class="text-[10px] text-cyan-200 hover:underline font-normal cursor-pointer">Tandai sudah dibaca</button>
+                    </div>
+                    <div id="notifDropdownList" class="max-h-64 overflow-y-auto divide-y divide-slate-100 text-xs">
+                        <div class="p-4 text-center text-slate-400 italic">Semua orderan sudah dibuka</div>
+                    </div>
+                </div>
+
+                <!-- ALL GLOBAL MODALS -->
+                <div id="imageViewerModal" class="fixed inset-0 bg-black/95 z-[150] hidden flex items-center justify-center p-2" onclick="this.classList.add('hidden')">
+                    <img id="viewerImage" src="" class="max-w-full max-h-[90vh] object-contain cursor-zoom-out rounded-sm shadow-2xl transition-transform duration-300" onclick="event.stopPropagation()">
+                    <button class="absolute top-4 right-4 text-white text-3xl opacity-70 hover:opacity-100 transition-opacity"><i class="fa-solid fa-times"></i></button>
+                </div>
+
+                <!-- MODAL UBAH STATUS OPERASIONAL UNIT (ADMIN / GL) -->
+                <div id="unitStatusModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[140] hidden p-3">
+                    <div class="bg-white rounded-xl shadow-2xl w-full max-w-[320px] overflow-hidden flex flex-col">
+                        <div class="p-3.5 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
+                            <h3 class="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                                <i class="fa-solid fa-truck-pickup text-cyan-600"></i>
+                                <span id="unitStatusModalTitle">Status Unit: -</span>
+                            </h3>
+                            <button onclick="document.getElementById('unitStatusModal').classList.add('hidden')" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-sm"></i></button>
+                        </div>
+                        <form onsubmit="submitUnitStatusChange(event)" class="p-4 space-y-3">
+                            <input type="hidden" id="targetUnitName">
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-600 mb-1">Status Operasi</label>
+                                <select id="unitStatusSelect" class="w-full border border-slate-300 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-cyan-500 font-semibold bg-white cursor-pointer" onchange="toggleUnitReasonField()">
+                                    <option value="ACTIVE">Aktif (Siap Beroperasi)</option>
+                                    <option value="INACTIVE">Non-Aktif / Breakdown</option>
+                                </select>
+                            </div>
+                            <div id="unitReasonWrapper">
+                                <label class="block text-[10px] font-bold text-red-600 mb-1">Keterangan / Alasan Non-Aktif *</label>
+                                <textarea id="unitStatusReason" class="w-full border border-red-300 bg-red-50/20 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-red-500 h-16" placeholder="Ketik alasan (contoh: Breakdown boom, servis berkala, dll)..."></textarea>
+                            </div>
+                            <div class="flex gap-2 pt-1">
+                                <button type="button" onclick="document.getElementById('unitStatusModal').classList.add('hidden')" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 rounded-md text-xs transition-colors">Batal</button>
+                                <button type="submit" class="flex-1 bg-[#0891b2] hover:bg-cyan-700 text-white font-bold py-2 rounded-md text-xs transition-colors shadow">Simpan Status</button>
+                            </div>
                         </form>
                     </div>
                 </div>
-            </div>
 
-            <!-- Modal Pengaturan (Ukuran Teks & Keamanan Password) -->
-            <div id="profileSettingsModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[140] hidden p-3">
-                <div class="bg-white rounded-xl shadow-xl w-full max-w-[340px] overflow-hidden flex flex-col max-h-[90vh]">
-                    <div class="p-3.5 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
-                        <h3 class="font-bold text-slate-800 text-xs sm:text-sm flex items-center gap-2">
-                            <i class="fa-solid fa-gear text-cyan-600"></i>Pengaturan Aplikasi
-                        </h3>
-                        <button onclick="document.getElementById('profileSettingsModal').classList.add('hidden')" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-sm"></i></button>
-                    </div>
-                    <div class="p-4 overflow-y-auto hide-scrollbar space-y-4">
-                        <!-- PENGATURAN UKURAN TEKS (MODEL GARIS SLIDER A ───●─── A) -->
-                        <div>
-                            <label class="block text-[11px] font-bold text-slate-700 mb-1 flex items-center gap-1.5">
-                                <i class="fa-solid fa-font text-cyan-600"></i> Ukuran Teks Tampilan
-                            </label>
-                            <p class="text-[9px] text-slate-400 mb-3">Geser atau ketuk garis untuk menyesuaikan ukuran teks:</p>
-                            
-                            <div class="bg-slate-50 border border-slate-200 rounded-xl p-3.5">
-                                <div class="flex items-center justify-between select-none">
-                                    <span onclick="setAppFontSizeByStep(0)" class="text-xs font-semibold text-slate-600 cursor-pointer hover:text-emerald-600 transition-colors w-5 text-center leading-none" title="Kecil">A</span>
-                                    
-                                    <!-- Jalur Slider Interaktif -->
-                                    <div class="relative flex-1 mx-3 h-6 flex items-center cursor-pointer">
-                                        <!-- Garis Abu-abu (Background) -->
-                                        <div class="absolute w-full h-[2px] bg-slate-300 rounded-full"></div>
-                                        
-                                        <!-- Garis Hijau (Progress dari kiri ke titik) -->
-                                        <div id="fontSliderActiveLine" class="absolute h-[2px] bg-emerald-500 rounded-full transition-all duration-200" style="width: 0%; left: 0;"></div>
-                                        
-                                        <!-- 3 Titik Penanda (Ticks) -->
-                                        <div class="absolute w-full flex justify-between items-center pointer-events-none px-0">
-                                            <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-                                            <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-                                            <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-                                        </div>
-                                        
-                                        <!-- Tombol Titik Bulat Hijau (Thumb Knob) -->
-                                        <div id="fontSliderThumb" class="absolute w-4 h-4 bg-emerald-500 rounded-full shadow transition-all duration-200 -ml-2 top-1/2 -translate-y-1/2 border-2 border-white ring-1 ring-emerald-500 pointer-events-none" style="left: 0%;"></div>
-
-                                        <!-- Input Range Transparan untuk Geser & Sentuh -->
-                                        <input type="range" id="fontSizeRangeInput" min="0" max="2" step="1" value="0" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" oninput="handleRangeSliderChange(this.value)">
-                                    </div>
-
-                                    <span onclick="setAppFontSizeByStep(2)" class="text-base font-bold text-slate-800 cursor-pointer hover:text-emerald-600 transition-colors w-5 text-center leading-none" title="Besar">A</span>
-                                </div>
-
-                                <!-- Label Keterangan Ukuran -->
-                                <div class="flex justify-between text-[10px] text-slate-400 font-medium px-4 mt-2 select-none">
-                                    <span id="fontLabel_0" class="cursor-pointer" onclick="setAppFontSizeByStep(0)">Kecil</span>
-                                    <span id="fontLabel_1" class="cursor-pointer" onclick="setAppFontSizeByStep(1)">Sedang (25%)</span>
-                                    <span id="fontLabel_2" class="cursor-pointer" onclick="setAppFontSizeByStep(2)">Besar (50%)</span>
-                                </div>
-                            </div>
-
-                            <div class="bg-white border border-slate-200 rounded-lg p-2.5 mt-2.5 text-center shadow-2xs">
-                                <p id="fontSizePreviewText" class="text-slate-600 font-medium leading-tight">
-                                    Ukuran teks Kecil (Standar bawaan sistem).
-                                </p>
-                            </div>
+                <!-- MODAL ALERT PENUGASAN BARU KHUSUS KRU MP (OPERATOR & RIGGER) -->
+                <div id="assignedJobModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex justify-center items-center z-[160] hidden p-4">
+                    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-[320px] p-5 text-center animate-pop-in flex flex-col items-center border border-cyan-100">
+                        <div class="w-14 h-14 rounded-full bg-cyan-100 text-cyan-600 flex items-center justify-center text-2xl mb-3 shadow-inner">
+                            <i class="fa-solid fa-bell animate-bounce"></i>
                         </div>
+                        <h3 class="text-sm font-black text-slate-800 uppercase tracking-tight">Penugasan Job Baru!</h3>
+                        <p class="text-[11px] text-slate-600 mt-1 font-medium leading-relaxed">
+                            Anda mendapatkan job baru, segera selesaikan. Terimakasih.
+                        </p>
+                        <div class="w-full bg-cyan-50/80 border border-cyan-200 rounded-lg p-2.5 my-3 text-left">
+                            <div class="text-[10px] text-slate-500 font-bold">NO WO: <span id="assignModalWo" class="font-mono text-cyan-700 font-black"></span></div>
+                            <div class="text-[10px] text-slate-700 font-bold mt-0.5">Unit: <span id="assignModalUnit" class="text-cyan-800"></span></div>
+                            <div class="text-[9px] text-slate-500 truncate mt-0.5" id="assignModalDeskripsi"></div>
+                        </div>
+                        <button id="assignModalBtnDetail" class="w-full bg-[#0891b2] hover:bg-cyan-700 text-white font-bold py-2 rounded-lg text-xs transition-colors shadow-md flex items-center justify-center gap-1.5">
+                            <i class="fa-solid fa-eye text-xs"></i> Buka Rincian Job
+                        </button>
+                    </div>
+                </div>
 
-                        <div class="border-t border-slate-100 pt-3"></div>
+                <div id="dayJobsModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[130] hidden p-3">
+                    <div class="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden flex flex-col max-h-[90vh]">
+                        <div class="p-3 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
+                            <h3 class="font-bold text-slate-800 text-xs" id="dayJobsTitle">Jadwal Tanggal</h3>
+                            <button onclick="document.getElementById('dayJobsModal').classList.add('hidden')" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-base"></i></button>
+                        </div>
+                        <div class="p-3 overflow-y-auto hide-scrollbar bg-slate-50/50 min-h-[100px]" id="dayJobsContent"></div>
+                    </div>
+                </div>
 
-                        <!-- PENGATURAN KATA SANDI -->
-                        <div>
-                            <label class="block text-[11px] font-bold text-slate-700 mb-2 flex items-center gap-1.5">
-                                <i class="fa-solid fa-lock text-slate-600"></i> Ubah Kata Sandi Akun
-                            </label>
-                            <form onsubmit="savePassword(event)" class="space-y-2.5">
-                                <div>
-                                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Kata Sandi Baru</label>
-                                    <div class="relative">
-                                        <input type="password" id="profPwd1" class="w-full border border-slate-300 rounded-md px-3 py-2 pr-8 text-xs focus:outline-none focus:border-cyan-500" placeholder="Ketik sandi baru..." required>
-                                        <i id="toggleProfPwd1" class="fa-regular fa-eye absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer pwd-toggle text-[10px]" onclick="togglePassword('profPwd1', 'toggleProfPwd1')"></i>
+                <div id="globalConfirmModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[140] hidden p-3">
+                    <div class="bg-white rounded-md shadow-xl w-full max-w-[280px] overflow-hidden flex flex-col">
+                        <div class="p-4 text-center border-b border-slate-100 shrink-0">
+                            <div class="w-10 h-10 rounded-full border-[3px] border-orange-200 text-orange-500 flex items-center justify-center mx-auto mb-2 text-xl font-bold"><i class="fa-solid fa-question"></i></div>
+                            <h2 class="text-xs font-bold text-slate-700" id="confirmTitle">Konfirmasi</h2>
+                            <p class="text-[10px] text-slate-500 mt-1" id="confirmMessage">Apakah Anda yakin?</p>
+                        </div>
+                        <div class="flex gap-0" id="confirmButtons"></div>
+                    </div>
+                </div>
+
+                <div id="editJobModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[120] hidden p-3">
+                    <div class="bg-white rounded-md shadow-xl w-full max-w-sm overflow-hidden flex flex-col max-h-[90vh]">
+                        <div class="p-3 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
+                            <h3 class="font-bold text-slate-800 text-xs"><i class="fa-solid fa-pen-to-square mr-1.5 text-cyan-600"></i>Edit / Validasi Job</h3>
+                            <button onclick="document.getElementById('editJobModal').classList.add('hidden')" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-sm"></i></button>
+                        </div>
+                        <div class="p-3 overflow-y-auto hide-scrollbar" id="editJobContent"></div>
+                    </div>
+                </div>
+
+                <div id="detailJobModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[120] hidden p-3">
+                    <div class="bg-white rounded-md shadow-xl w-full max-w-sm overflow-hidden flex flex-col max-h-[90vh]">
+                        <div class="p-2 border-b border-slate-200 flex justify-between items-center shrink-0">
+                            <h3 class="font-bold text-slate-800 text-xs">Detail Pekerjaan</h3>
+                            <button onclick="document.getElementById('detailJobModal').classList.add('hidden'); event.stopPropagation();" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-sm"></i></button>
+                        </div>
+                        <div class="p-3 overflow-y-auto hide-scrollbar" id="detailJobContent"></div>
+                    </div>
+                </div>
+
+                <div id="mpActionModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[120] hidden p-3">
+                    <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm sm:max-w-md overflow-hidden flex flex-col max-h-[92vh]">
+                        <div class="p-3 text-center border-b border-slate-100 shrink-0 relative bg-slate-50">
+                            <button onclick="document.getElementById('mpActionModal').classList.add('hidden')" class="absolute top-3 right-3 text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-sm"></i></button>
+                            <h2 class="text-sm font-bold text-slate-800 tracking-tight mt-0.5" id="mpActionTitle">Progres Pekerjaan</h2>
+                        </div>
+                        <div class="p-3.5 overflow-y-auto hide-scrollbar" id="mpActionContent"></div>
+                    </div>
+                </div>
+
+                <div id="kendalaModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex justify-center items-center z-[130] hidden p-3">
+                    <div class="bg-white rounded-xl shadow-2xl w-full max-w-[320px] overflow-hidden flex flex-col">
+                        <div class="p-4 border-b border-slate-100 text-center shrink-0">
+                            <h2 class="text-sm font-bold text-slate-800 tracking-tight">Kendala Waktu Terdeteksi!</h2>
+                            <p class="text-[10px] text-slate-500 mt-0.5">Waktu aktual melebihi batas toleransi yang ditentukan.</p>
+                        </div>
+                        <div class="p-4 overflow-y-auto hide-scrollbar" id="kendalaContent"></div>
+                    </div>
+                </div>
+
+                <div id="cancelPromptModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex justify-center items-center z-[130] hidden p-3">
+                    <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col max-h-[92vh]">
+                        <div class="p-3 text-center border-b border-slate-100 shrink-0 relative bg-slate-50">
+                            <button onclick="document.getElementById('cancelPromptModal').classList.add('hidden')" class="absolute top-3 right-3 text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-sm"></i></button>
+                            <h2 class="text-sm font-bold text-red-600 tracking-tight flex items-center justify-center gap-1.5">
+                                <i class="fa-solid fa-triangle-exclamation"></i> Batalkan Job
+                            </h2>
+                        </div>
+                        <div class="p-3.5 overflow-y-auto hide-scrollbar" id="cancelPromptContent"></div>
+                    </div>
+                </div>
+
+                <div id="resetPwdModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[140] hidden p-3">
+                    <div class="bg-white rounded-md shadow-xl w-full max-w-[260px] overflow-hidden">
+                        <div class="p-2 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                            <h3 class="font-bold text-slate-800 text-xs">Reset Password Pengguna</h3>
+                            <button onclick="document.getElementById('resetPwdModal').classList.add('hidden')" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-xs"></i></button>
+                        </div>
+                        <form onsubmit="processResetPassword(event)" class="p-3 space-y-2">
+                            <p class="text-[9px] text-slate-500 mb-1">NRP Target: <strong id="resetNrpLabel" class="text-slate-800"></strong></p>
+                            <input type="hidden" id="resetNrpVal">
+                            <div class="relative">
+                                <input type="password" id="resetPwdInput" placeholder="Password Baru" class="w-full border border-slate-300 rounded-sm px-2 py-1 pr-6 text-[10px] focus:outline-none focus:border-cyan-500" required>
+                                <i id="toggleResetPwd" class="fa-regular fa-eye absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer pwd-toggle text-[9px]" onclick="togglePassword('resetPwdInput', 'toggleResetPwd')"></i>
+                            </div>
+                            <button type="submit" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-1.5 rounded-sm text-[10px] mt-1">Simpan Password</button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Profile Biodata Modal -->
+                <div id="profileBiodataModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[140] hidden p-3">
+                    <div class="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden flex flex-col max-h-[90vh]">
+                        <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
+                            <h3 class="font-bold text-slate-800 text-sm"><i class="fa-solid fa-id-card mr-2 text-emerald-600"></i>Identitas Saya</h3>
+                            <button onclick="document.getElementById('profileBiodataModal').classList.add('hidden')" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-base"></i></button>
+                        </div>
+                        <div class="p-4 overflow-y-auto hide-scrollbar">
+                            <form onsubmit="saveProfile(event)" class="space-y-3">
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-slate-500 mb-1">NRP</label>
+                                        <input type="text" id="profNrp" value="${user.nrp || ''}" class="w-full border border-slate-200 bg-slate-50 rounded-md px-3 py-2 text-[10px] text-slate-500 cursor-not-allowed font-semibold" readonly>
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-slate-500 mb-1">Nama Lengkap</label>
+                                        <input type="text" id="profName" value="${user.nama_lengkap || ''}" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-md px-3 py-2 text-[10px] focus:outline-none focus:border-cyan-500" required>
                                     </div>
                                 </div>
-                                <div>
-                                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Konfirmasi Sandi Baru</label>
-                                    <div class="relative">
-                                        <input type="password" id="profPwd2" class="w-full border border-slate-300 rounded-md px-3 py-2 pr-8 text-xs focus:outline-none focus:border-cyan-500" placeholder="Ulangi sandi baru..." required>
-                                        <i id="toggleProfPwd2" class="fa-regular fa-eye absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer pwd-toggle text-[10px]" onclick="togglePassword('profPwd2', 'toggleProfPwd2')"></i>
+                                
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-slate-500 mb-1">Jabatan</label>
+                                        <input type="text" id="profJabatan" value="${user.jabatan || ''}" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-md px-3 py-2 text-[10px] focus:outline-none focus:border-cyan-500" required>
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-slate-500 mb-1">No WhatsApp</label>
+                                        <input type="number" id="profWa" value="${user.no_wa || ''}" class="w-full border border-slate-300 rounded-md px-3 py-2 text-[10px] focus:outline-none focus:border-cyan-500" required>
                                     </div>
                                 </div>
-                                <button type="submit" class="w-full bg-[#0891b2] hover:bg-cyan-700 text-white font-bold py-2 rounded-md text-xs mt-2 transition-colors shadow-md flex items-center justify-center gap-1.5">
-                                    <i class="fa-solid fa-check"></i> Perbarui Kata Sandi
-                                </button>
+                                
+                                <div class="space-y-2">
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-slate-500 mb-1">Perusahaan</label>
+                                        <select id="profPerusahaan" class="w-full border border-slate-300 rounded-md px-3 py-2 text-[10px] focus:outline-none focus:border-cyan-500 bg-white cursor-pointer" required></select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-slate-500 mb-1">Departemen</label>
+                                        <select id="profDepartemen" class="w-full border border-slate-300 rounded-md px-3 py-2 text-[10px] focus:outline-none focus:border-cyan-500 bg-white cursor-pointer" required></select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-slate-500 mb-1">Section</label>
+                                        <select id="profSection" class="w-full border border-slate-300 rounded-md px-3 py-2 text-[10px] focus:outline-none focus:border-cyan-500 bg-white cursor-pointer" required></select>
+                                    </div>
+                                </div>
+                                
+                                <button type="submit" class="w-full bg-[#0891b2] hover:bg-cyan-700 text-white font-bold py-2.5 rounded-md text-xs mt-4 transition-colors shadow-md">Simpan Perubahan Profil</button>
                             </form>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <div id="successModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex justify-center items-center z-[150] hidden">
-                <div class="bg-white rounded-xl shadow-2xl w-full max-w-[250px] p-6 text-center animate-pop-in flex flex-col items-center">
-                    <div id="successIcon" class="w-16 h-16 rounded-full flex items-center justify-center text-3xl mb-3 text-white"></div>
-                    <h2 id="successTitle" class="text-sm font-bold text-slate-800 mb-1">Berhasil</h2>
-                    <p id="successMessage" class="text-[10px] text-slate-500">Tersimpan.</p>
-                    <button onclick="document.getElementById('successModal').classList.add('hidden')" class="mt-4 w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 rounded-lg text-[10px] transition-colors">Tutup</button>
+                <!-- Modal Pengaturan (Ukuran Teks & Keamanan Password) -->
+                <div id="profileSettingsModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[140] hidden p-3">
+                    <div class="bg-white rounded-xl shadow-xl w-full max-w-[340px] overflow-hidden flex flex-col max-h-[90vh]">
+                        <div class="p-3.5 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
+                            <h3 class="font-bold text-slate-800 text-xs sm:text-sm flex items-center gap-2">
+                                <i class="fa-solid fa-gear text-cyan-600"></i>Pengaturan Aplikasi
+                            </h3>
+                            <button onclick="document.getElementById('profileSettingsModal').classList.add('hidden')" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-sm"></i></button>
+                        </div>
+                        <div class="p-4 overflow-y-auto hide-scrollbar space-y-4">
+                            <!-- PENGATURAN UKURAN TEKS (MODEL GARIS SLIDER A ───●─── A) -->
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-font text-cyan-600"></i> Ukuran Teks Tampilan
+                                </label>
+                                <p class="text-[9px] text-slate-400 mb-3">Geser atau ketuk garis untuk menyesuaikan ukuran teks:</p>
+                                
+                                <div class="bg-slate-50 border border-slate-200 rounded-xl p-3.5">
+                                    <div class="flex items-center justify-between select-none">
+                                        <span onclick="setAppFontSizeByStep(0)" class="text-xs font-semibold text-slate-600 cursor-pointer hover:text-emerald-600 transition-colors w-5 text-center leading-none" title="Kecil">A</span>
+                                        
+                                        <!-- Jalur Slider Interaktif -->
+                                        <div class="relative flex-1 mx-3 h-6 flex items-center cursor-pointer">
+                                            <!-- Garis Abu-abu (Background) -->
+                                            <div class="absolute w-full h-[2px] bg-slate-300 rounded-full"></div>
+                                            
+                                            <!-- Garis Hijau (Progress dari kiri ke titik) -->
+                                            <div id="fontSliderActiveLine" class="absolute h-[2px] bg-emerald-500 rounded-full transition-all duration-200" style="width: 0%; left: 0;"></div>
+                                            
+                                            <!-- 3 Titik Penanda (Ticks) -->
+                                            <div class="absolute w-full flex justify-between items-center pointer-events-none px-0">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                                                <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                                                <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                                            </div>
+                                            
+                                            <!-- Tombol Titik Bulat Hijau (Thumb Knob) -->
+                                            <div id="fontSliderThumb" class="absolute w-4 h-4 bg-emerald-500 rounded-full shadow transition-all duration-200 -ml-2 top-1/2 -translate-y-1/2 border-2 border-white ring-1 ring-emerald-500 pointer-events-none" style="left: 0%;"></div>
+
+                                            <!-- Input Range Transparan untuk Geser & Sentuh -->
+                                            <input type="range" id="fontSizeRangeInput" min="0" max="2" step="1" value="0" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" oninput="handleRangeSliderChange(this.value)">
+                                        </div>
+
+                                        <span onclick="setAppFontSizeByStep(2)" class="text-base font-bold text-slate-800 cursor-pointer hover:text-emerald-600 transition-colors w-5 text-center leading-none" title="Besar">A</span>
+                                    </div>
+
+                                    <!-- Label Keterangan Ukuran -->
+                                    <div class="flex justify-between text-[10px] text-slate-400 font-medium px-4 mt-2 select-none">
+                                        <span id="fontLabel_0" class="cursor-pointer" onclick="setAppFontSizeByStep(0)">Kecil</span>
+                                        <span id="fontLabel_1" class="cursor-pointer" onclick="setAppFontSizeByStep(1)">Sedang (25%)</span>
+                                        <span id="fontLabel_2" class="cursor-pointer" onclick="setAppFontSizeByStep(2)">Besar (50%)</span>
+                                    </div>
+                                </div>
+
+                                <div class="bg-white border border-slate-200 rounded-lg p-2.5 mt-2.5 text-center shadow-2xs">
+                                    <p id="fontSizePreviewText" class="text-slate-600 font-medium leading-tight">
+                                        Ukuran teks Kecil (Standar bawaan sistem).
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="border-t border-slate-100 pt-3"></div>
+
+                            <!-- PENGATURAN KATA SANDI -->
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 mb-2 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-lock text-slate-600"></i> Ubah Kata Sandi Akun
+                                </label>
+                                <form onsubmit="savePassword(event)" class="space-y-2.5">
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-slate-500 mb-1">Kata Sandi Baru</label>
+                                        <div class="relative">
+                                            <input type="password" id="profPwd1" class="w-full border border-slate-300 rounded-md px-3 py-2 pr-8 text-xs focus:outline-none focus:border-cyan-500" placeholder="Ketik sandi baru..." required>
+                                            <i id="toggleProfPwd1" class="fa-regular fa-eye absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer pwd-toggle text-[10px]" onclick="togglePassword('profPwd1', 'toggleProfPwd1')"></i>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-slate-500 mb-1">Konfirmasi Sandi Baru</label>
+                                        <div class="relative">
+                                            <input type="password" id="profPwd2" class="w-full border border-slate-300 rounded-md px-3 py-2 pr-8 text-xs focus:outline-none focus:border-cyan-500" placeholder="Ulangi sandi baru..." required>
+                                            <i id="toggleProfPwd2" class="fa-regular fa-eye absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer pwd-toggle text-[10px]" onclick="togglePassword('profPwd2', 'toggleProfPwd2')"></i>
+                                        </div>
+                                    </div>
+                                    <button type="submit" class="w-full bg-[#0891b2] hover:bg-cyan-700 text-white font-bold py-2 rounded-md text-xs mt-2 transition-colors shadow-md flex items-center justify-center gap-1.5">
+                                        <i class="fa-solid fa-check"></i> Perbarui Kata Sandi
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        `;
 
-        setTimeout(() => { document.querySelectorAll('.chart-bar').forEach(bar => { const w = bar.getAttribute('data-width'); if(w) bar.style.width = w; }); }, 50);
+                <div id="successModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex justify-center items-center z-[150] hidden">
+                    <div class="bg-white rounded-xl shadow-2xl w-full max-w-[250px] p-6 text-center animate-pop-in flex flex-col items-center">
+                        <div id="successIcon" class="w-16 h-16 rounded-full flex items-center justify-center text-3xl mb-3 text-white"></div>
+                        <h2 id="successTitle" class="text-sm font-bold text-slate-800 mb-1">Berhasil</h2>
+                        <p id="successMessage" class="text-[10px] text-slate-500">Tersimpan.</p>
+                        <button onclick="document.getElementById('successModal').classList.add('hidden')" class="mt-4 w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 rounded-lg text-[10px] transition-colors">Tutup</button>
+                    </div>
+                </div>
+            `;
 
-        if (currentTab === 'dashboard' && (user.role === 'ADMIN' || user.role === 'GL')) {
-            setTimeout(initDashboardCharts, 100);
+            setTimeout(() => { document.querySelectorAll('.chart-bar').forEach(bar => { const w = bar.getAttribute('data-width'); if(w) bar.style.width = w; }); }, 50);
+
+            if (currentTab === 'dashboard' && (user.role === 'ADMIN' || user.role === 'GL')) {
+                setTimeout(initDashboardCharts, 100);
+            }
+            
+            if (currentTab === 'jadwal' || (currentTab === 'order' && userOrderFleetMode === 'Big Crane' && user.role === 'USER')) {
+                setTimeout(initBcCalendar, 100);
+            }
+
+            setTimeout(updateNotificationBadge, 80);
+        } catch (err) {
+            console.error("Critical renderApp error:", err);
+            const app = document.getElementById('app');
+            if (app) {
+                app.innerHTML = `
+                    <div class="min-h-screen flex flex-col items-center justify-center p-6 bg-slate-100 text-center">
+                        <div class="w-14 h-14 rounded-full bg-red-100 text-red-500 flex items-center justify-center text-2xl mb-3 shadow-inner">
+                            <i class="fa-solid fa-triangle-exclamation"></i>
+                        </div>
+                        <h2 class="text-sm font-bold text-slate-800 uppercase tracking-wide">Terjadi Kendala Tampilan</h2>
+                        <p class="text-xs text-slate-500 mt-1 max-w-xs">Aplikasi mendeteksi anomali data cache. Klik tombol di bawah untuk memuat ulang.</p>
+                        <div class="flex gap-2 mt-4">
+                            <button onclick="location.reload()" class="bg-[#0891b2] hover:bg-cyan-700 text-white font-bold px-4 py-2 rounded-lg text-xs shadow transition-colors">
+                                <i class="fa-solid fa-rotate-right mr-1"></i> Muat Ulang Aplikasi
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
         }
-        
-        if (currentTab === 'jadwal' || (currentTab === 'order' && userOrderFleetMode === 'Big Crane' && user.role === 'USER')) {
-            setTimeout(initBcCalendar, 100);
-        }
-
-        setTimeout(updateNotificationBadge, 80);
     }
 
     function switchTab(tab) {
@@ -2997,10 +2975,21 @@
     }
 
     function deleteUserAccount(nrp) {
-        openCustomConfirm('Hapus Akun', `Hapus pengguna ${nrp} dari sistem?`, () => {
+        openCustomConfirm('Hapus Akun', `Hapus pengguna ${nrp} dari sistem?`, async () => {
+            addDeletedUser(nrp);
             let users = getUsers().filter(u => u.nrp !== nrp);
             saveUsers(users);
-            showToast('Pengguna dihapus');
+
+            if (SUPABASE_KEY && !SUPABASE_KEY.includes('PASTE_KUNCI')) {
+                try {
+                    await fetch(`${SUPABASE_URL}/rest/v1/users?nrp=eq.${encodeURIComponent(nrp)}`, {
+                        method: 'DELETE',
+                        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+                    });
+                } catch(e) { console.warn(e); }
+            }
+
+            showToast('Pengguna dihapus permanen');
             renderApp(true);
         });
     }
@@ -3508,23 +3497,19 @@
         }
     }
 
-    async function submitUnitStatusChange(e) {
+    function submitUnitStatusChange(e) {
         e.preventDefault();
         const unitName = document.getElementById('targetUnitName').value;
         const status = document.getElementById('unitStatusSelect').value;
-        let reason = document.getElementById('unitStatusReason').value.trim();
+        const reason = document.getElementById('unitStatusReason').value.trim();
 
         if (status === 'INACTIVE' && !reason) {
             return showToast('Mohon isi keterangan alasan non-aktif!', 'error');
         }
-        if (status === 'ACTIVE') {
-            reason = '';
-        }
 
+        saveUnitStatus(unitName, status, reason);
+        showToast(`Status unit ${unitName} berhasil diperbarui!`);
         document.getElementById('unitStatusModal').classList.add('hidden');
-        showToast(`Memperbarui status unit ${unitName}...`);
-        await saveUnitStatus(unitName, status, reason);
-        showToast(`Status unit ${unitName} berhasil diperbarui di server!`, 'success');
         renderApp(true);
     }
 
@@ -3961,15 +3946,7 @@
                         <button onclick="initiateCancelJob('${job.no_wo}')" class="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-1.5 rounded-sm text-[11px] shadow-sm"><i class="fa-solid fa-xmark"></i> Cancel</button>
                     ` : ''}
                     ${job.status === 'PENDING' ? `
-                        <div class="flex items-center gap-1.5 w-full">
-                            <div class="text-[10px] text-orange-600 font-bold flex-1 text-center bg-orange-50 py-1.5 rounded-sm border border-orange-200 shadow-sm"><i class="fa-solid fa-clock mr-1"></i> Job Pending</div>
-                            <button onclick="copyJobToWA('${job.no_wo}')" class="bg-orange-100 hover:bg-orange-200 text-orange-800 border border-orange-300 font-bold py-1.5 px-2.5 rounded-sm text-[10px] transition-colors"><i class="fa-solid fa-copy mr-1"></i> Salin Laporan</button>
-                        </div>
-                    ` : ''}
-                    ${job.status === 'COMPLETED' ? `
-                        <button onclick="copyJobToWA('${job.no_wo}')" class="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold py-1.5 rounded-sm text-[11px] shadow-xs flex items-center justify-center gap-1.5 transition-colors">
-                            <i class="fa-solid fa-copy"></i> Salin Laporan WA
-                        </button>
+                        <div class="text-[10px] text-orange-600 font-bold w-full text-center bg-orange-50 py-1.5 rounded-sm border border-orange-200 shadow-sm"><i class="fa-solid fa-clock mr-1"></i> Job Pending - Menunggu Validasi Lanjutan dari GL</div>
                     ` : ''}
                 </div>
             </div>`;
@@ -4353,17 +4330,11 @@
             // Masukkan tiket lanjutan ke daftar order
             jobs.unshift(rolloverJob);
             saveOrders(jobs);
-
-            // Salin laporan progres langsung ke clipboard tanpa pop-up
-            const reportText = generateManpowerReportText(jobs[1]);
-            copyText(reportText, 'Laporan');
+            showToast(`Job ${jobs[idx].no_wo} selesai. Dibuat tiket lanjutan ${newWo} (Status: PENDING) untuk validasi GL.`);
         } else {
             jobs[idx].status = pendingActionData.status;
             saveOrders(jobs);
-
-            // Salin laporan progres langsung ke clipboard tanpa pop-up
-            const reportText = generateManpowerReportText(jobs[idx]);
-            copyText(reportText, 'Laporan');
+            showToast('Pekerjaan berhasil diselesaikan!');
         }
 
         document.getElementById('mpActionModal').classList.add('hidden');
@@ -4761,10 +4732,8 @@
         const fotoInput = document.getElementById('req_foto');
 
         const btnSubmit = document.getElementById('btnSubmitOrder'); 
-        if (btnSubmit) {
-            btnSubmit.disabled = true; 
-            btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i> Sedang di proses...';
-        }
+        btnSubmit.disabled = true; 
+        btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Sedang diproses...';
         
         let tgl = document.getElementById('req_tgl')?.value || ''; 
         let jam = document.getElementById('req_jam')?.value || ''; 
@@ -4792,7 +4761,7 @@
         let durasiVal = document.getElementById('req_durasi')?.value || ''; 
         let satuan = document.getElementById('req_satuan')?.value || 'JAM';
         
-        const hasPhotoUploaded = (fotoInput && fotoInput.files && fotoInput.files.length > 0);
+        const hasPhotoUploaded = (fotoInput && fotoInput.files.length > 0);
 
         const baseOrder = {
             no_wo: generateWO(cat), 
@@ -4800,11 +4769,11 @@
             kategori: cat, 
             has_photo: hasPhotoUploaded,
             nrp_pemohon: user.nrp, 
-            nama_pemohon: isAdminGL ? (document.getElementById('del_nama')?.value || user.nama_lengkap) : user.nama_lengkap, 
-            perusahaan: isAdminGL ? (document.getElementById('del_vendor')?.value || user.perusahaan) : user.perusahaan, 
-            departemen: isAdminGL ? (document.getElementById('del_dept')?.value || user.departemen) : user.departemen, 
-            section: isAdminGL ? (document.getElementById('del_sect')?.value || user.section) : user.section,
-            no_wa: isAdminGL ? (document.getElementById('del_wa')?.value || user.no_wa) : user.no_wa,
+            nama_pemohon: isAdminGL ? document.getElementById('del_nama').value : user.nama_lengkap, 
+            perusahaan: isAdminGL ? document.getElementById('del_vendor').value : user.perusahaan, 
+            departemen: isAdminGL ? document.getElementById('del_dept').value : user.departemen, 
+            section: isAdminGL ? document.getElementById('del_sect').value : user.section,
+            no_wa: isAdminGL ? document.getElementById('del_wa').value : user.no_wa,
             tgl_pelaksanaan: tgl, 
             jam_pelaksanaan: jam, 
             shift: shiftVal, 
@@ -4816,60 +4785,64 @@
             gl: '', unit: '', operator: '', rigger: '', rigger2: '', jam_start_aktual: '', jam_end_aktual: '', durasi_aktual: '', final_inspeksi: '', alasan_telat: '', alasan_overtime: ''
         };
 
-        // Simpan seketika agar order 100% dipastikan langsung masuk tanpa macet
-        finishSubmitOrder(baseOrder, user);
-
-        // Jika ada foto, proses kompresi dan upload dilakukan di background (non-blocking)
-        if (hasPhotoUploaded) {
+        // Tunggu proses upload gambar tuntas (await) agar koneksi tidak terputus di tengah jalan
+        if (fotoInput && fotoInput.files.length > 0) {
+            btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Sedang diproses...';
             try {
-                const file = fotoInput.files[0]; 
-                const reader = new FileReader();
-                reader.onload = function(event) {
-                    const img = new Image();
-                    img.onload = function() {
-                        try {
-                            const canvas = document.createElement('canvas'); 
-                            const MAX_WIDTH = 640; 
-                            const MAX_HEIGHT = 640; 
-                            let width = img.width; 
-                            let height = img.height;
-                            if (width > height) { if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; } } 
-                            else { if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; } }
-                            canvas.width = width; canvas.height = height; 
-                            const ctx = canvas.getContext('2d'); 
-                            ctx.drawImage(img, 0, 0, width, height);
-                            
-                            let compressedBase64 = canvas.toDataURL('image/jpeg', 0.5);
-                            let base64Data = compressedBase64.split(',')[1];
-                            
-                            // Simpan ke cache lokal agar langsung bisa dilihat seketika di perangkat ini
-                            setPhotoCache(baseOrder.no_wo, compressedBase64);
-
-                            if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.startsWith('http')) {
-                                fetch(GOOGLE_SCRIPT_URL, { 
-                                    method: 'POST', 
-                                    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, 
-                                    body: JSON.stringify({ 
-                                        no_wo: baseOrder.no_wo,
-                                        fileName: `FOTO_${baseOrder.no_wo}.jpg`, 
-                                        mimeType: 'image/jpeg', 
-                                        base64Data: base64Data
-                                    }) 
-                                }).then(r => r.json()).then(res => {
-                                    if (res && res.url) {
-                                        setPhotoCache(baseOrder.no_wo, res.url);
-                                    }
-                                }).catch(err => console.warn("Background upload error:", err));
-                            }
-                        } catch(err) { console.warn("Upload lampiran notice:", err); }
+                const file = fotoInput.files[0];
+                const base64Data = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            try {
+                                const canvas = document.createElement('canvas');
+                                const MAX_DIM = 640;
+                                let w = img.width, h = img.height;
+                                if (w > h) { if (w > MAX_DIM) { h *= MAX_DIM / w; w = MAX_DIM; } }
+                                else { if (h > MAX_DIM) { w *= MAX_DIM / h; h = MAX_DIM; } }
+                                canvas.width = w; canvas.height = h;
+                                const ctx = canvas.getContext('2d');
+                                ctx.drawImage(img, 0, 0, w, h);
+                                const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.55);
+                                setPhotoCache(baseOrder.no_wo, compressedDataUrl);
+                                resolve(compressedDataUrl.split(',')[1]);
+                            } catch (err) { reject(err); }
+                        };
+                        img.onerror = reject;
+                        img.src = event.target.result;
                     };
-                    img.src = event.target.result;
-                };
-                reader.readAsDataURL(file);
-            } catch(e) {
-                console.warn("Background photo handler error:", e);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+
+                if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.startsWith('http')) {
+                    const uploadRes = await fetch(GOOGLE_SCRIPT_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: JSON.stringify({
+                            no_wo: baseOrder.no_wo,
+                            fileName: `FOTO_${baseOrder.no_wo}.jpg`,
+                            mimeType: 'image/jpeg',
+                            base64Data: base64Data
+                        })
+                    });
+                    const resJson = await uploadRes.json();
+                    if (resJson && resJson.url) {
+                        setPhotoCache(baseOrder.no_wo, resJson.url);
+                        // Simpan link foto ke photo_map di master data agar tersinkron ke semua perangkat
+                        const m = getMasterData();
+                        if (!m.photo_map) m.photo_map = {};
+                        m.photo_map[baseOrder.no_wo] = resJson.url;
+                        saveMasterData(m);
+                    }
+                }
+            } catch (err) {
+                console.warn("Upload foto:", err);
             }
         }
+
+        finishSubmitOrder(baseOrder, user);
     }
 
     function finishSubmitOrder(newOrder, user) {
@@ -4951,7 +4924,7 @@
             ${fotoHtml}
             
             <div class="flex gap-2 mt-2">
-                <button onclick="copyJobToWA('${job.no_wo}')" class="flex-1 bg-[#0891b2] hover:bg-cyan-700 text-white font-bold py-2 rounded-md text-[11px] flex items-center justify-center gap-1.5 shadow-sm transition-colors"><i class="fa-solid fa-copy"></i> Salin Laporan MP</button>
+                <button onclick="copyJobToWA('${job.no_wo}', true)" class="flex-1 bg-[#0891b2] hover:bg-cyan-700 text-white font-bold py-2 rounded-md text-[11px] flex items-center justify-center gap-1.5 shadow-sm transition-colors"><i class="fa-regular fa-copy"></i> Salin Detail Job</button>
                 <button onclick="document.getElementById('detailJobModal').classList.add('hidden')" class="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-bold py-2 rounded-md text-[11px] shadow-sm transition-colors">Tutup Detail</button>
             </div>
         `;
@@ -5030,15 +5003,29 @@
             return;
         }
 
+        // 2. CEK MAP FOTO DARI MASTER DATA (TERSINKRON DARI DATABASE SERVER)
+        const m = getMasterData();
+        if (m.photo_map && (m.photo_map[no_wo] || m.photo_map[baseLookupWo])) {
+            const syncedUrl = m.photo_map[no_wo] || m.photo_map[baseLookupWo];
+            setPhotoCache(no_wo, syncedUrl);
+            photoSection.classList.remove('hidden');
+            renderPhotoHtml(syncedUrl, no_wo, container, badge);
+            return;
+        }
+
         if (!GOOGLE_SCRIPT_URL || !GOOGLE_SCRIPT_URL.startsWith('http')) {
             photoSection.classList.add('hidden');
             return;
         }
 
+        // Tampilkan indikator memuat agar tidak langsung hilang
+        photoSection.classList.remove('hidden');
+        container.innerHTML = `<span class="text-xs text-slate-400 py-3 flex items-center justify-center gap-1.5"><i class="fa-solid fa-spinner fa-spin text-cyan-600"></i> Memuat lampiran foto dokumentasi...</span>`;
+
         try {
-            // Batas waktu timeout 5 detik
+            // Batas waktu toleran 12 detik
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000);
+            const timeoutId = setTimeout(() => controller.abort(), 12000);
             
             let res = await fetch(`${GOOGLE_SCRIPT_URL}?no_wo=${encodeURIComponent(no_wo)}`, {
                 signal: controller.signal
@@ -5048,7 +5035,6 @@
             if (!res.ok) throw new Error('HTTP ' + res.status);
             let data = await res.json();
 
-            // Jika tidak ditemukan pada no_wo lanjutan, periksa otomatis berdasarkan nomor tiket induknya
             if ((!data || !data.found) && baseLookupWo !== no_wo) {
                 try {
                     const resBase = await fetch(`${GOOGLE_SCRIPT_URL}?no_wo=${encodeURIComponent(baseLookupWo)}`);
@@ -5062,17 +5048,14 @@
             }
 
             if (data && data.found && data.url) {
-                // Simpan ke cache agar pemanggilan berikutnya 0 detik instan
                 setPhotoCache(no_wo, data.url);
                 if (baseLookupWo !== no_wo) setPhotoCache(baseLookupWo, data.url);
                 photoSection.classList.remove('hidden');
                 renderPhotoHtml(data.url, no_wo, container, badge);
             } else {
-                // JIKA TIDAK ADA FOTO: Sembunyikan total blok lampiran foto
                 photoSection.classList.add('hidden');
             }
         } catch (err) {
-            // Jika gagal atau tidak ada foto, sembunyikan section
             photoSection.classList.add('hidden');
         }
     }
@@ -5263,14 +5246,19 @@
 
     function confirmHapusOrder(wo) {
         openCustomConfirm('Hapus Data', `Apakah Anda yakin ingin menghapus order ${wo}?`, async () => {
+            addDeletedWo(wo);
             let jobs = getOrders().filter(j => j.no_wo !== wo);
             localStorage.setItem('lifting_orders', JSON.stringify(jobs));
             
             if (SUPABASE_KEY && !SUPABASE_KEY.includes('PASTE_KUNCI')) {
-                try { await fetch(`${SUPABASE_URL}/rest/v1/orders?no_wo=eq.${wo}`, { method: 'DELETE', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }); } 
-                catch(e) { console.warn(e); }
+                try { 
+                    await fetch(`${SUPABASE_URL}/rest/v1/orders?no_wo=eq.${encodeURIComponent(wo)}`, { 
+                        method: 'DELETE', 
+                        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } 
+                    }); 
+                } catch(e) { console.warn(e); }
             }
-            showToast('Data dihapus!'); 
+            showToast('Data dihapus permanen!'); 
             document.getElementById('editJobModal').classList.add('hidden'); 
             renderApp(true);
         });
@@ -5487,6 +5475,7 @@
 
     window.addEventListener('load', () => { 
         if (window.innerWidth >= 768) hideSplashScreen();
+        requestNotificationAccess();
         fetchFromSupabase().catch(e => console.warn(e)).finally(() => { 
             const user = JSON.parse(localStorage.getItem('lifting_user'));
             if (user) {
@@ -5615,6 +5604,18 @@
             }
         }
     }, { passive: false });
+
+    // Failsafe Global: Menangkap error unhandled agar layar tidak pernah blank putih
+    window.addEventListener('error', function(e) {
+        console.warn("Global error caught:", e.message);
+        hideSplashScreen();
+    });
+    window.addEventListener('unhandledrejection', function(e) {
+        console.warn("Unhandled promise rejection:", e.reason);
+        hideSplashScreen();
+    });
+    // Hard failsafe splash screen: Pastikan selalu tertutup maksimal dalam 3.2 detik
+    setTimeout(hideSplashScreen, 3200);
 </script>
 </body>
 </html>
