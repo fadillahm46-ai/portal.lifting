@@ -1028,7 +1028,21 @@
                 if(Array.isArray(data)) { 
                     // Membersihkan sisa string Base64 foto_evidence lama dari memori
                     data.forEach(item => { if (item.foto_evidence) delete item.foto_evidence; });
-                    let ds = JSON.stringify(data); 
+
+                    // Safe merge: gabungkan data server dengan pesanan lokal agar pesanan baru tidak tertimpa
+                    let localOrders = getOrders();
+                    let orderMap = new Map();
+                    data.forEach(item => { if (item && item.no_wo) orderMap.set(item.no_wo, item); });
+                    localOrders.forEach(lo => {
+                        if (lo && lo.no_wo && !orderMap.has(lo.no_wo)) {
+                            orderMap.set(lo.no_wo, lo);
+                            syncToSupabase([lo]);
+                        }
+                    });
+                    let merged = Array.from(orderMap.values());
+                    merged.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+
+                    let ds = JSON.stringify(merged); 
                     if(localStorage.getItem('lifting_orders') !== ds) { 
                         localStorage.setItem('lifting_orders', ds); 
                         shouldRender = true; 
@@ -1049,17 +1063,33 @@
         } catch(e) { console.warn("Gagal mengambil data:", e); }
     }
 
+    function sanitizeOrderForSupabase(order) {
+        if (!order) return null;
+        const validFields = [
+            'no_wo', 'timestamp', 'kategori', 'nrp_pemohon', 'nama_pemohon',
+            'perusahaan', 'departemen', 'section', 'no_wa', 'tgl_pelaksanaan',
+            'jam_pelaksanaan', 'shift', 'durasi_request', 'lokasi_angkat',
+            'lokasi_tujuan', 'deskripsi', 'status', 'gl', 'unit',
+            'operator', 'operator_nrp', 'rigger', 'rigger_nrp',
+            'rigger2', 'rigger2_nrp', 'jam_start_aktual', 'jam_end_aktual',
+            'durasi_aktual', 'final_inspeksi', 'alasan_telat', 'alasan_overtime'
+        ];
+        const clean = {};
+        validFields.forEach(field => {
+            if (order[field] !== undefined) {
+                clean[field] = order[field];
+            }
+        });
+        return clean;
+    }
+
     async function syncToSupabase(orders) {
         if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
         try {
             if (!orders || orders.length === 0) return;
-            // Sanitasi: Pastikan kolom foto_evidence dan string Base64 tidak ikut terkirim ke Supabase
-            const cleanOrders = orders.map(o => {
-                const copy = { ...o };
-                delete copy.foto_evidence;
-                return copy;
-            });
-            await fetch(`${SUPABASE_URL}/rest/v1/orders?on_conflict=no_wo`, { 
+            // Sanitasi: Pastikan kolom non-skema seperti has_photo dan foto_evidence dibersihkan sebelum dikirim
+            const cleanOrders = orders.map(sanitizeOrderForSupabase).filter(Boolean);
+            const res = await fetch(`${SUPABASE_URL}/rest/v1/orders?on_conflict=no_wo`, { 
                 method: 'POST', 
                 headers: { 
                     'Content-Type': 'application/json', 
@@ -1069,7 +1099,12 @@
                 }, 
                 body: JSON.stringify(cleanOrders) 
             });
-        } catch (e) {}
+            if (!res.ok) {
+                console.warn("Sinkronisasi pesanan ke Supabase status:", res.status);
+            }
+        } catch (e) {
+            console.warn("Koneksi Supabase error:", e);
+        }
     }
 
     async function syncUsersToSupabase(users) {
@@ -3637,7 +3672,7 @@
             </div>`;
         }
 
-        jobs = jobs.filter(j => j.nrp_pemohon === currentUser.nrp);
+        jobs = jobs.filter(j => String(j.nrp_pemohon || '').trim().toUpperCase() === String(currentUser.nrp || '').trim().toUpperCase());
         let filterCat = document.getElementById('filter_kategori') ? document.getElementById('filter_kategori').value : 'ALL';
         if (filterCat !== 'ALL') jobs = jobs.filter(j => j.kategori === filterCat);
         
@@ -4656,11 +4691,23 @@
         }
     }
 
-    function finishSubmitOrder(newOrder, user) {
+    async function finishSubmitOrder(newOrder, user) {
         clearOrderDraft();
-        const orders = getOrders();
-        orders.unshift(newOrder);
-        saveOrders(orders);
+        let orders = getOrders();
+        const existingIdx = orders.findIndex(o => o.no_wo === newOrder.no_wo);
+        if (existingIdx !== -1) {
+            orders[existingIdx] = newOrder;
+        } else {
+            orders.unshift(newOrder);
+        }
+        localStorage.setItem('lifting_orders', JSON.stringify(orders));
+        
+        // Sinkronisasi instan langsung ke server Supabase
+        try {
+            await syncToSupabase([newOrder]);
+        } catch(e) {
+            console.warn("Gagal simpan instan ke Supabase:", e);
+        }
         
         const homeTab = (user.role === 'ADMIN' || user.role === 'GL') ? 'dashboard' : 'monitoring';
         currentTab = homeTab;
