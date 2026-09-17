@@ -1,70 +1,72 @@
 // Service Worker Portal Lifting PPA
 // Mengelola instalasi PWA, bypass cache data realtime, dan penanganan notifikasi sistem
 
-const CACHE_NAME = 'portal-lifting-cache-v4';
+const CACHE_NAME = 'lifting-ppa-v1';
 
-// 1. Event Install: Mempercepat aktivasi service worker baru
+// Event Install: Mempercepat aktivasi service worker baru
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
 
-// 2. Event Activate: Membersihkan cache versi lama dan segera mengambil alih kontrol halaman
+// Event Activate: Mengambil kendali atas semua tab/klien yang aktif
 self.addEventListener('activate', (event) => {
-    event.waitUntil(
-        caches.keys().then((keys) => {
-            return Promise.all(
-                keys.map((key) => {
-                    if (key !== CACHE_NAME) {
-                        return caches.delete(key);
-                    }
-                })
-            );
-        }).then(() => self.clients.claim())
-    );
+    event.waitUntil(clients.claim());
 });
 
-// 3. Event Fetch: Mengambil data langsung dari internet (bypass cache untuk data realtime)
+// Event Fetch: Mengambil data langsung dari internet (bypass cache)
+// Memastikan data realtime Supabase dan REST API selalu mutakhir tanpa terhalang cache lokal
 self.addEventListener('fetch', (event) => {
     return;
 });
 
-// 4. Aksi Ketika Notifikasi Banner / Baris di HP Diklik Pengguna
+// Event saat notifikasi di status bar atau lockscreen HP diklik oleh pengguna
 self.addEventListener('notificationclick', (event) => {
     event.notification.close();
 
-    // Bersihkan titik badge notifikasi ikon aplikasi
+    // Bersihkan atau kurangi badge ikon aplikasi jika didukung
     if ('clearAppBadge' in navigator) {
         navigator.clearAppBadge().catch(() => {});
     }
 
-    const targetUrl = (event.notification.data && event.notification.data.url) 
-        ? event.notification.data.url 
-        : './';
-
+    // Fokuskan tab aplikasi yang sudah terbuka atau buka tab baru jika tertutup
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-            // Jika aplikasi sudah terbuka di HP, fokuskan kembali halamannya
+            // Jika ada jendela portal yang sudah aktif di browser HP, buka dan fokuskan
             for (const client of clientList) {
-                if (client.url.includes(self.location.origin) && 'focus' in client) {
+                if ('focus' in client) {
                     return client.focus();
                 }
             }
-            // Jika aplikasi tertutup, buka jendela baru
+            // Jika aplikasi belum terbuka sama sekali, buka jendela baru
             if (clients.openWindow) {
-                return clients.openWindow(targetUrl);
+                return clients.openWindow('/');
             }
         })
     );
 });
 
-// 5. Listener Pesan dari index.html (Pemicu Notifikasi Tunggal & App Icon Badge)
+// Event penanganan pesan dari index.html (untuk show notification dan update app icon badge di layar depan HP)
 self.addEventListener('message', (event) => {
-    const data = event.data;
-    if (!data) return;
+    if (!event.data) return;
 
-    // Handler: Update Angka Badge pada Ikon Aplikasi di Layar Utama HP
-    if (data.action === 'SET_BADGE' || data.type === 'SET_BADGE') {
-        const count = data.count || 0;
+    if (event.data.type === 'SHOW_NOTIFICATION') {
+        const payload = event.data.payload || {};
+        const title = payload.title || 'Portal Lifting PPA';
+        const options = {
+            body: payload.body || 'Ada pembaruan status pekerjaan.',
+            icon: 'https://lh3.googleusercontent.com/d/1hQZopiZU-_bQC9aRmyZndlmEF--k4h5U',
+            badge: 'https://lh3.googleusercontent.com/d/1hQZopiZU-_bQC9aRmyZndlmEF--k4h5U',
+            vibrate: [200, 100, 200],
+            tag: 'lifting-job-alert-' + Date.now(),
+            renotify: true,
+            data: payload
+        };
+        self.registration.showNotification(title, options);
+    }
+
+    // Set badge angka pada ikon aplikasi di layar depan HP
+    if (event.data.type === 'SET_BADGE') {
+        const count = event.data.count || 0;
         if ('setAppBadge' in navigator) {
             if (count > 0) {
                 navigator.setAppBadge(count).catch(() => {});
@@ -72,39 +74,13 @@ self.addEventListener('message', (event) => {
                 navigator.clearAppBadge().catch(() => {});
             }
         }
-    } else if (data.action === 'CLEAR_BADGE' || data.type === 'CLEAR_BADGE') {
-        if ('clearAppBadge' in navigator) {
-            navigator.clearAppBadge().catch(() => {});
-        }
-    }
-
-    // Handler: Tampilkan Notifikasi Banner di HP (Pasti 1 baris & menimpa notifikasi lama)
-    if (data.action === 'SHOW_NOTIFICATION' || data.type === 'SHOW_NOTIFICATION') {
-        const title = data.title || (data.payload && data.payload.title) || 'Ada Orderan Masuk!';
-        const body = data.body || (data.payload && data.payload.body) || 'Order baru siap divalidasi.';
-
-        // KUNCI UTAMA: Tag statis seragam agar Android langsung me-replace notifikasi lama (TIDAK BERTUMPUK)
-        const notificationTag = data.tag || 'portal-lifting-single-order-notif';
-
-        const options = {
-            body: body,
-            icon: data.icon || 'https://lh3.googleusercontent.com/d/1hQZopiZU-_bQC9aRmyZndlmEF--k4h5U',
-            badge: data.badge || 'https://lh3.googleusercontent.com/d/1hQZopiZU-_bQC9aRmyZndlmEF--k4h5U',
-            vibrate: [200, 100, 200],
-            tag: notificationTag,
-            renotify: true, // Memicu getar/bunyi lagi saat ada order baru tanpa menambah baris baru
-            data: data.payload || { url: './' }
-        };
-
-        event.waitUntil(
-            self.registration.showNotification(title, options)
-        );
     }
 });
 
-// 6. Event Push saat aplikasi tertutup / HP dalam keadaan standby
+// Event penanganan sinyal push saat aplikasi ditutup atau layar HP terkunci
 self.addEventListener('push', (event) => {
-    let payload = { title: 'Ada Orderan Masuk!', body: 'Order baru siap divalidasi.' };
+    let payload = { title: 'Order Lifting PPA', body: 'Ada pembaruan status pekerjaan.' };
+
     if (event.data) {
         try {
             payload = event.data.json();
@@ -113,21 +89,22 @@ self.addEventListener('push', (event) => {
         }
     }
 
-    const options = {
-        body: payload.body || 'Order baru siap divalidasi.',
+    const notificationOptions = {
+        body: payload.body,
         icon: 'https://lh3.googleusercontent.com/d/1hQZopiZU-_bQC9aRmyZndlmEF--k4h5U',
         badge: 'https://lh3.googleusercontent.com/d/1hQZopiZU-_bQC9aRmyZndlmEF--k4h5U',
         vibrate: [200, 100, 200],
-        tag: 'portal-lifting-single-order-notif',
+        tag: 'lifting-job-alert',
         renotify: true,
         data: payload
     };
 
+    // Tampilkan notifikasi dan aktifkan titik badge ikon aplikasi
     if ('setAppBadge' in navigator) {
         navigator.setAppBadge().catch(() => {});
     }
 
     event.waitUntil(
-        self.registration.showNotification(payload.title || 'Ada Orderan Masuk!', options)
+        self.registration.showNotification(payload.title, notificationOptions)
     );
 });
