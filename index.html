@@ -75,26 +75,38 @@
             transition: opacity 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
         }
 
-        /* Dynamic Font Sizing */
-        html.font-size-small { font-size: 100%; }
-        html.font-size-medium { font-size: 125%; }
-        html.font-size-large { font-size: 150%; }
+        /* Dynamic Font Sizing (4 Tingkat Ukuran) */
+        html.font-size-original, html.font-size-small { font-size: 100%; }
+        html.font-size-sedang { font-size: 112%; }
+        html.font-size-besar, html.font-size-medium { font-size: 125%; }
+        html.font-size-sangat-besar, html.font-size-large { font-size: 150%; }
 
-        html.font-size-medium .text-\[8px\] { font-size: 10px !important; }
-        html.font-size-medium .text-\[9px\] { font-size: 11.25px !important; }
-        html.font-size-medium .text-\[10px\] { font-size: 12.5px !important; }
-        html.font-size-medium .text-\[11px\] { font-size: 13.75px !important; }
-        html.font-size-medium .text-\[13px\] { font-size: 16.25px !important; }
-        html.font-size-medium .text-xs { font-size: 0.9375rem !important; }
-        html.font-size-medium .text-sm { font-size: 1.09375rem !important; }
+        /* Level 1: Sedang (+12%) */
+        html.font-size-sedang .text-\[8px\] { font-size: 9px !important; }
+        html.font-size-sedang .text-\[9px\] { font-size: 10px !important; }
+        html.font-size-sedang .text-\[10px\] { font-size: 11.2px !important; }
+        html.font-size-sedang .text-\[11px\] { font-size: 12.3px !important; }
+        html.font-size-sedang .text-\[13px\] { font-size: 14.5px !important; }
+        html.font-size-sedang .text-xs { font-size: 0.84rem !important; }
+        html.font-size-sedang .text-sm { font-size: 0.98rem !important; }
 
-        html.font-size-large .text-\[8px\] { font-size: 12px !important; }
-        html.font-size-large .text-\[9px\] { font-size: 13.5px !important; }
-        html.font-size-large .text-\[10px\] { font-size: 15px !important; }
-        html.font-size-large .text-\[11px\] { font-size: 16.5px !important; }
-        html.font-size-large .text-\[13px\] { font-size: 19.5px !important; }
-        html.font-size-large .text-xs { font-size: 1.125rem !important; }
-        html.font-size-large .text-sm { font-size: 1.3125rem !important; }
+        /* Level 2: Besar (+25%) */
+        html.font-size-besar .text-\[8px\], html.font-size-medium .text-\[8px\] { font-size: 10px !important; }
+        html.font-size-besar .text-\[9px\], html.font-size-medium .text-\[9px\] { font-size: 11.25px !important; }
+        html.font-size-besar .text-\[10px\], html.font-size-medium .text-\[10px\] { font-size: 12.5px !important; }
+        html.font-size-besar .text-\[11px\], html.font-size-medium .text-\[11px\] { font-size: 13.75px !important; }
+        html.font-size-besar .text-\[13px\], html.font-size-medium .text-\[13px\] { font-size: 16.25px !important; }
+        html.font-size-besar .text-xs, html.font-size-medium .text-xs { font-size: 0.9375rem !important; }
+        html.font-size-besar .text-sm, html.font-size-medium .text-sm { font-size: 1.09375rem !important; }
+
+        /* Level 3: Sangat Besar (+50%) */
+        html.font-size-sangat-besar .text-\[8px\], html.font-size-large .text-\[8px\] { font-size: 12px !important; }
+        html.font-size-sangat-besar .text-\[9px\], html.font-size-large .text-\[9px\] { font-size: 13.5px !important; }
+        html.font-size-sangat-besar .text-\[10px\], html.font-size-large .text-\[10px\] { font-size: 15px !important; }
+        html.font-size-sangat-besar .text-\[11px\], html.font-size-large .text-\[11px\] { font-size: 16.5px !important; }
+        html.font-size-sangat-besar .text-\[13px\], html.font-size-large .text-\[13px\] { font-size: 19.5px !important; }
+        html.font-size-sangat-besar .text-xs, html.font-size-large .text-xs { font-size: 1.125rem !important; }
+        html.font-size-sangat-besar .text-sm, html.font-size-large .text-sm { font-size: 1.3125rem !important; }
 
         /* FullCalendar Custom Theme */
         .fc .fc-toolbar-title { font-size: 13px !important; font-weight: bold; color: #0891b2; text-transform: uppercase; text-align: center !important; }
@@ -105,7 +117,27 @@
         .fc-daygrid-day-frame { cursor: pointer !important; transition: background-color 0.2s; }
         .fc-daygrid-day-frame:hover { background-color: rgba(8, 145, 178, 0.05); }
         .fc-daygrid-day.fc-day-today { background-color: #f0fdfa !important; }
-        .fc-event, .fc-event-main, .fc-event-title { pointer-events: none !important; cursor: default !important; border: none !important; border-radius: 2px; padding: 4px 2px; font-size: 9px; font-weight: bold; text-align: left; color: #000000 !important; white-space: normal !important; }
+        .fc-event, .fc-event-main { pointer-events: none !important; cursor: default !important; border: none !important; border-radius: 2px; color: #000000 !important; }
+        .fc-event-main { padding: 2px !important; overflow: hidden !important; }
+        .fc-event-title {
+            pointer-events: none !important;
+            cursor: default !important;
+            border: none !important;
+            padding: 1px 2px;
+            font-size: 9px;
+            font-weight: bold;
+            text-align: left;
+            color: #000000 !important;
+            white-space: normal !important;
+            display: -webkit-box !important;
+            -webkit-line-clamp: 2 !important;
+            -webkit-box-orient: vertical !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            word-break: break-word !important;
+            line-height: 1.25 !important;
+            max-height: 2.6em !important;
+        }
         .fc-daygrid-more-link { font-size: 9px !important; font-weight: 700 !important; color: #0891b2 !important; text-decoration: none !important; padding: 1px 5px !important; background-color: #ecfeff !important; border: 1px solid #cffafe !important; border-radius: 4px !important; display: inline-block !important; margin: 2px 0 1px 2px !important; transition: all 0.2s !important; }
         .fc-daygrid-more-link:hover { background-color: #cffafe !important; color: #0e7490 !important; }
 
@@ -845,6 +877,102 @@
         };
     }
 
+    /* ========================================================
+       HELPER MASTER DATA DENGAN OPSI "+ LAINNYA (KETIK MANUAL)"
+       ======================================================== */
+    function buildSelectOptionsWithOther(list = [], currentVal = '', label = 'Pilih') {
+        let items = Array.isArray(list) ? [...list] : [];
+        if (currentVal && currentVal !== '__OTHER__' && !items.includes(currentVal)) {
+            items.unshift(currentVal);
+        }
+        let html = `<option value="" disabled ${!currentVal ? 'selected' : ''}>-- ${label} --</option>`;
+        items.forEach(item => {
+            html += `<option value="${item}" ${currentVal === item ? 'selected' : ''}>${item}</option>`;
+        });
+        html += `<option value="__OTHER__">+ Lainnya (Ketik Manual)...</option>`;
+        return html;
+    }
+
+    function handleSelectOther(selectEl, otherInputId) {
+        const otherInput = document.getElementById(otherInputId);
+        if (!otherInput) return;
+        if (selectEl.value === '__OTHER__') {
+            otherInput.classList.remove('hidden');
+            otherInput.focus();
+            otherInput.required = true;
+        } else {
+            otherInput.classList.add('hidden');
+            otherInput.value = '';
+            otherInput.required = false;
+        }
+    }
+
+    function resolveMasterValue(selectId, otherInputId, masterKey) {
+        const selectEl = document.getElementById(selectId);
+        const otherEl = document.getElementById(otherInputId);
+        let finalVal = '';
+        if (selectEl && selectEl.value === '__OTHER__') {
+            finalVal = otherEl ? otherEl.value.trim().toUpperCase() : '';
+        } else if (selectEl) {
+            finalVal = selectEl.value.trim().toUpperCase();
+        }
+        if (finalVal && finalVal !== '__OTHER__') {
+            registerNewMasterItem(masterKey, finalVal);
+        }
+        return finalVal;
+    }
+
+    function registerNewMasterItem(masterKey, val) {
+        if (!masterKey || !val) return;
+        const clean = String(val).trim().toUpperCase();
+        if (!clean || clean === '__OTHER__') return;
+        let m = getMasterData();
+        if (!m[masterKey]) m[masterKey] = [];
+        if (!m[masterKey].includes(clean)) {
+            m[masterKey].push(clean);
+            saveMasterData(m);
+        }
+    }
+
+    function sanitizeOrderForSupabase(order) {
+        const allowedKeys = [
+            'no_wo', 'timestamp', 'kategori', 'nrp_pemohon', 'nama_pemohon', 
+            'perusahaan', 'departemen', 'section', 'no_wa', 'tgl_pelaksanaan', 
+            'jam_pelaksanaan', 'shift', 'durasi_request', 'lokasi_angkat', 
+            'lokasi_tujuan', 'deskripsi', 'status', 'gl', 'unit', 'operator', 
+            'rigger', 'rigger2', 'jam_start_aktual', 'jam_end_aktual', 
+            'durasi_aktual', 'final_inspeksi', 'alasan_telat', 'alasan_overtime'
+        ];
+        const clean = {};
+        allowedKeys.forEach(k => {
+            if (order[k] !== undefined) clean[k] = order[k];
+        });
+        return clean;
+    }
+
+    async function syncSingleOrderToSupabase(order) {
+        if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
+        try {
+            const clean = sanitizeOrderForSupabase(order);
+            if (supabaseClient) {
+                await supabaseClient.from('orders').upsert(clean, { onConflict: 'no_wo' });
+            } else {
+                await fetch(`${SUPABASE_URL}/rest/v1/orders?on_conflict=no_wo`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Prefer': 'resolution=merge-duplicates'
+                    },
+                    body: JSON.stringify(clean)
+                });
+            }
+        } catch(e) {
+            console.warn("Gagal simpan single order:", e);
+        }
+    }
+
     function formatDurationHM(minutes) {
         minutes = Math.round(minutes);
         if (isNaN(minutes) || minutes <= 0) return '0 Menit';
@@ -864,10 +992,54 @@
         return clean.trim();
     }
 
+    /* Helper Pembacaan Tanggal Jadwal Planning Lapangan Secara Presisi */
+    function getOrderScheduleDate(j) {
+        if (!j) return '';
+        let raw = String(j.tgl_pelaksanaan || '').trim();
+        if (!raw) return '';
+        // Format standar ISO YYYY-MM-DD
+        if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+        // Format DD/MM/YYYY atau DD-MM-YYYY
+        const m = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+        if (m) {
+            return `${m[3]}-${String(m[2]).padStart(2, '0')}-${String(m[1]).padStart(2, '0')}`;
+        }
+        const d = new Date(raw);
+        if (!isNaN(d)) {
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
+        return raw;
+    }
+
+    /* Helper Penarikan Data Operator & Rigger Langsung dari Manajemen Akun (users) */
+    function getAccountOperators() {
+        const users = getUsers();
+        const list = users
+            .filter(u => u.status_akun === 'ACTIVE' && (
+                (u.jabatan || '').toUpperCase().includes('OPERATOR') ||
+                (u.role || '').toUpperCase() === 'MANPOWER' ||
+                (u.role || '').toUpperCase() === 'MP'
+            ))
+            .map(u => (u.nama_lengkap || '').trim().toUpperCase())
+            .filter(Boolean);
+        return [...new Set(list)].sort();
+    }
+
+    function getAccountRiggers() {
+        const users = getUsers();
+        const list = users
+            .filter(u => u.status_akun === 'ACTIVE' && (
+                (u.jabatan || '').toUpperCase().includes('RIGGER') ||
+                (u.role || '').toUpperCase() === 'MANPOWER' ||
+                (u.role || '').toUpperCase() === 'MP'
+            ))
+            .map(u => (u.nama_lengkap || '').trim().toUpperCase())
+            .filter(Boolean);
+        return [...new Set(list)].sort();
+    }
+
     function getJobOperationalDate(j) {
-        if (!j || !j.tgl_pelaksanaan) return '';
-        // Murni membaca tanggal pelaksanaan tanpa memundurkan tanggal pada jam dini hari
-        return j.tgl_pelaksanaan;
+        return getOrderScheduleDate(j);
     }
 
     function getJobOperationalShift(j) {
@@ -912,98 +1084,295 @@
     let pendingActionData = null;
     let lastFetchTimestamp = Date.now();
 
+    /* ========================================================
+       SISTEM PENGATURAN PREFERENSI NOTIFIKASI PENGGUNA
+       ======================================================== */
+    function getNotificationPrefs() {
+        const user = JSON.parse(localStorage.getItem('lifting_user')) || {};
+        const nrp = user.nrp ? String(user.nrp).toUpperCase().trim() : 'DEFAULT';
+        const storageKey = `lifting_notif_prefs_${nrp}`;
+        try {
+            const saved = JSON.parse(localStorage.getItem(storageKey));
+            if (saved && typeof saved === 'object') {
+                return {
+                    order_masuk: saved.order_masuk !== false,
+                    tindakan_validasi: saved.tindakan_validasi !== false,
+                    notif_umum: saved.notif_umum !== false
+                };
+            }
+        } catch(e) {}
+        return { order_masuk: true, tindakan_validasi: true, notif_umum: true };
+    }
+
+    function saveNotificationPref(prefKey, value) {
+        const user = JSON.parse(localStorage.getItem('lifting_user')) || {};
+        const nrp = user.nrp ? String(user.nrp).toUpperCase().trim() : 'DEFAULT';
+        const storageKey = `lifting_notif_prefs_${nrp}`;
+        let prefs = getNotificationPrefs();
+        prefs[prefKey] = Boolean(value);
+        localStorage.setItem(storageKey, JSON.stringify(prefs));
+        showToast(`Pengaturan notifikasi berhasil diperbarui!`, 'success');
+    }
+
+    function renderNotificationSettingsUI() {
+        const user = JSON.parse(localStorage.getItem('lifting_user')) || {};
+        const role = String(user.role || '').toUpperCase().trim();
+        const isGlOrAdmin = ['ADMIN', 'GL', 'GROUP LEADER', 'LEADER'].includes(role) || 
+                            (user.jabatan && /GROUP LEADER|DISPATCHER|ADMIN/i.test(user.jabatan));
+        
+        const prefs = getNotificationPrefs();
+        const container = document.getElementById('notifSettingsContainer');
+        if (!container) return;
+
+        if (isGlOrAdmin) {
+            container.innerHTML = `
+                <div class="text-[11px] font-bold text-slate-700 flex items-center justify-between">
+                    <span class="flex items-center gap-1.5"><i class="fa-solid fa-bell text-cyan-600"></i> Pengaturan Notifikasi</span>
+                    <span class="text-[9px] text-cyan-600 font-bold bg-cyan-50 px-1.5 py-0.5 rounded border border-cyan-200 uppercase">${user.role}</span>
+                </div>
+                
+                <!-- Saklar 1: Notifikasi Order Masuk -->
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-3 shadow-2xs">
+                    <div class="flex-1 min-w-0">
+                        <div class="text-xs font-bold text-slate-800 leading-tight">Notifikasi Order Masuk</div>
+                        <div class="text-[10px] text-slate-500 mt-0.5 leading-snug">Pemberitahuan suara & pop-up banner saat user mengirimkan order baru</div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer shrink-0">
+                        <input type="checkbox" id="pref_order_masuk" ${prefs.order_masuk ? 'checked' : ''} onchange="saveNotificationPref('order_masuk', this.checked)" class="sr-only peer">
+                        <div class="w-10 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#0891b2]"></div>
+                    </label>
+                </div>
+
+                <!-- Saklar 2: Notifikasi Order Perlu Tindakan Validasi -->
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-3 shadow-2xs">
+                    <div class="flex-1 min-w-0">
+                        <div class="text-xs font-bold text-slate-800 leading-tight">Notifikasi Order Perlu Tindakan Validasi</div>
+                        <div class="text-[10px] text-slate-500 mt-0.5 leading-snug">Pemberitahuan order butuh penugasan unit/approval, pending, batal, atau selesai</div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer shrink-0">
+                        <input type="checkbox" id="pref_tindakan_validasi" ${prefs.tindakan_validasi ? 'checked' : ''} onchange="saveNotificationPref('tindakan_validasi', this.checked)" class="sr-only peer">
+                        <div class="w-10 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#0891b2]"></div>
+                    </label>
+                </div>
+            `;
+        } else {
+            // USER & MANPOWER (MP) - Hanya 1 tombol
+            const isMP = ['MANPOWER', 'MP', 'OPERATOR', 'RIGGER'].includes(role) || (user.jabatan && /OPERATOR|RIGGER/i.test(user.jabatan));
+            const labelTitle = isMP ? 'Notifikasi Penugasan & Tugas' : 'Notifikasi Pemberitahuan Order';
+            const labelDesc = isMP 
+                ? 'Pemberitahuan suara & pop-up banner saat Anda ditugaskan ke job baru atau perubahan status pekerjaan' 
+                : 'Pemberitahuan suara & pop-up banner saat order Anda divalidasi, sedang berjalan, dipending, atau selesai';
+
+            container.innerHTML = `
+                <div class="text-[11px] font-bold text-slate-700 flex items-center justify-between">
+                    <span class="flex items-center gap-1.5"><i class="fa-solid fa-bell text-cyan-600"></i> Pengaturan Notifikasi</span>
+                    <span class="text-[9px] text-cyan-600 font-bold bg-cyan-50 px-1.5 py-0.5 rounded border border-cyan-200 uppercase">${user.role}</span>
+                </div>
+                
+                <!-- 1 Tombol Saklar Notifikasi untuk User & MP -->
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-3 shadow-2xs">
+                    <div class="flex-1 min-w-0">
+                        <div class="text-xs font-bold text-slate-800 leading-tight">${labelTitle}</div>
+                        <div class="text-[10px] text-slate-500 mt-0.5 leading-snug">${labelDesc}</div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer shrink-0">
+                        <input type="checkbox" id="pref_notif_umum" ${prefs.notif_umum ? 'checked' : ''} onchange="saveNotificationPref('notif_umum', this.checked)" class="sr-only peer">
+                        <div class="w-10 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#0891b2]"></div>
+                    </label>
+                </div>
+            `;
+        }
+    }
+
+    // Membuka kunci AudioContext pada interaksi pertama agar suara notifikasi dapat berbunyi otomatis di HP
+    function unlockAudioContext() {
+        try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtx) {
+                const ctx = new AudioCtx();
+                if (ctx.state === 'suspended') ctx.resume();
+            }
+        } catch(e) {}
+        document.removeEventListener('click', unlockAudioContext);
+        document.removeEventListener('touchstart', unlockAudioContext);
+    }
+    document.addEventListener('click', unlockAudioContext);
+    document.addEventListener('touchstart', unlockAudioContext);
+
+    /* Logika Notifikasi Terpadu Real-time untuk Semua Role (Admin, GL, MP, dan User) */
+    function notifyRolesOnOrderChange(newRecord, oldRecord, eventType = 'UPDATE') {
+        const currentUser = JSON.parse(localStorage.getItem('lifting_user'));
+        if (!currentUser || !newRecord || !newRecord.no_wo) return;
+
+        const curRole = String(currentUser.role || '').toUpperCase().trim();
+        const curName = normalizeName(currentUser.nama_lengkap);
+        const curNrp = String(currentUser.nrp || '').toUpperCase().trim();
+
+        const orderNrp = String(newRecord.nrp_pemohon || '').toUpperCase().trim();
+        const orderName = normalizeName(newRecord.nama_pemohon);
+
+        const isGlOrAdmin = ['ADMIN', 'GL', 'GROUP LEADER', 'LEADER'].includes(curRole) ||
+                            (currentUser.jabatan && /GROUP LEADER|DISPATCHER|ADMIN/i.test(currentUser.jabatan));
+        const isMP = ['MANPOWER', 'MP', 'OPERATOR', 'RIGGER'].includes(curRole) ||
+                     (currentUser.jabatan && /OPERATOR|RIGGER/i.test(currentUser.jabatan));
+        const isOrderOwner = (orderNrp && orderNrp === curNrp) || (orderName && orderName === curName);
+
+        const newOp = normalizeName(newRecord.operator);
+        const newRig1 = normalizeName(newRecord.rigger);
+        const newRig2 = normalizeName(newRecord.rigger2);
+
+        const oldOp = oldRecord ? normalizeName(oldRecord.operator) : '';
+        const oldRig1 = oldRecord ? normalizeName(oldRecord.rigger) : '';
+        const oldRig2 = oldRecord ? normalizeName(oldRecord.rigger2) : '';
+
+        const isAssignedToMe = (newOp === curName || newRig1 === curName || newRig2 === curName);
+        const newlyAssigned = (newOp === curName && newOp !== oldOp) ||
+                              (newRig1 === curName && newRig1 !== oldRig1) ||
+                              (newRig2 === curName && newRig2 !== oldRig2);
+
+        const statusChanged = oldRecord ? (oldRecord.status !== newRecord.status) : true;
+
+        // Baca preferensi notifikasi pengguna yang tersimpan
+        const prefs = getNotificationPrefs();
+
+        // 1. NOTIFIKASI UNTUK ADMIN & GROUP LEADER (GL)
+        if (isGlOrAdmin) {
+            if (eventType === 'INSERT') {
+                if (!prefs.order_masuk) return;
+                triggerAppNotification(
+                    "Ada Orderan Masuk!",
+                    `Order ${newRecord.no_wo} dari ${newRecord.nama_pemohon || 'User'} (${newRecord.kategori || 'Armada'}) siap divalidasi.`,
+                    'gl',
+                    newRecord
+                );
+            } else if (statusChanged) {
+                if (!prefs.tindakan_validasi) return;
+                if (newRecord.status === 'COMPLETED') {
+                    triggerAppNotification(
+                        "Job Selesai Dikerjakan!",
+                        `Job ${newRecord.no_wo} (${newRecord.unit || '-'}) telah diselesaikan oleh ${newRecord.operator || 'MP'}.`,
+                        'gl',
+                        newRecord
+                    );
+                } else if (newRecord.status === 'PENDING') {
+                    triggerAppNotification(
+                        "Job Dipending di Lapangan!",
+                        `Job ${newRecord.no_wo} dipending. Memerlukan penanganan atau validasi shift berikutnya.`,
+                        'gl',
+                        newRecord
+                    );
+                } else if (newRecord.status === 'CANCELED') {
+                    triggerAppNotification(
+                        "Job Dibatalkan!",
+                        `Job ${newRecord.no_wo} telah dibatalkan oleh lapangan.`,
+                        'gl',
+                        newRecord
+                    );
+                } else if (['SCHEDULED', 'UNSCHEDULED'].includes(newRecord.status)) {
+                    triggerAppNotification(
+                        "Order Butuh Validasi!",
+                        `Order ${newRecord.no_wo} memerlukan penugasan unit atau approval GL.`,
+                        'gl',
+                        newRecord
+                    );
+                }
+            }
+        }
+
+        // 2. NOTIFIKASI UNTUK MANPOWER (OPERATOR & RIGGER)
+        if (isMP && isAssignedToMe) {
+            if (!prefs.notif_umum) return;
+            const isActiveState = ['ON PROGRESS', 'SCHEDULED'].includes(newRecord.status);
+            if ((eventType === 'INSERT' || newlyAssigned || (statusChanged && isActiveState)) && isActiveState) {
+                triggerAppNotification(
+                    "Penugasan Job Baru!",
+                    `Job ${newRecord.no_wo} (${newRecord.kategori || 'Armada'}) ditugaskan kepada Anda (Unit: ${newRecord.unit || '-'}). Segera laksanakan.`,
+                    'mp',
+                    newRecord
+                );
+                openAssignedJobAlert(newRecord);
+            } else if (statusChanged && newRecord.status === 'CANCELED') {
+                triggerAppNotification(
+                    "Job Dibatalkan",
+                    `Job ${newRecord.no_wo} yang ditugaskan kepada Anda telah dibatalkan.`,
+                    'gl',
+                    newRecord
+                );
+            } else if (statusChanged && newRecord.status === 'PENDING') {
+                triggerAppNotification(
+                    "Job Dipending",
+                    `Job ${newRecord.no_wo} telah ditandai pending. Menunggu validasi GL.`,
+                    'gl',
+                    newRecord
+                );
+            }
+        }
+
+        // 3. NOTIFIKASI UNTUK USER (PEMOHON)
+        if (isOrderOwner) {
+            if (!prefs.notif_umum) return;
+            if (eventType === 'INSERT' && newRecord.no_wo && newRecord.no_wo.includes('-L')) {
+                triggerAppNotification(
+                    "Order Lanjutan Diterbitkan!",
+                    `Order ${newRecord.no_wo} otomatis dibuat untuk melanjutkan pekerjaan sebelumnya.`,
+                    'gl',
+                    newRecord
+                );
+            } else if (statusChanged) {
+                let userMsg = '';
+                if (newRecord.status === 'ON PROGRESS') {
+                    userMsg = `Order ${newRecord.no_wo} sedang dikerjakan oleh unit ${newRecord.unit || '-'} (${newRecord.operator || 'Operator'}).`;
+                } else if (newRecord.status === 'COMPLETED') {
+                    userMsg = `Order ${newRecord.no_wo} telah selesai dikerjakan (COMPLETED). Terima kasih.`;
+                } else if (newRecord.status === 'PENDING') {
+                    userMsg = `Order ${newRecord.no_wo} dipending. Menunggu penanganan shift berikutnya.`;
+                } else if (newRecord.status === 'CANCELED') {
+                    userMsg = `Order ${newRecord.no_wo} telah dibatalkan: ${cleanKendalaText(newRecord.alasan_telat || '') || 'Dibatalkan'}.`;
+                } else if (newRecord.status === 'SCHEDULED' && oldRecord && oldRecord.status === 'UNSCHEDULED') {
+                    userMsg = `Order ${newRecord.no_wo} telah dijadwalkan untuk ${newRecord.tgl_pelaksanaan}.`;
+                }
+
+                if (userMsg) {
+                    triggerAppNotification(
+                        `Update Order: ${newRecord.status}`,
+                        userMsg,
+                        newRecord.status === 'COMPLETED' || newRecord.status === 'ON PROGRESS' ? 'mp' : 'gl',
+                        newRecord
+                    );
+                }
+            }
+        }
+    }
+
     // Handler Realtime Presisi: Memperbarui data lokal secara instan dari payload tanpa re-query PostgREST
     function handleRealtimeOrderChange(payload) {
         try {
             let orders = getOrders();
             const { eventType, new: newRecord, old: oldRecord } = payload;
             let changed = false;
-            const currentUser = JSON.parse(localStorage.getItem('lifting_user'));
 
             if (eventType === 'INSERT' && newRecord && newRecord.no_wo) {
                 const existingIdx = orders.findIndex(o => o.no_wo === newRecord.no_wo);
                 if (existingIdx === -1) {
                     orders.unshift(newRecord);
                     changed = true;
-                    
-                    // Notifikasi untuk Admin & Group Leader (GL) saat order baru masuk
-                    if (currentUser) {
-                        const curRole = String(currentUser.role || '').toUpperCase().trim();
-                        const isGlOrAdmin = ['ADMIN', 'GL', 'GROUP LEADER', 'LEADER'].includes(curRole);
-                        if (isGlOrAdmin) {
-                            triggerAppNotification(
-                                "Ada Orderan Masuk!",
-                                `Order ${newRecord.no_wo} dari ${newRecord.nama_pemohon || 'User'} (${newRecord.kategori || 'Armada'}) siap divalidasi.`,
-                                'gl',
-                                newRecord
-                            );
-                        } else if (curRole === 'USER' && (newRecord.nrp_pemohon || '').toUpperCase() === (currentUser.nrp || '').toUpperCase()) {
-                            // Notifikasi ke User jika ada order lanjutan baru yang otomatis terbit untuk dirinya
-                            if (newRecord.no_wo && newRecord.no_wo.includes('-L')) {
-                                triggerAppNotification(
-                                    "Order Lanjutan Diterbitkan!",
-                                    `Order ${newRecord.no_wo} (Pending) otomatis dibuat untuk melanjutkan pekerjaan Anda.`,
-                                    'gl',
-                                    newRecord
-                                );
-                            }
-                        }
-                    }
+                    notifyRolesOnOrderChange(newRecord, null, 'INSERT');
                 } else {
+                    const prev = orders[existingIdx];
                     orders[existingIdx] = newRecord;
                     changed = true;
+                    notifyRolesOnOrderChange(newRecord, prev, 'UPDATE');
                 }
             } else if (eventType === 'UPDATE' && newRecord && newRecord.no_wo) {
                 const idx = orders.findIndex(o => o.no_wo === newRecord.no_wo);
+                const prev = idx !== -1 ? orders[idx] : oldRecord;
                 if (idx !== -1) {
                     orders[idx] = newRecord;
-                    changed = true;
                 } else {
                     orders.unshift(newRecord);
-                    changed = true;
                 }
-
-                if (currentUser) {
-                    const curRole = String(currentUser.role || '').toUpperCase().trim();
-                    const isGlOrAdmin = ['ADMIN', 'GL', 'GROUP LEADER', 'LEADER'].includes(curRole);
-                    const isMP = ['MANPOWER', 'MP', 'OPERATOR', 'RIGGER'].includes(curRole);
-
-                    // Notifikasi jika ada order pending/butuh validasi ulang untuk GL & Admin
-                    if (isGlOrAdmin && ['PENDING', 'UNSCHEDULED', 'SCHEDULED'].includes(newRecord.status) && (!oldRecord || oldRecord.status !== newRecord.status)) {
-                        triggerAppNotification(
-                            "Order Butuh Tindakan!",
-                            `Order ${newRecord.no_wo} memerlukan penugasan atau validasi lanjutan.`,
-                            'gl'
-                        );
-                    }
-
-                    // Notifikasi khusus Manpower (Operator & Rigger) saat namanya ditugaskan dari master data
-                    if (isMP) {
-                        const currentName = normalizeName(currentUser.nama_lengkap);
-                        const newOp = normalizeName(newRecord.operator);
-                        const newRig1 = normalizeName(newRecord.rigger);
-                        const newRig2 = normalizeName(newRecord.rigger2);
-
-                        const oldOp = oldRecord ? normalizeName(oldRecord.operator) : '';
-                        const oldRig1 = oldRecord ? normalizeName(oldRecord.rigger) : '';
-                        const oldRig2 = oldRecord ? normalizeName(oldRecord.rigger2) : '';
-
-                        const newlyAssigned = (newOp === currentName && newOp !== oldOp) ||
-                                              (newRig1 === currentName && newRig1 !== oldRig1) ||
-                                              (newRig2 === currentName && newRig2 !== oldRig2);
-
-                        const isStatusActive = ['ON PROGRESS', 'SCHEDULED'].includes(newRecord.status);
-
-                        if (newlyAssigned && isStatusActive) {
-                            triggerAppNotification(
-                                "Penugasan Job Baru!",
-                                "Anda mendapatkan job baru, segera selesaikan. Terimakasih.",
-                                'mp'
-                            );
-                            openAssignedJobAlert(newRecord);
-                        }
-                    }
-                }
+                changed = true;
+                notifyRolesOnOrderChange(newRecord, prev, 'UPDATE');
             } else if (eventType === 'DELETE' && oldRecord) {
                 const targetWo = oldRecord.no_wo;
                 const prevLen = orders.length;
@@ -1121,44 +1490,49 @@
         } catch (e) {}
     }
 
-    var isPreviewCanvas = window.self !== window.top || window.location.hostname.includes('usercontent.goog');
-
     let realtimeChannel = null;
+    let realtimeReconnectTimer = null;
+
     function initSupabaseRealtime() {
-        if (!supabaseClient || isPreviewCanvas) return;
+        if (!supabaseClient) return;
         try {
             if (realtimeChannel) {
                 supabaseClient.removeChannel(realtimeChannel);
+                realtimeChannel = null;
             }
-            realtimeChannel = supabaseClient.channel('custom-all-channel')
+            realtimeChannel = supabaseClient.channel('portal-lifting-realtime-all')
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, handleRealtimeOrderChange)
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, handleRealtimeSettingsChange)
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, handleRealtimeUsersChange)
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'master_data' }, handleRealtimeMasterChange)
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'unit_status' }, handleRealtimeUnitStatusChange)
-                .subscribe((status) => {
+                .subscribe((status, err) => {
                     console.log("Supabase Realtime Status:", status);
+                    if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+                        if (!realtimeReconnectTimer) {
+                            realtimeReconnectTimer = setTimeout(() => {
+                                realtimeReconnectTimer = null;
+                                initSupabaseRealtime();
+                            }, 3000);
+                        }
+                    }
                 });
         } catch(e) {
             console.warn("Koneksi realtime Supabase:", e);
+            if (!realtimeReconnectTimer) {
+                realtimeReconnectTimer = setTimeout(() => {
+                    realtimeReconnectTimer = null;
+                    initSupabaseRealtime();
+                }, 5000);
+            }
         }
     }
 
-    if (isPreviewCanvas) {
-        setInterval(() => {
-            const user = localStorage.getItem('lifting_user');
-            if (!user) return;
-            const isTyping = document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
-            const isModalOpen = ['editJobModal', 'detailJobModal', 'mpActionModal', 'kendalaModal', 'cancelPromptModal', 'globalConfirmModal', 'resetPwdModal', 'successModal', 'successRegModal', 'profileBiodataModal', 'profileSettingsModal', 'imageViewerModal', 'dayJobsModal'].some(id => {
-                const el = document.getElementById(id); return el && !el.classList.contains('hidden');
-            });
-            if (!isTyping && !isModalOpen && currentTab !== 'order' && currentTab !== 'master' && currentTab !== 'profile') {
-                fetchFromSupabase(false);
-            }
-        }, 60000);
-    } else {
-        initSupabaseRealtime();
-    }
+    // Aktifkan Realtime WebSocket segera untuk semua lingkungan (Mobile, Desktop, Standalone, dan iFrame)
+    initSupabaseRealtime();
+
+    // Polling latar belakang (setInterval) dinonaktifkan sepenuhnya
+    // Pembaruan data otomatis kini 100% mengandalkan event Supabase Realtime WebSocket (hanya update saat ada perubahan data di Supabase)
 
     async function fetchFromSupabase(isManual = false) {
         if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
@@ -1178,9 +1552,29 @@
                 const data = await resOrders.json(); 
                 if(Array.isArray(data)) { 
                     data.forEach(item => { if (item.foto_evidence) delete item.foto_evidence; });
-                    let ds = JSON.stringify(data); 
+                    const localOrders = getOrders();
+                    
+                    // Deteksi perubahan atau order baru yang masuk saat background sync
+                    data.forEach(serverJob => {
+                        const localJob = localOrders.find(o => o.no_wo === serverJob.no_wo);
+                        if (!localJob) {
+                            notifyRolesOnOrderChange(serverJob, null, 'INSERT');
+                        } else if (localJob.status !== serverJob.status || 
+                                   localJob.unit !== serverJob.unit || 
+                                   localJob.operator !== serverJob.operator || 
+                                   localJob.rigger !== serverJob.rigger) {
+                            notifyRolesOnOrderChange(serverJob, localJob, 'UPDATE');
+                        }
+                    });
+
+                    // Pertahankan order lokal yang baru dibuat jika belum tercermin di server
+                    const pendingLocal = localOrders.filter(lo => !data.some(so => so.no_wo === lo.no_wo));
+                    const mergedData = [...pendingLocal, ...data];
+
+                    let ds = JSON.stringify(mergedData); 
                     if(localStorage.getItem('lifting_orders') !== ds) { 
                         localStorage.setItem('lifting_orders', ds); 
+                        updateNotificationBadge();
                         shouldRender = true; 
                     } 
                 } 
@@ -1238,12 +1632,8 @@
         if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
         try {
             if (!orders || orders.length === 0) return;
-            // Sanitasi: Pastikan kolom foto_evidence dan string Base64 tidak ikut terkirim ke Supabase
-            const cleanOrders = orders.map(o => {
-                const copy = { ...o };
-                delete copy.foto_evidence;
-                return copy;
-            });
+            // Sanitasi: Pastikan hanya kolom valid tabel orders yang dikirim
+            const cleanOrders = orders.map(o => sanitizeOrderForSupabase(o));
             await fetch(`${SUPABASE_URL}/rest/v1/orders?on_conflict=no_wo`, { 
                 method: 'POST', 
                 headers: { 
@@ -1348,10 +1738,10 @@
             lok_tujuan: document.getElementById('req_lok_tujuan')?.value,
             deskripsi: document.getElementById('req_deskripsi')?.value,
             del_nama: document.getElementById('del_nama')?.value,
-            del_dept: document.getElementById('del_dept')?.value,
-            del_vendor: document.getElementById('del_vendor')?.value,
+            del_dept: document.getElementById('del_dept')?.value === '__OTHER__' ? document.getElementById('del_dept_other')?.value : document.getElementById('del_dept')?.value,
+            del_vendor: document.getElementById('del_vendor')?.value === '__OTHER__' ? document.getElementById('del_vendor_other')?.value : document.getElementById('del_vendor')?.value,
             del_wa: document.getElementById('del_wa')?.value,
-            del_sect: document.getElementById('del_sect')?.value
+            del_sect: document.getElementById('del_sect')?.value === '__OTHER__' ? document.getElementById('del_sect_other')?.value : document.getElementById('del_sect')?.value
         };
         localStorage.setItem(key, JSON.stringify(draft));
     }
@@ -1511,8 +1901,8 @@
 - *TANGGAL REQ :* ${job.tgl_pelaksanaan || '-'}
 - *JAM REQ :* ${job.jam_pelaksanaan || '-'}
 - *DURASI JOB :* ${job.durasi_request || '-'}
-- *LOKASI ASAL :* ${job.lokasi_angkat || '-'}
-- *LOKASI TUJUAN :* ${job.lokasi_tujuan || '-'}
+${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}` : `- *LOKASI ASAL :* ${job.lokasi_angkat || '-'}
+- *LOKASI TUJUAN :* ${job.lokasi_tujuan || '-'}`}
 - *DESKRIPSI :* ${job.deskripsi || '-'}`;
 
         // Pembersihan presisi: Mencegah timbulnya teks ganda "Telat : Telat" atau "Over : Over"
@@ -1838,15 +2228,18 @@
                             <div class="space-y-2">
                                 <div>
                                     <label class="block text-[10px] font-bold text-slate-500 mb-1">Perusahaan</label>
-                                    <select id="profPerusahaan" class="w-full border border-slate-300 rounded-md px-3 py-2 text-[10px] focus:outline-none focus:border-cyan-500 bg-white cursor-pointer" required></select>
+                                    <select id="profPerusahaan" onchange="handleSelectOther(this, 'profPerusahaanOther')" class="w-full border border-slate-300 rounded-md px-3 py-2 text-[10px] focus:outline-none focus:border-cyan-500 bg-white cursor-pointer" required></select>
+                                    <input type="text" id="profPerusahaanOther" oninput="this.value = this.value.toUpperCase()" placeholder="Ketik nama perusahaan..." class="hidden w-full border border-cyan-400 bg-cyan-50/30 rounded-md px-2 py-1 text-xs mt-1 outline-none">
                                 </div>
                                 <div>
                                     <label class="block text-[10px] font-bold text-slate-500 mb-1">Departemen</label>
-                                    <select id="profDepartemen" class="w-full border border-slate-300 rounded-md px-3 py-2 text-[10px] focus:outline-none focus:border-cyan-500 bg-white cursor-pointer" required></select>
+                                    <select id="profDepartemen" onchange="handleSelectOther(this, 'profDepartemenOther')" class="w-full border border-slate-300 rounded-md px-3 py-2 text-[10px] focus:outline-none focus:border-cyan-500 bg-white cursor-pointer" required></select>
+                                    <input type="text" id="profDepartemenOther" oninput="this.value = this.value.toUpperCase()" placeholder="Ketik departemen..." class="hidden w-full border border-cyan-400 bg-cyan-50/30 rounded-md px-2 py-1 text-xs mt-1 outline-none">
                                 </div>
                                 <div>
                                     <label class="block text-[10px] font-bold text-slate-500 mb-1">Section</label>
-                                    <select id="profSection" class="w-full border border-slate-300 rounded-md px-3 py-2 text-[10px] focus:outline-none focus:border-cyan-500 bg-white cursor-pointer" required></select>
+                                    <select id="profSection" onchange="handleSelectOther(this, 'profSectionOther')" class="w-full border border-slate-300 rounded-md px-3 py-2 text-[10px] focus:outline-none focus:border-cyan-500 bg-white cursor-pointer" required></select>
+                                    <input type="text" id="profSectionOther" oninput="this.value = this.value.toUpperCase()" placeholder="Ketik section..." class="hidden w-full border border-cyan-400 bg-cyan-50/30 rounded-md px-2 py-1 text-xs mt-1 outline-none">
                                 </div>
                             </div>
                             
@@ -1863,33 +2256,76 @@
                         <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2">
                             <i class="fa-solid fa-gear text-cyan-600"></i>Pengaturan Aplikasi
                         </h3>
-                        <button onclick="document.getElementById('profileSettingsModal').classList.add('hidden')" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-base"></i></button>
+                        <button onclick="closeProfileSettingsModal()" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-base"></i></button>
                     </div>
                     <div class="overflow-y-auto hide-scrollbar divide-y divide-slate-100">
-                        <!-- Bagian 1: Ukuran Teks Tampilan -->
-                        <div class="p-4 space-y-2.5">
-                            <label class="block text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
-                                <i class="fa-solid fa-text-height text-cyan-600"></i> Ukuran Teks Tampilan
-                            </label>
-                            <div class="flex gap-1.5">
-                                <button type="button" id="fontSizeSmall" onclick="applyAppFontSize('small')" class="flex-1 py-2 px-1 rounded-lg text-[11px] font-bold border transition-all text-center cursor-pointer">
-                                    Kecil
-                                </button>
-                                <button type="button" id="fontSizeMedium" onclick="applyAppFontSize('medium')" class="flex-1 py-2 px-1 rounded-lg text-[11px] font-bold border transition-all text-center cursor-pointer">
-                                    Sedang (+25%)
-                                </button>
-                                <button type="button" id="fontSizeLarge" onclick="applyAppFontSize('large')" class="flex-1 py-2 px-1 rounded-lg text-[11px] font-bold border transition-all text-center cursor-pointer">
-                                    Besar (+50%)
-                                </button>
+                        <!-- Bagian 1: Slider Garis Ukuran Teks (Tanpa Border Biru + Konfirmasi Simpan) -->
+                        <div class="p-4 space-y-3">
+                            <div class="bg-slate-50 border border-slate-200 rounded-xl p-3.5 shadow-2xs">
+                                <div class="text-[11px] font-bold text-slate-800 mb-2 select-none">Font size</div>
+                                
+                                <!-- Baris Slider: A kecil, Garis + 4 Titik + Indikator Biru, A besar -->
+                                <div class="flex items-center gap-3">
+                                    <span class="text-xs font-black text-slate-800 select-none">A</span>
+                                    
+                                    <div class="relative flex-1 flex items-center py-2.5 px-2">
+                                        <!-- Garis Abu-abu di Belakang -->
+                                        <div class="w-full h-0.5 bg-slate-300 rounded-full"></div>
+                                        
+                                        <!-- 4 Titik Diskret Sesuai Posisi 0%, 33.33%, 66.67%, 100% -->
+                                        <div class="absolute inset-x-2 flex justify-between items-center pointer-events-none">
+                                            <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+                                            <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+                                            <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+                                            <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+                                        </div>
+                                        
+                                        <!-- Lingkaran Thumb Biru Aktif (Berpindah Halus) -->
+                                        <div class="absolute inset-x-2 pointer-events-none">
+                                            <div id="fontSizeThumb" class="w-5 h-5 rounded-full bg-blue-600 shadow-md border-2 border-white transition-all duration-150 absolute top-1/2 -translate-y-1/2 -translate-x-1/2" style="left: 0%;"></div>
+                                        </div>
+                                        
+                                        <!-- Input Range Transparan Agar Bisa Disentuh / Digeser di HP & Desktop -->
+                                        <input type="range" id="fontSizeRange" min="0" max="3" step="1" value="0" oninput="handleFontSizeSlider(this.value)" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+                                    </div>
+                                    
+                                    <span class="text-lg font-black text-slate-800 select-none">A</span>
+                                </div>
+
+                                <!-- Label 4 Tingkat Ukuran -->
+                                <div class="grid grid-cols-4 text-[9px] pt-2.5 mt-1 border-t border-slate-200 select-none">
+                                    <div id="fontStepLbl0" onclick="setAppFontSizeLevel(0)" class="cursor-pointer text-center font-bold text-blue-600 leading-tight">
+                                        Original<br><span class="text-[8px] font-normal text-slate-400">Kecil</span>
+                                    </div>
+                                    <div id="fontStepLbl1" onclick="setAppFontSizeLevel(1)" class="cursor-pointer text-center font-medium text-slate-500 hover:text-blue-600 leading-tight">
+                                        Sedang<br><span class="text-[8px] font-normal text-slate-400">(+12%)</span>
+                                    </div>
+                                    <div id="fontStepLbl2" onclick="setAppFontSizeLevel(2)" class="cursor-pointer text-center font-medium text-slate-500 hover:text-blue-600 leading-tight">
+                                        Besar<br><span class="text-[8px] font-normal text-slate-400">(+25%)</span>
+                                    </div>
+                                    <div id="fontStepLbl3" onclick="setAppFontSizeLevel(3)" class="cursor-pointer text-center font-medium text-slate-500 hover:text-blue-600 leading-tight">
+                                        Sangat Besar<br><span class="text-[8px] font-normal text-slate-400">(+50%)</span>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-center">
-                                <span id="fontSizePreviewText" class="text-xs text-slate-600 font-medium leading-relaxed block">
-                                    Contoh Teks: Ukuran Kecil (Bawaan). Standar antarmuka sistem.
+
+                            <!-- Kotak Pratinjau Teks -->
+                            <div class="bg-white border border-slate-200 rounded-lg p-2.5 text-center shadow-2xs">
+                                <span id="fontSizePreviewText" class="text-xs text-slate-600 font-medium leading-relaxed block transition-all duration-150">
+                                    Contoh Teks: Ukuran Original Kecil (100%). Standar antarmuka sistem.
                                 </span>
                             </div>
+
+                            <!-- Tombol Konfirmasi Simpan Ukuran Font -->
+                            <button id="btnSaveFontSize" type="button" onclick="saveAppFontSize()" class="w-full bg-[#0891b2] hover:bg-cyan-700 text-white font-bold py-2 rounded-md text-xs transition-colors shadow-sm flex items-center justify-center gap-1.5">
+                                <i class="fa-solid fa-floppy-disk"></i> Simpan Ukuran Font
+                            </button>
                         </div>
 
-                        <!-- Bagian 2: Ubah Kata Sandi -->
+                        <!-- Bagian 2: Pengaturan Notifikasi Pemberitahuan (Dinamis Sesuai Role Pengguna) -->
+                        <div id="notifSettingsContainer" class="p-4 space-y-3"></div>
+
+                        <!-- Bagian 3: Ubah Kata Sandi -->
                         <form onsubmit="savePassword(event)" class="p-4 space-y-3">
                             <div class="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
                                 <i class="fa-solid fa-lock text-slate-500"></i> Ubah Kata Sandi
@@ -1911,6 +2347,80 @@
                             <button type="submit" class="w-full bg-[#0891b2] hover:bg-cyan-700 text-white font-bold py-2 rounded-md text-xs mt-2 transition-colors shadow-md">Perbarui Kata Sandi</button>
                         </form>
                     </div>
+                </div>
+            </div>
+
+            <!-- MODAL TAMBAH PENGGUNA BARU (OPERATOR / RIGGER / USER) -->
+            <div id="createUserModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[140] hidden p-3">
+                <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col max-h-[92vh]">
+                    <div class="p-3.5 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
+                        <h3 class="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                            <i class="fa-solid fa-user-plus text-cyan-600"></i> Tambah Akun Pengguna Baru
+                        </h3>
+                        <button onclick="document.getElementById('createUserModal').classList.add('hidden')" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-sm"></i></button>
+                    </div>
+                    <form onsubmit="handleCreateUserByAdmin(event)" class="p-4 space-y-2.5 overflow-y-auto hide-scrollbar text-left">
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-600 mb-0.5">NRP *</label>
+                                <input type="text" id="newAccNrp" oninput="this.value = this.value.toUpperCase()" placeholder="NRP/ID" class="w-full border border-slate-300 rounded px-2 py-1.5 text-xs outline-none focus:border-cyan-500" required>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-600 mb-0.5">Role Akun *</label>
+                                <select id="newAccRole" class="w-full border border-slate-300 rounded px-2 py-1.5 text-xs outline-none focus:border-cyan-500 bg-white font-semibold cursor-pointer" required>
+                                    <option value="MANPOWER">MANPOWER (MP)</option>
+                                    <option value="USER">USER</option>
+                                    <option value="GL">GROUP LEADER (GL)</option>
+                                    <option value="ADMIN">ADMIN</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-600 mb-0.5">Nama Lengkap *</label>
+                            <input type="text" id="newAccName" oninput="this.value = this.value.toUpperCase()" placeholder="Nama Lengkap" class="w-full border border-slate-300 rounded px-2 py-1.5 text-xs outline-none focus:border-cyan-500" required>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-600 mb-0.5">Jabatan *</label>
+                                <input type="text" id="newAccJabatan" oninput="this.value = this.value.toUpperCase()" placeholder="OPERATOR / RIGGER" class="w-full border border-slate-300 rounded px-2 py-1.5 text-xs outline-none focus:border-cyan-500 font-semibold" required>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-600 mb-0.5">No WhatsApp *</label>
+                                <input type="number" id="newAccWa" placeholder="08..." class="w-full border border-slate-300 rounded px-2 py-1.5 text-xs outline-none focus:border-cyan-500" required>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-600 mb-0.5">Perusahaan *</label>
+                            <select id="newAccPerusahaan" onchange="handleSelectOther(this, 'newAccPerusahaanOther')" class="w-full border border-slate-300 rounded px-2 py-1.5 text-xs outline-none focus:border-cyan-500 bg-white font-medium cursor-pointer" required>
+                                ${buildSelectOptionsWithOther(getMasterData().perusahaan, 'PPA', 'Pilih Perusahaan')}
+                            </select>
+                            <input type="text" id="newAccPerusahaanOther" oninput="this.value = this.value.toUpperCase()" placeholder="Ketik nama perusahaan..." class="hidden w-full border border-cyan-400 bg-cyan-50/30 rounded px-2 py-1 text-xs mt-1 outline-none">
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-600 mb-0.5">Departemen *</label>
+                                <select id="newAccDept" onchange="handleSelectOther(this, 'newAccDeptOther')" class="w-full border border-slate-300 rounded px-2 py-1.5 text-xs outline-none focus:border-cyan-500 bg-white font-medium cursor-pointer" required>
+                                    ${buildSelectOptionsWithOther(getMasterData().departemen, 'OPERATION', 'Pilih Departemen')}
+                                </select>
+                                <input type="text" id="newAccDeptOther" oninput="this.value = this.value.toUpperCase()" placeholder="Ketik departemen..." class="hidden w-full border border-cyan-400 bg-cyan-50/30 rounded px-2 py-1 text-xs mt-1 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-600 mb-0.5">Section *</label>
+                                <select id="newAccSection" onchange="handleSelectOther(this, 'newAccSectionOther')" class="w-full border border-slate-300 rounded px-2 py-1.5 text-xs outline-none focus:border-cyan-500 bg-white font-medium cursor-pointer" required>
+                                    ${buildSelectOptionsWithOther(getMasterData().section, 'LIFTING', 'Pilih Section')}
+                                </select>
+                                <input type="text" id="newAccSectionOther" oninput="this.value = this.value.toUpperCase()" placeholder="Ketik section..." class="hidden w-full border border-cyan-400 bg-cyan-50/30 rounded px-2 py-1 text-xs mt-1 outline-none">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-600 mb-0.5">Password Awal *</label>
+                            <input type="text" id="newAccPwd" value="123456" class="w-full border border-slate-300 rounded px-2 py-1.5 text-xs outline-none focus:border-cyan-500 font-mono" required>
+                        </div>
+                        <div class="pt-2 flex gap-2">
+                            <button type="button" onclick="document.getElementById('createUserModal').classList.add('hidden')" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 rounded text-xs transition-colors">Batal</button>
+                            <button type="submit" class="flex-1 bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 rounded text-xs transition-colors shadow-md">Simpan Akun</button>
+                        </div>
+                    </form>
                 </div>
             </div>
 
@@ -2100,11 +2610,29 @@
                         <div><label class="block text-[10px] font-bold text-slate-600 mb-1">Nama Lengkap</label><input type="text" id="regName" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500 shadow-sm" required></div>
 
                         <div class="grid grid-cols-2 gap-2">
-                            <div><label class="block text-[10px] font-bold text-slate-600 mb-1">Perusahaan</label><select id="regPerusahaan" class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500 cursor-pointer bg-white shadow-sm" required>${optPerusahaan}</select></div>
-                            <div><label class="block text-[10px] font-bold text-slate-600 mb-1">Departemen</label><select id="regDepartemen" class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500 cursor-pointer bg-white shadow-sm" required>${optDepartemen}</select></div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-600 mb-1">Perusahaan</label>
+                                <select id="regPerusahaan" onchange="handleSelectOther(this, 'regPerusahaanOther')" class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500 cursor-pointer bg-white shadow-sm" required>
+                                    ${buildSelectOptionsWithOther(m.perusahaan, '', 'Pilih Perusahaan')}
+                                </select>
+                                <input type="text" id="regPerusahaanOther" oninput="this.value = this.value.toUpperCase()" placeholder="Ketik perusahaan..." class="hidden w-full border border-cyan-400 bg-cyan-50/30 rounded-md px-2 py-1 text-xs mt-1 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-600 mb-1">Departemen</label>
+                                <select id="regDepartemen" onchange="handleSelectOther(this, 'regDepartemenOther')" class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500 cursor-pointer bg-white shadow-sm" required>
+                                    ${buildSelectOptionsWithOther(m.departemen, '', 'Pilih Departemen')}
+                                </select>
+                                <input type="text" id="regDepartemenOther" oninput="this.value = this.value.toUpperCase()" placeholder="Ketik departemen..." class="hidden w-full border border-cyan-400 bg-cyan-50/30 rounded-md px-2 py-1 text-xs mt-1 outline-none">
+                            </div>
                         </div>
                         <div class="grid grid-cols-2 gap-2">
-                            <div><label class="block text-[10px] font-bold text-slate-600 mb-1">Section</label><select id="regSection" class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500 cursor-pointer bg-white shadow-sm" required>${optSection}</select></div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-600 mb-1">Section</label>
+                                <select id="regSection" onchange="handleSelectOther(this, 'regSectionOther')" class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500 cursor-pointer bg-white shadow-sm" required>
+                                    ${buildSelectOptionsWithOther(m.section, '', 'Pilih Section')}
+                                </select>
+                                <input type="text" id="regSectionOther" oninput="this.value = this.value.toUpperCase()" placeholder="Ketik section..." class="hidden w-full border border-cyan-400 bg-cyan-50/30 rounded-md px-2 py-1 text-xs mt-1 outline-none">
+                            </div>
                             <div><label class="block text-[10px] font-bold text-slate-600 mb-1">Jabatan</label><input type="text" id="regJabatan" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500 shadow-sm" required></div>
                         </div>
 
@@ -2234,13 +2762,21 @@
         const users = getUsers(); const nrp = document.getElementById('regNrp').value.trim().toUpperCase();
         if (users.find(u => (u.nrp || '').toUpperCase() === nrp)) return showToast('NRP terdaftar!', 'error');
 
+        const perusahaanVal = resolveMasterValue('regPerusahaan', 'regPerusahaanOther', 'perusahaan');
+        const deptVal = resolveMasterValue('regDepartemen', 'regDepartemenOther', 'departemen');
+        const sectionVal = resolveMasterValue('regSection', 'regSectionOther', 'section');
+
+        if (!perusahaanVal || !deptVal || !sectionVal) {
+            return showToast('Mohon lengkapi data Perusahaan, Departemen, dan Section!', 'error');
+        }
+
         const newUser = {
             nrp: nrp, 
             nama_lengkap: document.getElementById('regName').value.trim().toUpperCase(), 
             jabatan: document.getElementById('regJabatan').value.trim().toUpperCase(),
-            perusahaan: document.getElementById('regPerusahaan').value, 
-            departemen: document.getElementById('regDepartemen').value,
-            section: document.getElementById('regSection').value, 
+            perusahaan: perusahaanVal, 
+            departemen: deptVal,
+            section: sectionVal, 
             no_wa: document.getElementById('regWa').value,
             password_hash: document.getElementById('regPwd').value, 
             role: 'USER', 
@@ -2350,75 +2886,146 @@
         const selSection = document.getElementById('profSection');
 
         if (selPerusahaan) {
-            selPerusahaan.innerHTML = '<option value="" disabled>-- Perusahaan --</option>' + 
-                (m.perusahaan || []).map(p => `<option value="${p}" ${user.perusahaan === p ? 'selected' : ''}>${p}</option>`).join('');
+            selPerusahaan.innerHTML = buildSelectOptionsWithOther(m.perusahaan, user.perusahaan, 'Perusahaan');
         }
             
         if (selDept) {
-            selDept.innerHTML = '<option value="" disabled>-- Departemen --</option>' + 
-                (m.departemen || []).map(d => `<option value="${d}" ${user.departemen === d ? 'selected' : ''}>${d}</option>`).join('');
+            selDept.innerHTML = buildSelectOptionsWithOther(m.departemen, user.departemen, 'Departemen');
         }
             
         if (selSection) {
-            selSection.innerHTML = '<option value="" disabled>-- Section --</option>' + 
-                (m.section || []).map(s => `<option value="${s}" ${user.section === s ? 'selected' : ''}>${s}</option>`).join('');
+            selSection.innerHTML = buildSelectOptionsWithOther(m.section, user.section, 'Section');
         }
+
+        ['profPerusahaanOther', 'profDepartemenOther', 'profSectionOther'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) { el.value = ''; el.classList.add('hidden'); }
+        });
 
         const modal = document.getElementById('profileBiodataModal');
         if (modal) modal.classList.remove('hidden');
     }
 
     /* ========================================================
-       SISTEM PENGATURAN UKURAN TEKS & MODAL PENGATURAN
+       SISTEM PENGATURAN UKURAN TEKS & MODAL PENGATURAN (4 TINGKAT)
        ======================================================== */
-    function getAppFontSize() {
-        return localStorage.getItem('lifting_font_size') || 'small';
+    const FONT_LEVELS = ['original', 'sedang', 'besar', 'sangat-besar'];
+    let tempSelectedFontSizeLevel = 0;
+
+    function getAppFontSizeLevel() {
+        const saved = localStorage.getItem('lifting_font_size') || 'original';
+        if (saved === 'sedang' || saved === '1') return 1;
+        if (saved === 'besar' || saved === 'medium' || saved === '2') return 2;
+        if (saved === 'sangat-besar' || saved === 'large' || saved === '3') return 3;
+        return 0; // 'original', 'small', '0'
     }
 
-    function applyAppFontSize(size) {
+    function applyAppFontSizeLevel(level) {
+        level = parseInt(level, 10);
+        if (isNaN(level) || level < 0) level = 0;
+        if (level > 3) level = 3;
+
         const root = document.documentElement;
-        root.classList.remove('font-size-small', 'font-size-medium', 'font-size-large');
-        if (size === 'medium') {
-            root.classList.add('font-size-medium');
-        } else if (size === 'large') {
-            root.classList.add('font-size-large');
-        } else {
-            root.classList.add('font-size-small');
-        }
-        localStorage.setItem('lifting_font_size', size);
-        updateFontSizeUI(size);
+        root.classList.remove('font-size-original', 'font-size-small', 'font-size-sedang', 'font-size-besar', 'font-size-medium', 'font-size-sangat-besar', 'font-size-large');
+
+        const levelKey = FONT_LEVELS[level];
+        root.classList.add('font-size-' + levelKey);
+        localStorage.setItem('lifting_font_size', levelKey);
     }
 
-    function updateFontSizeUI(size) {
-        const btnSmall = document.getElementById('fontSizeSmall');
-        const btnMedium = document.getElementById('fontSizeMedium');
-        const btnLarge = document.getElementById('fontSizeLarge');
+    function handleFontSizeSlider(val) {
+        tempSelectedFontSizeLevel = parseInt(val, 10);
+        updateFontSizeUI(tempSelectedFontSizeLevel, true);
+    }
+
+    function setAppFontSizeLevel(val) {
+        tempSelectedFontSizeLevel = parseInt(val, 10);
+        updateFontSizeUI(tempSelectedFontSizeLevel, true);
+    }
+
+    // Kompatibilitas fungsi pemanggilan lama
+    function applyAppFontSize(size) {
+        if (size === 'sedang' || size === '1') applyAppFontSizeLevel(1);
+        else if (size === 'besar' || size === 'medium' || size === '2') applyAppFontSizeLevel(2);
+        else if (size === 'sangat-besar' || size === 'large' || size === '3') applyAppFontSizeLevel(3);
+        else applyAppFontSizeLevel(0);
+    }
+
+    function updateFontSizeUI(level, isDirty = false) {
+        level = parseInt(level, 10);
+        if (isNaN(level) || level < 0) level = 0;
+        if (level > 3) level = 3;
+
+        const range = document.getElementById('fontSizeRange');
+        const thumb = document.getElementById('fontSizeThumb');
         const preview = document.getElementById('fontSizePreviewText');
+        const btnSave = document.getElementById('btnSaveFontSize');
 
-        const activeClass = "bg-[#0891b2] text-white border-cyan-600 shadow-sm";
-        const inactiveClass = "bg-white text-slate-700 border-slate-300 hover:bg-slate-50";
-
-        if (btnSmall && btnMedium && btnLarge) {
-            btnSmall.className = `flex-1 py-2 px-1 rounded-lg text-[11px] font-bold border transition-all text-center cursor-pointer ${size === 'small' ? activeClass : inactiveClass}`;
-            btnMedium.className = `flex-1 py-2 px-1 rounded-lg text-[11px] font-bold border transition-all text-center cursor-pointer ${size === 'medium' ? activeClass : inactiveClass}`;
-            btnLarge.className = `flex-1 py-2 px-1 rounded-lg text-[11px] font-bold border transition-all text-center cursor-pointer ${size === 'large' ? activeClass : inactiveClass}`;
+        if (range) range.value = level;
+        if (thumb) {
+            const pct = (level / 3) * 100;
+            thumb.style.left = `${pct}%`;
         }
 
         if (preview) {
-            if (size === 'medium') {
-                preview.innerText = "Contoh Teks: Ukuran Sedang (+25%). Teks lebih nyaman dibaca.";
-            } else if (size === 'large') {
-                preview.innerText = "Contoh Teks: Ukuran Besar (+50%). Teks jauh lebih jelas dan besar.";
+            if (level === 1) {
+                preview.style.fontSize = '13.5px';
+                preview.innerText = "Contoh Teks: Ukuran Sedang (+12%). Teks sedikit lebih nyaman dibaca.";
+            } else if (level === 2) {
+                preview.style.fontSize = '15px';
+                preview.innerText = "Contoh Teks: Ukuran Besar (+25%). Teks lebih besar dan proporsional.";
+            } else if (level === 3) {
+                preview.style.fontSize = '18px';
+                preview.innerText = "Contoh Teks: Ukuran Sangat Besar (+50%). Teks jauh lebih jelas dan besar.";
             } else {
-                preview.innerText = "Contoh Teks: Ukuran Kecil (Bawaan). Standar antarmuka sistem.";
+                preview.style.fontSize = '12px';
+                preview.innerText = "Contoh Teks: Ukuran Original Kecil (100%). Standar antarmuka sistem.";
+            }
+        }
+
+        // Highlight label step yang aktif
+        for (let i = 0; i <= 3; i++) {
+            const lbl = document.getElementById('fontStepLbl' + i);
+            if (lbl) {
+                if (i === level) {
+                    lbl.className = "cursor-pointer text-center font-bold text-blue-600 leading-tight";
+                } else {
+                    lbl.className = "cursor-pointer text-center font-medium text-slate-500 hover:text-blue-600 leading-tight";
+                }
+            }
+        }
+
+        // Indikator tombol simpan: aktif jika ada perubahan dari yang tersimpan
+        if (btnSave) {
+            const currentSaved = getAppFontSizeLevel();
+            if (level !== currentSaved) {
+                btnSave.className = "w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-md text-xs transition-colors shadow-md flex items-center justify-center gap-1.5 animate-pulse cursor-pointer";
+                btnSave.innerHTML = '<i class="fa-solid fa-check"></i> Simpan Perubahan Ukuran';
+            } else {
+                btnSave.className = "w-full bg-slate-100 text-slate-500 font-bold py-2 rounded-md text-xs transition-colors border border-slate-200 flex items-center justify-center gap-1.5 cursor-default";
+                btnSave.innerHTML = '<i class="fa-solid fa-circle-check text-emerald-600"></i> Ukuran Teks Aktif (Tersimpan)';
             }
         }
     }
 
+    function saveAppFontSize() {
+        applyAppFontSizeLevel(tempSelectedFontSizeLevel);
+        updateFontSizeUI(tempSelectedFontSizeLevel, false);
+        showToast('Ukuran teks berhasil disimpan!', 'success');
+    }
+
+    function closeProfileSettingsModal() {
+        // Kembalikan slider ke ukuran yang tersimpan saat ini tanpa mengubah sistem
+        tempSelectedFontSizeLevel = getAppFontSizeLevel();
+        updateFontSizeUI(tempSelectedFontSizeLevel, false);
+        const modal = document.getElementById('profileSettingsModal');
+        if (modal) modal.classList.add('hidden');
+    }
+
     // Inisialisasi ukuran teks tersimpan sejak skrip pertama kali dijalankan
     (function initFontSize() {
-        const saved = localStorage.getItem('lifting_font_size') || 'small';
-        applyAppFontSize(saved);
+        const level = getAppFontSizeLevel();
+        applyAppFontSizeLevel(level);
     })();
 
     function openProfileSettings() {
@@ -2426,8 +3033,12 @@
         const p2 = document.getElementById('profPwd2');
         if (p1) p1.value = '';
         if (p2) p2.value = '';
-        const currentSize = getAppFontSize();
-        updateFontSizeUI(currentSize);
+        tempSelectedFontSizeLevel = getAppFontSizeLevel();
+        updateFontSizeUI(tempSelectedFontSizeLevel, false);
+
+        // Tampilkan saklar notifikasi sesuai role pengguna (Admin/GL vs User/MP)
+        renderNotificationSettingsUI();
+
         const modal = document.getElementById('profileSettingsModal');
         if (modal) modal.classList.remove('hidden');
     }
@@ -2523,9 +3134,9 @@
             user.nama_lengkap = document.getElementById('profName').value.trim().toUpperCase(); 
         }
         user.jabatan = document.getElementById('profJabatan').value.trim().toUpperCase(); 
-        user.perusahaan = document.getElementById('profPerusahaan').value; 
-        user.departemen = document.getElementById('profDepartemen').value; 
-        user.section = document.getElementById('profSection').value; 
+        user.perusahaan = resolveMasterValue('profPerusahaan', 'profPerusahaanOther', 'perusahaan') || user.perusahaan; 
+        user.departemen = resolveMasterValue('profDepartemen', 'profDepartemenOther', 'departemen') || user.departemen; 
+        user.section = resolveMasterValue('profSection', 'profSectionOther', 'section') || user.section; 
         user.no_wa = document.getElementById('profWa').value.trim(); 
         
         if(idx !== -1) {
@@ -2592,6 +3203,7 @@
         const users = getUsers();
         const settings = getSettings();
 
+        // Mengalihkan pengelolaan Operator dan Rigger agar dikelola langsung pada Manajemen Akun
         const tabs = [
             { id: 'perusahaan', label: 'Perusahaan' },
             { id: 'departemen', label: 'Departemen' },
@@ -2600,8 +3212,6 @@
             { id: 'unit_big_crane', label: 'Unit BC' },
             { id: 'unit_lowboy', label: 'Unit Lowboy' },
             { id: 'gl', label: 'Group Leader' },
-            { id: 'operator', label: 'Operator' },
-            { id: 'rigger', label: 'Rigger' },
             { id: 'users', label: 'Manajemen Akun' },
             { id: 'branding', label: 'Branding & Tampilan' }
         ];
@@ -2637,38 +3247,48 @@
             </form>`;
         } else if (currentMasterTab === 'users') {
             contentHtml = `
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse">
-                    <thead class="bg-slate-100 text-slate-600 text-[10px] border-b border-slate-200">
-                        <tr>
-                            <th class="px-2 py-2">NRP</th>
-                            <th class="px-2 py-2">Nama</th>
-                            <th class="px-2 py-2">Jabatan</th>
-                            <th class="px-2 py-2">Perusahaan / Dept</th>
-                            <th class="px-2 py-2">Role</th>
-                            <th class="px-2 py-2 text-center">Status</th>
-                            <th class="px-2 py-2 text-center">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100 text-[10px]">
-                        ${users.map(u => `
-                        <tr class="hover:bg-slate-50 transition-colors">
-                            <td class="px-2 py-2 font-mono font-bold text-cyan-600">${u.nrp}</td>
-                            <td class="px-2 py-2 font-semibold text-slate-800">${u.nama_lengkap}</td>
-                            <td class="px-2 py-2 text-slate-600">${u.jabatan || '-'}</td>
-                            <td class="px-2 py-2 text-slate-500">${u.perusahaan} &bull; ${u.departemen}</td>
-                            <td class="px-2 py-2"><span class="bg-slate-100 text-slate-700 border border-slate-200 px-1.5 py-0.5 rounded font-semibold text-[9px]">${u.role}</span></td>
-                            <td class="px-2 py-2 text-center"><span class="${u.status_akun === 'ACTIVE' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'} border px-1.5 py-0.5 rounded text-[9px] font-bold">${u.status_akun}</span></td>
-                            <td class="px-2 py-2 text-center">
-                                <div class="flex items-center justify-center gap-1">
-                                    <button onclick="openResetPasswordModal('${u.nrp}')" class="bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border border-cyan-200 px-1.5 py-0.5 rounded text-[9px] font-semibold" title="Reset Sandi"><i class="fa-solid fa-key"></i></button>
-                                    <button onclick="toggleUserStatus('${u.nrp}')" class="bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 px-1.5 py-0.5 rounded text-[9px] font-semibold" title="Ubah Status Aktif"><i class="fa-solid fa-power-off"></i></button>
-                                    <button onclick="deleteUserAccount('${u.nrp}')" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-1.5 py-0.5 rounded text-[9px] font-semibold" title="Hapus User"><i class="fa-solid fa-trash"></i></button>
-                                </div>
-                            </td>
-                        </tr>`).join('')}
-                    </tbody>
-                </table>
+            <div class="space-y-3">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 bg-cyan-50/70 border border-cyan-200 p-2.5 rounded-lg">
+                    <div class="text-[10px] text-cyan-800 font-semibold">
+                        <i class="fa-solid fa-users mr-1 text-cyan-600"></i> Sumber penugasan Operator & Rigger kini langsung terhubung dengan akun pengguna aktif (Push Notification).
+                    </div>
+                    <button onclick="document.getElementById('createUserModal').classList.remove('hidden')" class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold px-3 py-1.5 rounded-md text-[10px] flex items-center gap-1.5 shadow-sm transition-colors shrink-0">
+                        <i class="fa-solid fa-user-plus"></i> Tambah Akun (MP / User)
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-slate-100 text-slate-600 text-[10px] border-b border-slate-200">
+                            <tr>
+                                <th class="px-2 py-2">NRP</th>
+                                <th class="px-2 py-2">Nama</th>
+                                <th class="px-2 py-2">Jabatan</th>
+                                <th class="px-2 py-2">Perusahaan / Dept</th>
+                                <th class="px-2 py-2">Role</th>
+                                <th class="px-2 py-2 text-center">Status</th>
+                                <th class="px-2 py-2 text-center">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 text-[10px]">
+                            ${users.map(u => `
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="px-2 py-2 font-mono font-bold text-cyan-600">${u.nrp}</td>
+                                <td class="px-2 py-2 font-semibold text-slate-800">${u.nama_lengkap}</td>
+                                <td class="px-2 py-2 text-slate-600 font-semibold">${u.jabatan || '-'}</td>
+                                <td class="px-2 py-2 text-slate-500">${u.perusahaan} &bull; ${u.departemen}</td>
+                                <td class="px-2 py-2"><span class="bg-slate-100 text-slate-700 border border-slate-200 px-1.5 py-0.5 rounded font-semibold text-[9px]">${u.role}</span></td>
+                                <td class="px-2 py-2 text-center"><span class="${u.status_akun === 'ACTIVE' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'} border px-1.5 py-0.5 rounded text-[9px] font-bold">${u.status_akun}</span></td>
+                                <td class="px-2 py-2 text-center">
+                                    <div class="flex items-center justify-center gap-1">
+                                        <button onclick="openResetPasswordModal('${u.nrp}')" class="bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border border-cyan-200 px-1.5 py-0.5 rounded text-[9px] font-semibold" title="Reset Sandi"><i class="fa-solid fa-key"></i></button>
+                                        <button onclick="toggleUserStatus('${u.nrp}')" class="bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 px-1.5 py-0.5 rounded text-[9px] font-semibold" title="Ubah Status Aktif"><i class="fa-solid fa-power-off"></i></button>
+                                        <button onclick="deleteUserAccount('${u.nrp}')" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-1.5 py-0.5 rounded text-[9px] font-semibold" title="Hapus User"><i class="fa-solid fa-trash"></i></button>
+                                    </div>
+                                </td>
+                            </tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>
             </div>`;
         } else {
             const list = m[currentMasterTab] || [];
@@ -2795,6 +3415,38 @@
         });
     }
 
+    function handleCreateUserByAdmin(e) {
+        e.preventDefault();
+        const nrp = document.getElementById('newAccNrp').value.trim().toUpperCase();
+        let users = getUsers();
+        if (users.some(u => (u.nrp || '').toUpperCase() === nrp)) {
+            return showToast('NRP sudah terdaftar!', 'error');
+        }
+
+        const finalPerusahaan = resolveMasterValue('newAccPerusahaan', 'newAccPerusahaanOther', 'perusahaan') || 'PPA';
+        const finalDept = resolveMasterValue('newAccDept', 'newAccDeptOther', 'departemen') || 'OPERATION';
+        const finalSection = resolveMasterValue('newAccSection', 'newAccSectionOther', 'section') || 'LIFTING';
+
+        const newUser = {
+            nrp: nrp,
+            nama_lengkap: document.getElementById('newAccName').value.trim().toUpperCase(),
+            jabatan: document.getElementById('newAccJabatan').value.trim().toUpperCase(),
+            perusahaan: finalPerusahaan,
+            departemen: finalDept,
+            section: finalSection,
+            no_wa: document.getElementById('newAccWa').value.trim(),
+            password_hash: document.getElementById('newAccPwd').value.trim() || '123456',
+            role: document.getElementById('newAccRole').value,
+            status_akun: 'ACTIVE'
+        };
+
+        users.push(newUser);
+        saveUsers(users);
+        showToast(`Akun ${newUser.nama_lengkap} (${newUser.jabatan}) berhasil ditambahkan!`, 'success');
+        document.getElementById('createUserModal').classList.add('hidden');
+        renderApp(true);
+    }
+
     function getDashboardView() {
         let jobs = getOrders();
         
@@ -2831,7 +3483,7 @@
         let pieStyle = `background: conic-gradient(#0d9488 0deg ${degCT}deg, #4ade80 ${degCT}deg ${degBC}deg, #a7f3d0 ${degBC}deg 360deg);`;
 
         return `
-        <div class="w-full max-w-[1360px] mx-auto px-4 sm:px-6 py-2.5 space-y-3.5 relative z-10">
+        <div class="w-full px-3.5 sm:px-6 lg:px-8 py-3.5 space-y-4 relative z-10">
             <!-- Header Simetris: Kiri Judul & Sync, Kanan Filter Terpadu -->
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                 <div class="flex items-center gap-2">
@@ -2911,7 +3563,7 @@
                     <!-- Kolom 1: Donut Chart -->
                     <div class="lg:col-span-4 xl:col-span-3 flex flex-col items-center justify-start">
                         <h3 class="text-xs font-bold text-slate-700 mb-2 w-full text-left">Data Perusahaan</h3>
-                        <div class="relative h-44 w-44 flex items-center justify-center">
+                        <div class="relative h-48 w-48 sm:h-52 sm:w-52 flex items-center justify-center my-auto">
                             <canvas id="companyDonutChart"></canvas>
                         </div>
                     </div>
@@ -2926,7 +3578,7 @@
                                 <span class="col-span-3 text-right">TOTAL JAM</span>
                                 <span class="col-span-3 text-right">TOTAL ORDER</span>
                             </div>
-                            <div class="flex flex-col gap-1.5 hide-scrollbar overflow-y-auto max-h-44" id="legendCompanyContainer"></div>
+                            <div class="flex flex-col gap-1.5 hide-scrollbar overflow-y-auto max-h-72" id="legendCompanyContainer"></div>
                         </div>
                         
                         <!-- Rincian Dept Plant Bergaris Pemisah Sejajar -->
@@ -2937,7 +3589,7 @@
                                 <span class="col-span-3 text-right">TOTAL JAM</span>
                                 <span class="col-span-3 text-right">TOTAL ORDER</span>
                             </div>
-                            <div class="flex flex-col gap-1.5 hide-scrollbar overflow-y-auto max-h-44">
+                            <div class="flex flex-col gap-1.5 hide-scrollbar overflow-y-auto max-h-72">
                                 ${(() => {
                                     let plantStats = {};
                                     filteredJobs.forEach(j => {
@@ -3166,27 +3818,53 @@
                 if (j.status === 'COMPLETED' && j.durasi_aktual) companyStats[p].hours += parseFloat(j.durasi_aktual);
             });
             
-            let cLabels = []; let cDataCount = []; let cBgColors = [];
+            let cLabels = []; 
+            let cDataCount = []; 
+            let cBgColors = [];
             const cColors = { 'PPA': '#3b82f6', 'BIB': '#111827', 'UT': '#eab308', 'KME': '#f97316' };
-            const fallbackColors = ['#10b981', '#8b5cf6', '#ec4899', '#06b6d4', '#64748b'];
+            const fallbackColors = ['#10b981', '#8b5cf6', '#ec4899', '#06b6d4', '#0284c7'];
             
-            let idxColor = 0; let companyArray = Object.entries(companyStats).sort((a,b)=>b[1].count - a[1].count); let totalCompanyJobs = companyArray.reduce((sum, item) => sum + item[1].count, 0) || 1;
+            let companyArray = Object.entries(companyStats).sort((a,b) => b[1].count - a[1].count); 
+            let totalCompanyJobs = companyArray.reduce((sum, item) => sum + item[1].count, 0) || 1;
+
+            // Pisahkan 6 perusahaan teratas dan sisanya menjadi entitas "Lainnya"
+            let top6Companies = companyArray.slice(0, 6);
+            let remainingCompanies = companyArray.slice(6);
+            let finalCompanyList = [...top6Companies];
+
+            if (remainingCompanies.length > 0) {
+                let otherCount = remainingCompanies.reduce((sum, item) => sum + item[1].count, 0);
+                let otherHours = remainingCompanies.reduce((sum, item) => sum + item[1].hours, 0);
+                finalCompanyList.push(['Lainnya', { count: otherCount, hours: otherHours, isOther: true }]);
+            }
+
+            let idxColor = 0;
             let companyLegendHtml = '';
-            companyArray.forEach((item) => {
-                let cName = item[0]; let cObj = item[1]; let pct = Math.round((cObj.count / totalCompanyJobs) * 100); let color = cColors[cName] || fallbackColors[idxColor % fallbackColors.length];
-                cLabels.push(cName); cDataCount.push(cObj.count); cBgColors.push(color);
-                if(!cColors[cName]) idxColor++;
+
+            finalCompanyList.forEach((item) => {
+                let cName = item[0]; 
+                let cObj = item[1]; 
+                let pct = Math.round((cObj.count / totalCompanyJobs) * 100); 
+                let color = cObj.isOther ? '#94a3b8' : (cColors[cName] || fallbackColors[idxColor % fallbackColors.length]);
+                
+                cLabels.push(cName); 
+                cDataCount.push(cObj.count); 
+                cBgColors.push(color);
+                
+                if (!cColors[cName] && !cObj.isOther) idxColor++;
+
                 companyLegendHtml += `
                     <div class="grid grid-cols-12 text-[10px] items-center py-1 border-b border-slate-50">
                         <div class="col-span-4 flex items-center gap-1.5 truncate pr-1">
                             <div class="w-2.5 h-2.5 rounded-sm shrink-0" style="background-color: ${color}"></div>
-                            <span class="font-semibold text-slate-700 truncate" title="${cName}">${cName}</span>
+                            <span class="font-semibold ${cObj.isOther ? 'text-slate-500 italic' : 'text-slate-700'} truncate" title="${cName}">${cName}</span>
                         </div>
                         <div class="col-span-2 text-slate-500 text-center font-medium">${pct}%</div>
                         <div class="col-span-3 text-slate-600 font-semibold text-right pr-1">${cObj.hours.toFixed(1)}J</div>
                         <div class="col-span-3 text-slate-600 font-semibold text-right">${cObj.count} Job</div>
                     </div>`;
             });
+
             if(!companyLegendHtml) {
                 companyLegendHtml = '<div class="text-[10px] text-slate-400 italic py-2">Data kosong</div>';
             }
@@ -3194,7 +3872,11 @@
 
             if(window.dashCompanyDonut) window.dashCompanyDonut.destroy();
             const ctxDonut = document.getElementById('companyDonutChart').getContext('2d');
-            window.dashCompanyDonut = new Chart(ctxDonut, { type: 'doughnut', data: { labels: cLabels, datasets: [{ data: cDataCount, backgroundColor: cBgColors, borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '65%', plugins: { legend: { display: false } } } });
+            window.dashCompanyDonut = new Chart(ctxDonut, { 
+                type: 'doughnut', 
+                data: { labels: cLabels, datasets: [{ data: cDataCount, backgroundColor: cBgColors, borderWidth: 0 }] }, 
+                options: { responsive: true, maintainAspectRatio: false, cutout: '50%', plugins: { legend: { display: false } } } 
+            });
         }
     }
 
@@ -3208,15 +3890,16 @@
             const filterShift = document.getElementById('filter_shift') ? document.getElementById('filter_shift').value : 'ALL';
             const filterKategori = document.getElementById('filter_admin_kategori') ? document.getElementById('filter_admin_kategori').value : 'ALL';
 
+            // Filter tanggal mengacu pada Jadwal Pekerjaan / Planning (tgl_pelaksanaan)
             if (tglMulai && tglSelesai) {
                 jobs = jobs.filter(j => {
-                    const opDate = getJobOperationalDate(j);
-                    return opDate >= tglMulai && opDate <= tglSelesai;
+                    const schedDate = getOrderScheduleDate(j);
+                    return schedDate >= tglMulai && schedDate <= tglSelesai;
                 });
             } else if (tglMulai) {
-                jobs = jobs.filter(j => getJobOperationalDate(j) >= tglMulai);
+                jobs = jobs.filter(j => getOrderScheduleDate(j) >= tglMulai);
             } else if (tglSelesai) {
-                jobs = jobs.filter(j => getJobOperationalDate(j) <= tglSelesai);
+                jobs = jobs.filter(j => getOrderScheduleDate(j) <= tglSelesai);
             }
 
             if (filterShift !== 'ALL') {
@@ -3372,15 +4055,16 @@
             let filterShift = document.getElementById('filter_shift') ? document.getElementById('filter_shift').value : 'ALL';
             let filterKategori = document.getElementById('filter_admin_kategori') ? document.getElementById('filter_admin_kategori').value : 'ALL';
 
+            // Filter tanggal mengacu pada Jadwal Pekerjaan / Planning (tgl_pelaksanaan)
             if (tglMulai && tglSelesai) {
                 jobs = jobs.filter(j => {
-                    const opDate = getJobOperationalDate(j);
-                    return opDate >= tglMulai && opDate <= tglSelesai;
+                    const schedDate = getOrderScheduleDate(j);
+                    return schedDate >= tglMulai && schedDate <= tglSelesai;
                 });
             } else if (tglMulai) {
-                jobs = jobs.filter(j => getJobOperationalDate(j) >= tglMulai);
+                jobs = jobs.filter(j => getOrderScheduleDate(j) >= tglMulai);
             } else if (tglSelesai) {
-                jobs = jobs.filter(j => getJobOperationalDate(j) <= tglSelesai);
+                jobs = jobs.filter(j => getOrderScheduleDate(j) <= tglSelesai);
             }
 
             if (filterShift !== 'ALL') {
@@ -3503,16 +4187,16 @@
 
                         <!-- Sisi Kanan / Center: Filter Tanggal, Shift, dan Armada -->
                         <div class="w-full md:w-auto flex items-center justify-start md:justify-end gap-1.5 overflow-x-auto hide-scrollbar text-[10px] pb-0.5 md:pb-0">
-                            <!-- Filter Rentang Tanggal Bentuk Pill: Dari & Ke -->
-                            <div class="flex items-center bg-white border border-slate-200 rounded-full px-3 py-1 shadow-2xs shrink-0">
-                                <span class="text-[10px] text-slate-500 font-medium mr-1.5 select-none">Dari:</span>
+                            <!-- Filter Rentang Tanggal Jadwal Planning: Dari & Ke -->
+                            <div class="flex items-center bg-white border border-slate-200 rounded-full px-3 py-1 shadow-2xs shrink-0" title="Filter Jadwal Planning">
+                                <span class="text-[10px] text-slate-500 font-medium mr-1.5 select-none">Jadwal:</span>
                                 <input type="date" id="filter_tgl_mulai" class="bg-transparent text-slate-700 font-semibold focus:outline-none text-[10px] cursor-pointer" value="${tglMulai}" onchange="renderApp(true)">
                             </div>
-                            <div class="flex items-center bg-white border border-slate-200 rounded-full px-3 py-1 shadow-2xs shrink-0">
-                                <span class="text-[10px] text-slate-500 font-medium mr-1.5 select-none">Ke:</span>
+                            <div class="flex items-center bg-white border border-slate-200 rounded-full px-3 py-1 shadow-2xs shrink-0" title="Filter Jadwal Planning">
+                                <span class="text-[10px] text-slate-500 font-medium mr-1.5 select-none">s/d</span>
                                 <input type="date" id="filter_tgl_selesai" class="bg-transparent text-slate-700 font-semibold focus:outline-none text-[10px] cursor-pointer" value="${tglSelesai}" onchange="renderApp(true)">
                             </div>
-                            <button type="button" onclick="resetMonitoringFilter()" class="w-7 h-7 rounded-full bg-white border border-slate-200 hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-700 transition-colors shadow-2xs shrink-0 cursor-pointer" title="Reset Filter">
+                            <button type="button" onclick="resetMonitoringFilter()" class="w-7 h-7 rounded-full bg-white border border-slate-200 hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-700 transition-colors shadow-2xs shrink-0 cursor-pointer" title="Reset Filter Tanggal Jadwal">
                                 <i class="fa-solid fa-rotate-left text-[10px]"></i>
                             </button>
 
@@ -3654,7 +4338,7 @@
                                     <td class="px-2 py-1.5 align-top relative z-10"><div class="cursor-pointer hover:underline leading-tight inline-block ${getWoColorClass(job, 'text-cyan-600 font-bold')} text-[9px] md:text-[10px]" onclick="viewJobDetail('${job.no_wo}')">${job.no_wo}</div><div class="text-[8px] md:text-[9px] text-slate-500 mb-1 leading-tight">${formatLocalTimestamp(job.timestamp)}</div><div class="md:hidden"><span class="${statusColor} border text-[7px] px-1 py-0.5 rounded-sm font-bold leading-none whitespace-nowrap inline-block">${job.status}</span></div></td>
                                     <td class="px-2 py-1.5 align-top"><div class="font-semibold text-slate-800 text-[9px] md:text-[10px] uppercase truncate max-w-[60px] md:max-w-[90px] leading-tight" title="${job.nama_pemohon}">${job.nama_pemohon}</div><div class="text-[8px] md:text-[9px] text-slate-500 truncate max-w-[60px] md:max-w-[90px] leading-tight" title="${job.perusahaan} - ${job.departemen}">${job.departemen}</div></td>
                                     <td class="px-2 py-1.5 align-top hidden md:table-cell"><div class="font-bold text-slate-700 text-[10px]">${job.tgl_pelaksanaan}</div><div class="text-[9px] text-slate-500">${job.shift} | Req: ${job.jam_pelaksanaan || '-'} (${job.durasi_request})</div></td>
-                                    <td class="px-2 py-1.5 align-top max-w-[180px] md:max-w-[320px]">${job.kategori !== 'Big Crane' ? `<div class="text-[9px] md:text-[10px] text-orange-600 font-semibold flex items-start gap-1 mb-0.5 leading-tight"><i class="fa-solid fa-location-dot mt-0.5 shrink-0"></i> <span class="truncate">${job.lokasi_angkat || '-'} <i class="fa-solid fa-arrow-right text-[7px] mx-0.5 text-slate-400"></i> ${job.lokasi_tujuan || '-'}</span></div>` : ''}<div class="text-[9px] text-emerald-700 flex items-start gap-1 min-w-0"><i class="fa-solid fa-flag-checkered mt-0.5 shrink-0"></i> <span class="leading-tight line-clamp-2 break-words min-w-0 flex-1" title="${job.deskripsi}">${job.deskripsi}</span></div></td>
+                                    <td class="px-2 py-1.5 align-top max-w-[180px] md:max-w-[320px]">${job.kategori !== 'Big Crane' ? `<div class="text-[9px] md:text-[10px] text-orange-600 font-semibold flex items-start gap-1 mb-0.5 leading-tight"><i class="fa-solid fa-location-dot mt-0.5 shrink-0"></i> <span class="truncate">${job.lokasi_angkat || '-'} <i class="fa-solid fa-arrow-right text-[7px] mx-0.5 text-slate-400"></i> ${job.lokasi_tujuan || '-'}</span></div>` : (job.lokasi_angkat ? `<div class="text-[9px] md:text-[10px] text-orange-600 font-semibold flex items-start gap-1 mb-0.5 leading-tight"><i class="fa-solid fa-location-dot mt-0.5 shrink-0"></i> <span class="truncate">${job.lokasi_angkat}</span></div>` : '')}<div class="text-[9px] text-emerald-700 flex items-start gap-1 min-w-0"><i class="fa-solid fa-flag-checkered mt-0.5 shrink-0"></i> <span class="leading-tight line-clamp-2 break-words min-w-0 flex-1" title="${job.deskripsi}">${job.deskripsi}</span></div></td>
                                     <td class="px-2 py-1.5 text-center align-top hidden md:table-cell"><span class="${statusColor} border text-[9px] px-1.5 py-0.5 rounded-sm font-semibold whitespace-nowrap inline-block">${job.status}</span></td>
                                     <td class="px-2 py-1.5 text-[9px] align-top text-slate-600 leading-tight hidden md:table-cell"><div class="flex flex-col gap-0.5"><div><span class="text-slate-400">GL:</span> <span class="font-semibold text-slate-800">${job.gl || '-'}</span></div><div><span class="text-slate-400">Unit:</span> <span class="font-semibold text-slate-800">${job.unit || '-'}</span></div><div><span class="text-slate-400">OP:</span> <span class="font-semibold text-slate-800">${job.operator || '-'}</span></div><div><span class="text-slate-400">Rg:</span> <span class="font-semibold text-slate-800">${job.rigger || '-'}${job.rigger2 ? ', ' + job.rigger2 : ''}</span></div></div></td>
                                     <td class="px-2 py-1.5 text-[9px] align-top text-slate-600 font-mono tracking-tighter hidden md:table-cell whitespace-nowrap">${job.jam_start_aktual || '--:--'} s/d ${job.jam_end_aktual || '--:--'}</td>
@@ -3698,7 +4382,7 @@
                 <div class="flex items-center gap-1.5 mb-1.5"><span class="font-bold text-slate-800 text-xs">${job.kategori}</span><span class="text-slate-300">|</span><span class="text-slate-500 text-[10px]">${job.tgl_pelaksanaan} ${job.jam_pelaksanaan || ''}</span></div>
                 <div class="bg-slate-50 rounded-sm border border-slate-100 p-1.5 grid grid-cols-3 gap-1.5 mb-1.5 text-[10px]">
                     <div><div class="text-slate-400 text-[9px]">Durasi Req</div><div class="font-bold text-slate-700">${job.durasi_request}</div></div>
-                    <div><div class="text-slate-400 text-[9px]">Lokasi</div><div class="font-medium text-slate-600 truncate">${job.lokasi_angkat || '-'} <i class="fa-solid fa-arrow-right text-[8px] text-slate-400 mx-0.5"></i> ${job.lokasi_tujuan || '-'}</div></div>
+                    <div><div class="text-slate-400 text-[9px]">Lokasi</div><div class="font-medium text-slate-600 truncate">${job.kategori === 'Big Crane' ? (job.lokasi_angkat || '-') : `${job.lokasi_angkat || '-'} <i class="fa-solid fa-arrow-right text-[8px] text-slate-400 mx-0.5"></i> ${job.lokasi_tujuan || '-'}`}</div></div>
                     <div><div class="text-slate-400 text-[9px]">Unit</div><div class="font-bold text-cyan-600">${job.unit || 'Belum ada'}</div></div>
                 </div>
                 <div class="text-[10px] text-slate-500 mb-2 pl-1 border-l-2 border-slate-300 truncate">${job.deskripsi}</div>
@@ -3781,7 +4465,7 @@
                     </div>
                 </div>
                 <div class="font-bold text-slate-800 text-xs mb-1">Req: ${job.tgl_pelaksanaan} ${job.jam_pelaksanaan || ''}</div>
-                ${job.kategori !== 'Big Crane' ? `<div class="text-[11px] text-slate-500 mb-3 truncate">Lokasi: ${job.lokasi_angkat||'-'} ➔ ${job.lokasi_tujuan||'-'}</div>` : `<div class="text-[11px] text-slate-500 mb-3 truncate border-l-2 border-slate-300 pl-1">${job.deskripsi}</div>`}
+                ${job.kategori !== 'Big Crane' ? `<div class="text-[11px] text-slate-500 mb-3 truncate">Lokasi: ${job.lokasi_angkat||'-'} ➔ ${job.lokasi_tujuan||'-'}</div>` : `<div class="text-[11px] text-slate-500 mb-1 truncate"><i class="fa-solid fa-location-dot text-orange-500 mr-1"></i>Lokasi: ${job.lokasi_angkat||'-'}</div><div class="text-[11px] text-slate-500 mb-3 truncate border-l-2 border-slate-300 pl-1">${job.deskripsi}</div>`}
                 <div class="flex gap-1.5 flex-wrap">
                     ${job.status === 'ON PROGRESS' ? `
                         <button onclick="openManpowerAction('${job.no_wo}', 'COMPLETED')" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-1.5 rounded-sm text-[11px] shadow-sm"><i class="fa-solid fa-check"></i> Close Job</button>
@@ -3827,9 +4511,15 @@
         });
         const unitOptions = availableUnits.map(u => `<option value="${u}" ${job.unit === u ? 'selected' : ''}>${u}</option>`).join('');
         
-        const opOptions = (m.operator || []).map(o => `<option value="${o}" ${job.operator === o ? 'selected' : ''}>${o}</option>`).join('');
-        const rigOptions1 = (m.rigger || []).map(r => `<option value="${r}" ${job.rigger === r ? 'selected' : ''}>${r}</option>`).join('');
-        const rigOptions2 = (m.rigger || []).map(r => `<option value="${r}" ${job.rigger2 === r ? 'selected' : ''}>${r}</option>`).join('');
+        // Mengambil daftar Operator & Rigger langsung dari Manajemen Akun (users)
+        const operatorsList = getAccountOperators();
+        if (job.operator && !operatorsList.includes(job.operator)) operatorsList.unshift(job.operator);
+        const opOptions = operatorsList.map(o => `<option value="${o}" ${job.operator === o ? 'selected' : ''}>${o}</option>`).join('');
+
+        const riggersList = getAccountRiggers();
+        if (job.rigger && !riggersList.includes(job.rigger)) riggersList.unshift(job.rigger);
+        const rigOptions1 = riggersList.map(r => `<option value="${r}" ${job.rigger === r ? 'selected' : ''}>${r}</option>`).join('');
+        const rigOptions2 = riggersList.map(r => `<option value="${r}" ${job.rigger2 === r ? 'selected' : ''}>${r}</option>`).join('');
 
         const targetLabel = job.jam_pelaksanaan ? `Jam ${job.jam_pelaksanaan}` : (job.tgl_pelaksanaan || '-');
         const durasiReqLabel = job.durasi_request || '-';
@@ -3849,7 +4539,10 @@
                     ${job.kategori !== 'Big Crane' ? `
                     <div class="text-[10px] text-slate-700">
                         <span class="text-slate-400 font-normal">Rute:</span> <span class="text-orange-600 font-bold">${job.lokasi_angkat || '-'}</span> <i class="fa-solid fa-arrow-right text-[8px] text-slate-400 mx-0.5"></i> <span class="text-emerald-600 font-bold">${job.lokasi_tujuan || '-'}</span>
-                    </div>` : ''}
+                    </div>` : (job.lokasi_angkat ? `
+                    <div class="text-[10px] text-slate-700">
+                        <span class="text-slate-400 font-normal">Lokasi Kerja:</span> <span class="text-orange-600 font-bold">${job.lokasi_angkat}</span>
+                    </div>` : '')}
                     <div class="text-[10px] text-slate-700 bg-white/90 p-1.5 rounded border border-cyan-100 mt-1">
                         <span class="text-slate-400 font-semibold block text-[8px] uppercase tracking-wider">Deskripsi Pekerjaan:</span>
                         <span class="font-medium text-slate-800 leading-snug">${job.deskripsi || '-'}</span>
@@ -4181,9 +4874,16 @@
         else if (job.kategori === 'Lowboy') unitList = m.unit_lowboy || [];
 
         const unitOptions = unitList.map(u => `<option value="${u}" ${job.unit === u ? 'selected' : ''}>${u}</option>`).join('');
-        const opOptions = (m.operator || []).map(o => `<option value="${o}" ${job.operator === o ? 'selected' : ''}>${o}</option>`).join('');
-        const rigOptions1 = (m.rigger || []).map(r => `<option value="${r}" ${job.rigger === r ? 'selected' : ''}>${r}</option>`).join('');
-        const rigOptions2 = (m.rigger || []).map(r => `<option value="${r}" ${job.rigger2 === r ? 'selected' : ''}>${r}</option>`).join('');
+        
+        // Mengambil daftar Operator & Rigger langsung dari Manajemen Akun (users)
+        const operatorsList = getAccountOperators();
+        if (job.operator && !operatorsList.includes(job.operator)) operatorsList.unshift(job.operator);
+        const opOptions = operatorsList.map(o => `<option value="${o}" ${job.operator === o ? 'selected' : ''}>${o}</option>`).join('');
+
+        const riggersList = getAccountRiggers();
+        if (job.rigger && !riggersList.includes(job.rigger)) riggersList.unshift(job.rigger);
+        const rigOptions1 = riggersList.map(r => `<option value="${r}" ${job.rigger === r ? 'selected' : ''}>${r}</option>`).join('');
+        const rigOptions2 = riggersList.map(r => `<option value="${r}" ${job.rigger2 === r ? 'selected' : ''}>${r}</option>`).join('');
 
         const container = document.getElementById('cancelPromptContent');
         if (container) {
@@ -4324,7 +5024,7 @@
         let valShift = (d && d.shift !== undefined) ? d.shift : initialShift;
         let valJam = (d && d.jam !== undefined) ? d.jam : currentJam;
         let valDurasi = (d && d.durasi !== undefined) ? d.durasi : '';
-        let valSatuan = (d && d.satuan !== undefined) ? d.satuan : 'JAM';
+        let valSatuan = (d && d.satuan !== undefined) ? d.satuan : (cat === 'Big Crane' ? 'HARI' : 'JAM');
         let valLokAsal = (d && d.lok_asal !== undefined) ? d.lok_asal : '';
         let valLokTujuan = (d && d.lok_tujuan !== undefined) ? d.lok_tujuan : '';
         let valDeskripsi = (d && d.deskripsi !== undefined) ? d.deskripsi : '';
@@ -4365,8 +5065,9 @@
             formFields = `
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
                     <div><label class="block text-[10px] font-semibold text-slate-600 mb-1">Tgl Pelaksanaan *</label><input type="date" id="req_tgl" value="${valTgl}" class="w-full border border-slate-300 rounded-md px-2.5 py-2 text-xs focus:outline-none focus:border-cyan-500" required></div>
-                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-1">Durasi *</label><div class="flex gap-1.5"><input type="number" step="0.5" id="req_durasi" value="${valDurasi}" class="w-2/3 border border-slate-300 rounded-md px-2.5 py-2 text-xs focus:outline-none focus:border-cyan-500" required><select id="req_satuan" class="w-1/3 border border-slate-300 rounded-md px-2 py-2 text-xs focus:outline-none focus:border-cyan-500 bg-white cursor-pointer"><option value="HARI" ${valSatuan==='HARI'?'selected':''}>Hari</option><option value="JAM" ${valSatuan==='JAM'?'selected':''}>Jam</option></select></div></div>
+                    <div><label class="block text-[10px] font-semibold text-slate-600 mb-1">Durasi *</label><div class="flex gap-1.5"><input type="number" step="0.5" id="req_durasi" value="${valDurasi}" oninput="saveOrderDraft()" class="w-2/3 border border-slate-300 rounded-md px-2.5 py-2 text-xs focus:outline-none focus:border-cyan-500" required><select id="req_satuan" onchange="saveOrderDraft()" class="w-1/3 border border-slate-300 rounded-md px-2 py-2 text-xs focus:outline-none focus:border-cyan-500 bg-white cursor-pointer"><option value="HARI" ${valSatuan==='HARI'?'selected':''}>Hari</option><option value="JAM" ${valSatuan==='JAM'?'selected':''}>Jam</option></select></div></div>
                 </div>
+                <div><label class="block text-[10px] font-semibold text-slate-600 mb-1">Lokasi Kerja *</label><input type="text" id="req_lok_asal" value="${valLokAsal}" oninput="this.value = this.value.toUpperCase(); saveOrderDraft();" class="w-full border border-slate-300 rounded-md px-2.5 py-2 text-xs focus:outline-none focus:border-cyan-500" placeholder="Titik / area kerja..." required></div>
                 <div><label class="block text-[10px] font-semibold text-slate-600 mb-1">Deskripsi Pekerjaan *</label><textarea id="req_deskripsi" oninput="saveOrderDraft()" class="w-full border border-slate-300 rounded-md px-2.5 py-2 text-xs focus:outline-none focus:border-cyan-500 h-24" placeholder="Rincian pekerjaan angkat..." required>${valDeskripsi}</textarea></div>
                 <div><label class="block text-[10px] font-semibold text-slate-600 mb-1">Upload Foto Area / Beban (Opsional)</label><input type="file" id="req_foto" accept="image/*" class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-[10px] file:font-semibold file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100 cursor-pointer"></div>
             `;
@@ -4390,19 +5091,25 @@
                 <p class="text-[10px] font-bold text-cyan-800 mb-2 uppercase tracking-wider flex items-center gap-1.5"><i class="fa-solid fa-user-pen"></i> Delegasi: Info Pemohon</p>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                     <input type="text" id="del_nama" placeholder="Nama Pemohon..." value="${valDelNama}" oninput="this.value = this.value.toUpperCase(); saveOrderDraft();" class="w-full border border-slate-300 rounded-md px-2.5 py-1.5 focus:border-cyan-500 outline-none bg-white font-medium" required>
-                    <select id="del_dept" class="w-full border border-slate-300 rounded-md px-2.5 py-1.5 bg-white focus:border-cyan-500 outline-none font-medium cursor-pointer" required>
-                        <option value="" disabled>-- Departemen --</option>
-                        ${(m.departemen || []).map(d => `<option value="${d}" ${valDelDept===d?'selected':''}>${d}</option>`).join('')}
-                    </select>
-                    <select id="del_vendor" class="w-full border border-slate-300 rounded-md px-2.5 py-1.5 bg-white focus:border-cyan-500 outline-none font-medium cursor-pointer" required>
-                        <option value="" disabled>-- Perusahaan --</option>
-                        ${(m.perusahaan || []).map(p => `<option value="${p}" ${valDelVendor===p?'selected':''}>${p}</option>`).join('')}
-                    </select>
+                    <div>
+                        <select id="del_dept" onchange="handleSelectOther(this, 'del_dept_other')" class="w-full border border-slate-300 rounded-md px-2.5 py-1.5 bg-white focus:border-cyan-500 outline-none font-medium cursor-pointer" required>
+                            ${buildSelectOptionsWithOther(m.departemen, valDelDept, 'Departemen')}
+                        </select>
+                        <input type="text" id="del_dept_other" oninput="this.value = this.value.toUpperCase(); saveOrderDraft();" placeholder="Ketik departemen..." class="hidden w-full border border-cyan-400 bg-cyan-50/30 rounded-md px-2 py-1 text-xs mt-1 outline-none">
+                    </div>
+                    <div>
+                        <select id="del_vendor" onchange="handleSelectOther(this, 'del_vendor_other')" class="w-full border border-slate-300 rounded-md px-2.5 py-1.5 bg-white focus:border-cyan-500 outline-none font-medium cursor-pointer" required>
+                            ${buildSelectOptionsWithOther(m.perusahaan, valDelVendor, 'Perusahaan')}
+                        </select>
+                        <input type="text" id="del_vendor_other" oninput="this.value = this.value.toUpperCase(); saveOrderDraft();" placeholder="Ketik perusahaan..." class="hidden w-full border border-cyan-400 bg-cyan-50/30 rounded-md px-2 py-1 text-xs mt-1 outline-none">
+                    </div>
                     <input type="number" id="del_wa" placeholder="No WhatsApp..." value="${valDelWa}" oninput="saveOrderDraft()" class="w-full border border-slate-300 rounded-md px-2.5 py-1.5 focus:border-cyan-500 outline-none bg-white font-medium" required>
-                    <select id="del_sect" class="w-full border border-slate-300 rounded-md px-2.5 py-1.5 bg-white focus:border-cyan-500 outline-none font-medium cursor-pointer sm:col-span-2" required>
-                        <option value="" disabled>-- Section --</option>
-                        ${(m.section || []).map(s => `<option value="${s}" ${valDelSect===s?'selected':''}>${s}</option>`).join('')}
-                    </select>
+                    <div class="sm:col-span-2">
+                        <select id="del_sect" onchange="handleSelectOther(this, 'del_sect_other')" class="w-full border border-slate-300 rounded-md px-2.5 py-1.5 bg-white focus:border-cyan-500 outline-none font-medium cursor-pointer" required>
+                            ${buildSelectOptionsWithOther(m.section, valDelSect, 'Section')}
+                        </select>
+                        <input type="text" id="del_sect_other" oninput="this.value = this.value.toUpperCase(); saveOrderDraft();" placeholder="Ketik section..." class="hidden w-full border border-cyan-400 bg-cyan-50/30 rounded-md px-2 py-1 text-xs mt-1 outline-none">
+                    </div>
                 </div>
             </div>` : `
             <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 mb-3 flex items-center justify-between shadow-2xs">
@@ -4542,131 +5249,187 @@
         ${calendarSectionHtml}`;
     }
 
-    async function submitOrder(e) {
-        e.preventDefault();
-        const user = JSON.parse(localStorage.getItem('lifting_user')); 
-        const cat = userOrderFleetMode; 
-        const isAdminGL = user.role === 'ADMIN' || user.role === 'GL';
-        const fotoInput = document.getElementById('req_foto');
-
-        const btnSubmit = document.getElementById('btnSubmitOrder'); 
-        btnSubmit.disabled = true; 
-        btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Sedang diproses...';
-        
-        let tgl = document.getElementById('req_tgl')?.value || ''; 
-        let jam = document.getElementById('req_jam')?.value || ''; 
-        let statusTag = 'SCHEDULED';
-        let shiftVal = '-';
-
-        if (tgl) {
-            let reqDate = new Date(`${tgl}T00:00:00`); 
-            let now = new Date(); 
-            now.setHours(0,0,0,0); 
-            let diffDays = (reqDate - now) / (1000 * 60 * 60 * 24);
-            
-            if (cat === 'Big Crane') { 
-                if (diffDays < 3) statusTag = 'UNSCHEDULED'; 
-            } else if (cat === 'Crane Truck' && jam) { 
-                let reqTime = new Date(`${tgl}T${jam}:00`); 
-                let diffHours = (reqTime - new Date()) / (1000 * 60 * 60); 
-                if (diffHours < 6) statusTag = 'UNSCHEDULED'; 
-                
-                let h = parseInt(jam.split(':')[0]);
-                shiftVal = (h >= 5 && h < 17) ? 'Shift 1' : 'Shift 2';
-            }
-        }
-
-        let durasiVal = document.getElementById('req_durasi')?.value || ''; 
-        let satuan = document.getElementById('req_satuan')?.value || 'JAM';
-        
-        const baseOrder = {
-            no_wo: generateWO(cat), 
-            timestamp: new Date().toISOString(), 
-            kategori: cat, 
-            nrp_pemohon: user.nrp, 
-            nama_pemohon: isAdminGL ? document.getElementById('del_nama').value : user.nama_lengkap, 
-            perusahaan: isAdminGL ? document.getElementById('del_vendor').value : user.perusahaan, 
-            departemen: isAdminGL ? document.getElementById('del_dept').value : user.departemen, 
-            section: isAdminGL ? document.getElementById('del_sect').value : user.section,
-            no_wa: isAdminGL ? document.getElementById('del_wa').value : user.no_wa,
-            tgl_pelaksanaan: tgl, 
-            jam_pelaksanaan: jam, 
-            shift: shiftVal, 
-            durasi_request: `${durasiVal} ${satuan}`,
-            lokasi_angkat: document.getElementById('req_lok_asal')?.value || '', 
-            lokasi_tujuan: document.getElementById('req_lok_tujuan')?.value || '', 
-            deskripsi: document.getElementById('req_deskripsi')?.value || '',
-            status: statusTag, 
-            gl: '', unit: '', operator: '', rigger: '', rigger2: '', jam_start_aktual: '', jam_end_aktual: '', durasi_aktual: '', final_inspeksi: '', alasan_telat: '', alasan_overtime: ''
-        };
-
-        // Keandalan Upload & Sinkronisasi Foto: Form order dijamin tuntas tersimpan (non-blocking)
-        if (fotoInput && fotoInput.files.length > 0) {
-            const file = fotoInput.files[0]; 
+    /* Helper Kompresi Gambar Berbasis Canvas */
+    function compressImageFile(file) {
+        return new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = function(event) {
                 const img = new Image();
                 img.onload = function() {
                     try {
-                        const canvas = document.createElement('canvas'); 
-                        const MAX_WIDTH = 720; 
-                        const MAX_HEIGHT = 720; 
-                        let width = img.width; 
+                        const canvas = document.createElement('canvas');
+                        const MAX_WIDTH = 720;
+                        const MAX_HEIGHT = 720;
+                        let width = img.width;
                         let height = img.height;
-                        if (width > height) { if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; } } 
-                        else { if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; } }
-                        canvas.width = width; canvas.height = height; 
-                        const ctx = canvas.getContext('2d'); 
-                        ctx.drawImage(img, 0, 0, width, height);
-                        
-                        let compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
-                        let base64Data = compressedBase64.split(',')[1];
-                        
-                        // 1. Simpan preview ke cache lokal seketika (0 ms) agar langsung tersedia bagi pengguna
-                        setPhotoCache(baseOrder.no_wo, compressedBase64);
-
-                        // 2. Unggah asinkron ke Google Apps Script tanpa menunda pembentukan tiket
-                        if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.startsWith('http')) {
-                            fetch(GOOGLE_SCRIPT_URL, { 
-                                method: 'POST', 
-                                headers: { 'Content-Type': 'text/plain;charset=utf-8' }, 
-                                body: JSON.stringify({ 
-                                    no_wo: baseOrder.no_wo,
-                                    fileName: `FOTO_${baseOrder.no_wo}.jpg`, 
-                                    mimeType: 'image/jpeg', 
-                                    base64Data: base64Data
-                                }) 
-                            }).then(r => r.json()).then(res => {
-                                if (res && res.url) {
-                                    setPhotoCache(baseOrder.no_wo, res.url);
-                                }
-                            }).catch(err => console.warn("Background upload error:", err));
+                        if (width > height) {
+                            if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+                        } else {
+                            if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
                         }
-
-                    } catch(err) { console.warn("Kompresi lampiran foto:", err); }
-                    
-                    finishSubmitOrder(baseOrder, user);
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        resolve(canvas.toDataURL('image/jpeg', 0.6));
+                    } catch(e) {
+                        resolve(event.target.result);
+                    }
                 };
+                img.onerror = () => reject(new Error("Gagal memproses file foto"));
                 img.src = event.target.result;
             };
+            reader.onerror = () => reject(new Error("Gagal membaca file foto"));
             reader.readAsDataURL(file);
-        } else { 
-            finishSubmitOrder(baseOrder, user); 
+        });
+    }
+
+    async function submitOrder(e) {
+        e.preventDefault();
+        const user = JSON.parse(localStorage.getItem('lifting_user')) || {}; 
+        const cat = userOrderFleetMode; 
+        const isAdminGL = user.role === 'ADMIN' || user.role === 'GL';
+        const fotoInput = document.getElementById('req_foto');
+
+        const btnSubmit = document.getElementById('btnSubmitOrder'); 
+        if (btnSubmit) {
+            btnSubmit.disabled = true; 
+            btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i> Sedang di proses...';
+        }
+        showToast('Sedang di proses...', 'success');
+        
+        try {
+            let tgl = document.getElementById('req_tgl')?.value || ''; 
+            let jam = document.getElementById('req_jam')?.value || ''; 
+            let statusTag = 'SCHEDULED';
+            let shiftVal = '-';
+
+            if (tgl) {
+                let reqDate = new Date(`${tgl}T00:00:00`); 
+                let now = new Date(); 
+                now.setHours(0,0,0,0); 
+                let diffDays = (reqDate - now) / (1000 * 60 * 60 * 24);
+                
+                if (cat === 'Big Crane') { 
+                    if (diffDays < 3) statusTag = 'UNSCHEDULED'; 
+                } else if (cat === 'Crane Truck' && jam) { 
+                    let reqTime = new Date(`${tgl}T${jam}:00`); 
+                    let diffHours = (reqTime - new Date()) / (1000 * 60 * 60); 
+                    if (diffHours < 6) statusTag = 'UNSCHEDULED'; 
+                    
+                    let h = parseInt(jam.split(':')[0]);
+                    shiftVal = (h >= 5 && h < 17) ? 'Shift 1' : 'Shift 2';
+                }
+            }
+
+            let durasiVal = document.getElementById('req_durasi')?.value || ''; 
+            let satuan = document.getElementById('req_satuan')?.value || (cat === 'Big Crane' ? 'HARI' : 'JAM');
+            
+            const valDelNama = isAdminGL ? (document.getElementById('del_nama')?.value || user.nama_lengkap) : (user.nama_lengkap || user.nrp);
+            const valDelVendor = isAdminGL ? resolveMasterValue('del_vendor', 'del_vendor_other', 'perusahaan') : (user.perusahaan || 'PPA');
+            const valDelDept = isAdminGL ? resolveMasterValue('del_dept', 'del_dept_other', 'departemen') : (user.departemen || 'PLANT');
+            const valDelSect = isAdminGL ? resolveMasterValue('del_sect', 'del_sect_other', 'section') : (user.section || 'SE');
+            const valDelWa = isAdminGL ? (document.getElementById('del_wa')?.value || user.no_wa) : (user.no_wa || '-');
+
+            const baseOrder = {
+                no_wo: generateWO(cat), 
+                timestamp: new Date().toISOString(), 
+                kategori: cat, 
+                nrp_pemohon: user.nrp, 
+                nama_pemohon: valDelNama, 
+                perusahaan: valDelVendor, 
+                departemen: valDelDept, 
+                section: valDelSect,
+                no_wa: valDelWa,
+                tgl_pelaksanaan: tgl, 
+                jam_pelaksanaan: jam, 
+                shift: shiftVal, 
+                durasi_request: `${durasiVal} ${satuan}`.trim(),
+                lokasi_angkat: document.getElementById('req_lok_asal')?.value || '', 
+                lokasi_tujuan: document.getElementById('req_lok_tujuan')?.value || '', 
+                deskripsi: document.getElementById('req_deskripsi')?.value || '',
+                status: statusTag, 
+                gl: '', unit: '', operator: '', rigger: '', rigger2: '', jam_start_aktual: '', jam_end_aktual: '', durasi_aktual: '', final_inspeksi: '', alasan_telat: '', alasan_overtime: '',
+                has_foto: false,
+                foto_url: ''
+            };
+
+            // Penanganan Lampiran Foto Terikat Kuat (Strict Binding & Await Safety)
+            if (fotoInput && fotoInput.files && fotoInput.files.length > 0) {
+                baseOrder.has_foto = true;
+                if (btnSubmit) btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i> Sedang di proses...';
+
+                try {
+                    const compressedBase64 = await compressImageFile(fotoInput.files[0]);
+                    const base64Data = compressedBase64.split(',')[1];
+
+                    // 1. Simpan preview instan ke cache lokal khusus No WO ini
+                    setPhotoCache(baseOrder.no_wo, compressedBase64);
+
+                    // 2. Unggah ke Google Drive via Google Apps Script dengan batas tunggu 5 detik
+                    if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.startsWith('http')) {
+                        const uploadPromise = fetch(GOOGLE_SCRIPT_URL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                            body: JSON.stringify({
+                                no_wo: baseOrder.no_wo,
+                                fileName: `FOTO_${baseOrder.no_wo}.jpg`,
+                                mimeType: 'image/jpeg',
+                                base64Data: base64Data
+                            })
+                        }).then(r => r.json());
+
+                        const timeoutPromise = new Promise(resolve => setTimeout(() => resolve({ timeout: true }), 5000));
+                        const res = await Promise.race([uploadPromise, timeoutPromise]);
+
+                        if (res && res.url) {
+                            baseOrder.foto_url = res.url;
+                            setPhotoCache(baseOrder.no_wo, res.url);
+                        }
+                    }
+                } catch (err) {
+                    console.warn("Upload foto berjalan di background:", err);
+                }
+            } else {
+                baseOrder.has_foto = false;
+                baseOrder.foto_url = '';
+            }
+
+            if (fotoInput) fotoInput.value = '';
+
+            await finishSubmitOrder(baseOrder, user);
+
+        } catch (err) {
+            console.error("Gagal memproses submit order:", err);
+            showToast('Terjadi kesalahan: ' + (err.message || 'Gagal membuat order'), 'error');
+            if (btnSubmit) {
+                btnSubmit.disabled = false;
+                btnSubmit.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Order';
+            }
         }
     }
 
-    function finishSubmitOrder(newOrder, user) {
+    async function finishSubmitOrder(newOrder, user) {
         clearOrderDraft();
-        const orders = getOrders();
+        let orders = getOrders();
+        // Cegah duplikasi No WO di lokal
+        orders = orders.filter(o => o.no_wo !== newOrder.no_wo);
         orders.unshift(newOrder);
-        saveOrders(orders);
+        localStorage.setItem('lifting_orders', JSON.stringify(orders));
         
-        const homeTab = (user.role === 'ADMIN' || user.role === 'GL') ? 'dashboard' : 'monitoring';
-        currentTab = homeTab;
-        window.location.hash = homeTab;
+        // Pindah seketika ke tab monitoring sehingga order langsung muncul di layar user
+        currentTab = 'monitoring';
+        window.location.hash = 'monitoring';
         userOrderFleetMode = null;
         renderApp(false);
         showSuccessAnim('check', 'Order Berhasil!', 'Pesanan Anda telah kami terima.');
+
+        // Simpan langsung tiket order baru ke Supabase
+        try {
+            await syncSingleOrderToSupabase(newOrder);
+        } catch(err) {
+            console.warn("Background sync error:", err);
+        }
     }
 
     function viewJobDetail(wo) {
@@ -4676,8 +5439,10 @@
         // Tandai order sudah pernah dibuka oleh pengguna (kurangi badge lonceng)
         markOrderAsOpened(wo);
 
-        let fotoHtml = `
-            <div class="mb-3">
+        const hasFotoAttached = (job.has_foto !== false && job.has_foto !== 'false') || !!job.foto_url;
+
+        let fotoHtml = hasFotoAttached ? `
+            <div class="mb-3" id="detailPhotoWrapper">
                 <div class="text-[8px] font-bold text-slate-400 uppercase mb-1 flex items-center justify-between">
                     <span><i class="fa-solid fa-camera mr-1 text-cyan-600"></i>LAMPIRAN FOTO DOKUMENTASI</span>
                     <span id="photoStatusBadge" class="text-[8px] text-slate-400 font-normal">Memeriksa...</span>
@@ -4688,6 +5453,10 @@
                         <span>Memeriksa lampiran foto...</span>
                     </div>
                 </div>
+            </div>
+        ` : `
+            <div class="mb-3 bg-slate-50 border border-slate-100 rounded-md p-2 text-center text-slate-400 text-[9px] italic">
+                <i class="fa-regular fa-image mr-1"></i> Tidak ada lampiran foto untuk order ini.
             </div>
         `;
 
@@ -4726,7 +5495,11 @@
             <div class="mb-2">
                 <div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">RUTE / LOKASI</div>
                 <div class="bg-slate-50 border border-slate-100 p-1.5 rounded-sm text-[10px] font-semibold text-slate-600 uppercase">${job.lokasi_angkat||'-'} <i class="fa-solid fa-arrow-right mx-1 text-[8px] text-slate-400"></i> ${job.lokasi_tujuan||'-'}</div>
-            </div>` : ''}
+            </div>` : (job.lokasi_angkat ? `
+            <div class="mb-2">
+                <div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">LOKASI KERJA</div>
+                <div class="bg-slate-50 border border-slate-100 p-1.5 rounded-sm text-[10px] font-semibold text-slate-600 uppercase"><i class="fa-solid fa-location-dot text-orange-500 mr-1"></i>${job.lokasi_angkat}</div>
+            </div>` : '')}
             <div class="mb-3">
                 <div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">DESKRIPSI</div>
                 <div class="bg-slate-50 border border-slate-100 p-1.5 rounded-sm text-[10px] text-slate-600">${job.deskripsi}</div>
@@ -4743,11 +5516,14 @@
             </div>
         `;
         document.getElementById('detailJobModal').classList.remove('hidden');
-        fetchOrderPhotoFromDrive(job.no_wo);
+
+        if (hasFotoAttached) {
+            fetchOrderPhotoFromDrive(job.no_wo);
+        }
     }
 
     /* ========================================================
-       SISTEM SMART PHOTO CACHE (LOAD INSTAN 0 DETIK)
+       SISTEM SMART PHOTO CACHE (LOAD INSTAN & ISOLASI WO)
        ======================================================== */
     function getPhotoCache() {
         try {
@@ -4763,7 +5539,7 @@
             if (keys.length > 50) {
                 delete cache[keys[0]]; // Hapus item terlama jika cache melebihi 50 item
             }
-            cache[no_wo] = url;
+            cache[String(no_wo).trim()] = url;
             localStorage.setItem('lifting_photo_cache', JSON.stringify(cache));
         } catch(e) {}
     }
@@ -4796,14 +5572,14 @@
         const badge = document.getElementById('photoStatusBadge');
         if (!container) return;
 
-        // Nomor WO dasar jika tiket merupakan tiket lanjutan (-L1, -L2, dst)
-        const baseLookupWo = String(no_wo).replace(/-L\d+$/i, '');
+        const targetWo = String(no_wo || '').trim();
+        const baseLookupWo = targetWo.replace(/-L\d+$/i, '');
 
-        // 1. CEK CACHE LOKAL TERLEBIH DAHULU: Langsung tampilkan dalam 0 detik jika sudah ada
+        // 1. CEK CACHE LOKAL: Hanya gunakan jika persis milik No WO ini
         const cache = getPhotoCache();
-        const cachedPhoto = cache[no_wo] || cache[baseLookupWo];
+        const cachedPhoto = cache[targetWo] || (targetWo.includes('-L') ? cache[baseLookupWo] : null);
         if (cachedPhoto) {
-            renderPhotoHtml(cachedPhoto, no_wo, container, badge);
+            renderPhotoHtml(cachedPhoto, targetWo, container, badge);
             return;
         }
 
@@ -4814,11 +5590,10 @@
         }
 
         try {
-            // Batas waktu timeout dipersingkat menjadi 7 detik
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 7000);
+            const timeoutId = setTimeout(() => controller.abort(), 6000);
             
-            let res = await fetch(`${GOOGLE_SCRIPT_URL}?no_wo=${encodeURIComponent(no_wo)}`, {
+            let res = await fetch(`${GOOGLE_SCRIPT_URL}?no_wo=${encodeURIComponent(targetWo)}`, {
                 signal: controller.signal
             });
             clearTimeout(timeoutId);
@@ -4826,8 +5601,8 @@
             if (!res.ok) throw new Error('HTTP ' + res.status);
             let data = await res.json();
 
-            // Jika tidak ditemukan pada no_wo lanjutan, periksa otomatis berdasarkan nomor tiket induknya
-            if ((!data || !data.found) && baseLookupWo !== no_wo) {
+            // Jika tiket turunan (-L) dan belum ada foto baru, periksa tiket induknya
+            if ((!data || !data.found) && baseLookupWo !== targetWo) {
                 try {
                     const resBase = await fetch(`${GOOGLE_SCRIPT_URL}?no_wo=${encodeURIComponent(baseLookupWo)}`);
                     if (resBase.ok) {
@@ -4839,11 +5614,10 @@
                 } catch(e) {}
             }
 
-            if (data && data.found && data.url) {
-                // Simpan ke cache agar pemanggilan berikutnya 0 detik instan
-                setPhotoCache(no_wo, data.url);
-                if (baseLookupWo !== no_wo) setPhotoCache(baseLookupWo, data.url);
-                renderPhotoHtml(data.url, no_wo, container, badge);
+            // Validasi Ketat: Pastikan respons yang dikembalikan server cocok dengan No WO yang diminta
+            if (data && data.found && data.url && (data.no_wo === targetWo || data.no_wo === baseLookupWo)) {
+                setPhotoCache(targetWo, data.url);
+                renderPhotoHtml(data.url, targetWo, container, badge);
             } else {
                 if (badge) {
                     badge.innerText = 'Tidak Ada';
@@ -4866,7 +5640,7 @@
                     <span class="text-[9px] text-slate-500">
                         Foto tidak dapat dimuat (Waktu tunggu habis atau server sibuk).
                     </span>
-                    <button type="button" onclick="fetchOrderPhotoFromDrive('${no_wo}')" class="text-[9px] text-cyan-600 hover:underline font-bold mt-1 flex items-center gap-1">
+                    <button type="button" onclick="fetchOrderPhotoFromDrive('${targetWo}')" class="text-[9px] text-cyan-600 hover:underline font-bold mt-1 flex items-center gap-1">
                         <i class="fa-solid fa-rotate-right"></i> Coba Muat Ulang
                     </button>
                 </div>
@@ -4895,9 +5669,16 @@
         const unitOptions = availableUnits.map(u => `<option value="${u}" ${job.unit===u?'selected':''}>${u}</option>`).join('');
 
         const glOptions = (m.gl || []).map(g => `<option value="${g}" ${job.gl===g?'selected':''}>${g}</option>`).join('');
-        const opOptions = (m.operator || []).map(o => `<option value="${o}" ${job.operator===o?'selected':''}>${o}</option>`).join('');
-        const rigOptions1 = (m.rigger || []).map(r => `<option value="${r}" ${job.rigger===r?'selected':''}>${r}</option>`).join('');
-        const rigOptions2 = (m.rigger || []).map(r => `<option value="${r}" ${job.rigger2===r?'selected':''}>${r}</option>`).join('');
+        
+        // Mengambil daftar Operator & Rigger langsung dari Manajemen Akun (users)
+        const operatorsList = getAccountOperators();
+        if (job.operator && !operatorsList.includes(job.operator)) operatorsList.unshift(job.operator);
+        const opOptions = operatorsList.map(o => `<option value="${o}" ${job.operator===o?'selected':''}>${o}</option>`).join('');
+
+        const riggersList = getAccountRiggers();
+        if (job.rigger && !riggersList.includes(job.rigger)) riggersList.unshift(job.rigger);
+        const rigOptions1 = riggersList.map(r => `<option value="${r}" ${job.rigger===r?'selected':''}>${r}</option>`).join('');
+        const rigOptions2 = riggersList.map(r => `<option value="${r}" ${job.rigger2===r?'selected':''}>${r}</option>`).join('');
 
         let riggerHTML = '';
         if (job.kategori === 'Big Crane') {
@@ -4942,7 +5723,11 @@
                 <div class="grid grid-cols-2 gap-2">
                     <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Lokasi Asal</label><input type="text" id="edit_lok_asal" value="${job.lokasi_angkat || ''}" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
                     <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Lokasi Tujuan</label><input type="text" id="edit_lok_tujuan" value="${job.lokasi_tujuan || ''}" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
-                </div>` : ''}
+                </div>` : `
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-0.5">Lokasi Kerja</label>
+                    <input type="text" id="edit_lok_asal" value="${job.lokasi_angkat || ''}" oninput="this.value = this.value.toUpperCase()" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500" placeholder="Titik / area kerja..." required>
+                </div>`}
                 <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Deskripsi / Beban</label><input type="text" id="edit_deskripsi" value="${job.deskripsi || ''}" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
 
                 <hr class="my-2 border-slate-200">
@@ -5011,6 +5796,9 @@
         if (jobs[idx].kategori !== 'Big Crane') {
             jobs[idx].lokasi_angkat = document.getElementById('edit_lok_asal').value;
             jobs[idx].lokasi_tujuan = document.getElementById('edit_lok_tujuan').value;
+        } else {
+            jobs[idx].lokasi_angkat = document.getElementById('edit_lok_asal') ? document.getElementById('edit_lok_asal').value : '';
+            jobs[idx].lokasi_tujuan = '';
         }
         jobs[idx].deskripsi = document.getElementById('edit_deskripsi').value;
         
@@ -5247,7 +6035,7 @@
             content = jobs.map(job => {
                 let statusColor = job.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : (job.status === 'ON PROGRESS' ? 'bg-blue-100 text-blue-700 border-blue-200' : (job.status === 'PENDING' ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-slate-100 text-slate-700 border-slate-200'));
                 let statusEmoji = job.status === 'COMPLETED' ? '🟢' : (job.status === 'ON PROGRESS' ? '🔵' : '⚪');
-                return `<div class="bg-white border border-slate-200 rounded-md p-2.5 mb-2 cursor-pointer hover:border-cyan-400 shadow-sm transition-all" onclick="document.getElementById('dayJobsModal').classList.add('hidden'); viewJobDetail('${job.no_wo}')"><div class="flex justify-between items-center mb-1 border-b border-slate-100 pb-1"><span class="text-[10px] font-mono ${getWoColorClass(job, 'text-cyan-600 font-bold')}">${job.no_wo}</span><span class="${statusColor} text-[8px] font-bold px-1.5 py-0.5 border rounded-sm tracking-wide flex items-center gap-1"><span>${statusEmoji}</span>${job.status}</span></div><div class="text-[11px] font-bold text-slate-800 uppercase mt-1 leading-tight">${job.unit ? '['+job.unit+']' : '<span class="text-red-500">[TBA]</span>'} ${job.nama_pemohon}</div><div class="text-[9px] text-slate-500 truncate mt-1 bg-slate-50 p-1 rounded border border-slate-100">${job.deskripsi} ${statusEmoji}</div></div>`;
+                return `<div class="bg-white border border-slate-200 rounded-md p-2.5 mb-2 cursor-pointer hover:border-cyan-400 shadow-sm transition-all" onclick="document.getElementById('dayJobsModal').classList.add('hidden'); viewJobDetail('${job.no_wo}')"><div class="flex justify-between items-center mb-1 border-b border-slate-100 pb-1"><span class="text-[10px] font-mono ${getWoColorClass(job, 'text-cyan-600 font-bold')}">${job.no_wo}</span><span class="${statusColor} text-[8px] font-bold px-1.5 py-0.5 border rounded-sm tracking-wide flex items-center gap-1"><span>${statusEmoji}</span>${job.status}</span></div><div class="text-[11px] font-bold text-slate-800 uppercase mt-1 leading-tight">${job.unit ? '['+job.unit+']' : '<span class="text-red-500">[TBA]</span>'} ${job.nama_pemohon}</div><div class="text-[9px] text-slate-600 line-clamp-2 mt-1 bg-slate-50 p-1.5 rounded border border-slate-100 leading-tight" title="${job.deskripsi || ''}">${job.deskripsi} ${statusEmoji}</div></div>`;
             }).join('');
         }
         document.getElementById('dayJobsTitle').innerText = dateIndo;
@@ -5319,20 +6107,8 @@
         } else if (document.visibilityState === "visible") {
             const user = localStorage.getItem('lifting_user');
             if (user) {
-                // Hubungkan kembali channel Supabase Realtime jika terputus saat HP standby
+                // Pastikan koneksi Supabase Realtime aktif kembali saat layar HP menyala
                 initSupabaseRealtime();
-
-                // JANGAN re-render jika sedang berada di tab order untuk mencegah hilangnya teks/input form
-                if (currentTab === 'order') return;
-                const isModalOpen = ['editJobModal', 'detailJobModal', 'mpActionModal', 'kendalaModal', 'cancelPromptModal', 'globalConfirmModal', 'resetPwdModal', 'successModal', 'successRegModal', 'profileBiodataModal', 'profileSettingsModal', 'imageViewerModal', 'dayJobsModal'].some(id => {
-                    const el = document.getElementById(id); return el && !el.classList.contains('hidden');
-                });
-                if (isModalOpen) return;
-
-                // Batasi pemanggilan fetch ulang: maksimal 1 kali per 5 menit saat tab dibuka kembali
-                if (Date.now() - lastFetchTimestamp > 5 * 60 * 1000) {
-                    fetchFromSupabase(false).then(() => { renderApp(true); });
-                }
             }
         }
     });
