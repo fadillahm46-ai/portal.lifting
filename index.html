@@ -322,6 +322,12 @@
 
     const defaultMasterData = {
         perusahaan: ['PPA', 'SUBKON A', 'SUBKON B', 'PT. BIB'],
+        perusahaan_colors: {
+            'PPA': 'biru',
+            'SUBKON A': 'biru',
+            'SUBKON B': 'biru',
+            'PT. BIB': 'biru'
+        },
         departemen: ['MINING', 'PLANT', 'SAFETY', 'HR'],
         section: ['OPERATION', 'MAINTENANCE', 'HSE', 'RECRUITMENT', 'SE'],
         unit_ct: ['CT-01', 'CT-02', 'CT-03'],
@@ -405,15 +411,46 @@
         return String(str || '').toUpperCase().replace(/\s+/g, ' ').trim();
     }
 
-    /* Helper Pendeteksi Pesanan Perusahaan BIB & Pewarnaan No WO Merah */
-    function isBibCompany(jobOrCompany) {
-        if (!jobOrCompany) return false;
-        const comp = typeof jobOrCompany === 'object' ? (jobOrCompany.perusahaan || '') : jobOrCompany;
-        return String(comp).toUpperCase().includes('BIB');
+    /* ========================================================
+       SISTEM PEWARNAAN NO WO MANUAL PER PERUSAHAAN (BIRU / MERAH)
+       ======================================================== */
+    function getCompanyWoColor(jobOrCompany) {
+        if (!jobOrCompany) return 'biru';
+        if (typeof jobOrCompany === 'object' && jobOrCompany.warna_wo) {
+            return String(jobOrCompany.warna_wo).toLowerCase();
+        }
+        const comp = typeof jobOrCompany === 'object' ? (jobOrCompany.perusahaan || '') : String(jobOrCompany);
+        if (!comp) return 'biru';
+        
+        const m = getMasterData();
+        const colors = m.perusahaan_colors || {};
+        if (colors[comp]) return colors[comp].toLowerCase();
+        
+        const norm = normalizeName(comp);
+        if (colors[norm]) return colors[norm].toLowerCase();
+        for (const [k, v] of Object.entries(colors)) {
+            if (normalizeName(k) === norm) return v.toLowerCase();
+        }
+        return 'biru';
     }
 
-    function getWoColorClass(jobOrCompany, defaultColor = 'text-cyan-700') {
-        return isBibCompany(jobOrCompany) ? 'text-red-600 font-black' : defaultColor;
+    function setCompanyWoColor(companyName, color) {
+        if (!companyName) return;
+        let m = getMasterData();
+        if (!m.perusahaan_colors) m.perusahaan_colors = {};
+        m.perusahaan_colors[companyName] = color;
+        m.perusahaan_colors[normalizeName(companyName)] = color;
+        saveMasterData(m);
+        showToast(`Warna WO untuk perusahaan ${companyName} diatur ke ${color.toUpperCase()}`, 'success');
+        renderApp(true);
+    }
+
+    function getWoColorClass(jobOrCompany, defaultColor = 'text-cyan-700 font-bold') {
+        const color = getCompanyWoColor(jobOrCompany);
+        if (color === 'merah') {
+            return 'text-red-600 font-black';
+        }
+        return defaultColor && (defaultColor.includes('cyan') || defaultColor.includes('blue')) ? defaultColor : 'text-cyan-700 font-bold';
     }
 
     function getUnitWorkload(unitName, ordersList = null) {
@@ -933,6 +970,11 @@
         if (!m[masterKey]) m[masterKey] = [];
         if (!m[masterKey].includes(clean)) {
             m[masterKey].push(clean);
+            if (masterKey === 'perusahaan') {
+                if (!m.perusahaan_colors) m.perusahaan_colors = {};
+                m.perusahaan_colors[clean] = 'biru';
+                m.perusahaan_colors[normalizeName(clean)] = 'biru';
+            }
             saveMasterData(m);
         }
     }
@@ -1073,8 +1115,8 @@
     let userOrderFleetMode = null; 
     let mpFleetMode = null; 
     
-    let sortColumn = 'timestamp';
-    let sortDirection = 'desc';
+    let sortColumn = null;
+    let sortDirection = null;
     let orderSearchQuery = '';
     let userSearchQuery = ''; 
     let userRoleFilter = 'ALL'; 
@@ -1776,19 +1818,42 @@
         if (data.unit_status_map && typeof data.unit_status_map === 'object') {
             safeData.unit_status_map = data.unit_status_map;
         }
+        if (data.perusahaan_colors && typeof data.perusahaan_colors === 'object') {
+            safeData.perusahaan_colors = data.perusahaan_colors;
+        } else {
+            safeData.perusahaan_colors = defaultMasterData.perusahaan_colors || {};
+        }
         return safeData;
     }
     function saveMasterData(data) { localStorage.setItem('lifting_master_data', JSON.stringify(data)); syncMasterToSupabase(data); }
 
     function handleSort(col) {
-        if (sortColumn === col) { sortDirection = sortDirection === 'asc' ? 'desc' : 'asc'; } 
-        else { sortColumn = col; sortDirection = 'asc'; }
+        if (sortColumn === col) {
+            if (sortDirection === 'asc') {
+                // Klik ke-2: Ubah ke Descending
+                sortDirection = 'desc';
+            } else if (sortDirection === 'desc') {
+                // Klik ke-3: Non-aktifkan sortir (kembali ke urutan default)
+                sortColumn = null;
+                sortDirection = null;
+            } else {
+                sortDirection = 'asc';
+            }
+        } else {
+            // Klik ke-1 pada kolom baru: Urutkan Ascending
+            sortColumn = col;
+            sortDirection = 'asc';
+        }
         renderApp(true); 
     }
 
     function getSortIcon(col) {
-        if (sortColumn !== col) return '<i class="fa-solid fa-sort text-slate-300 ml-1"></i>';
-        return sortDirection === 'asc' ? '<i class="fa-solid fa-sort-up text-cyan-600 ml-1"></i>' : '<i class="fa-solid fa-sort-down text-cyan-600 ml-1"></i>';
+        if (!sortColumn || sortColumn !== col || !sortDirection) {
+            return '<i class="fa-solid fa-sort text-slate-300 ml-1"></i>';
+        }
+        return sortDirection === 'asc' 
+            ? '<i class="fa-solid fa-sort-up text-cyan-600 ml-1"></i>' 
+            : '<i class="fa-solid fa-sort-down text-cyan-600 ml-1"></i>';
     }
 
     function executeOrderSearch() {
@@ -1816,6 +1881,8 @@
         orderSearchQuery = '';
         const elSearch = document.getElementById('orderSearchInput');
         if (elSearch) elSearch.value = '';
+        sortColumn = null;
+        sortDirection = null;
         renderApp(true);
     }
 
@@ -3307,6 +3374,47 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
                     </table>
                 </div>
             </div>`;
+        } else if (currentMasterTab === 'perusahaan') {
+            const list = m.perusahaan || [];
+            contentHtml = `
+            <div class="space-y-3">
+                <div class="bg-cyan-50/70 border border-cyan-200 p-2.5 rounded-lg text-[10px] text-cyan-900 font-medium flex items-center justify-between shadow-2xs">
+                    <span class="flex items-center gap-1.5">
+                        <i class="fa-solid fa-palette text-cyan-700"></i>
+                        Pilih <strong>Biru</strong> atau <strong>Merah</strong> pada dropdown di sebelah nama perusahaan untuk menentukan warna nomor WO.
+                    </span>
+                </div>
+                <form onsubmit="addCompanyMasterItem(event)" class="flex gap-2 items-center">
+                    <input type="text" id="newMasterItemInput" oninput="this.value = this.value.toUpperCase()" placeholder="Tambah nama perusahaan baru..." class="flex-1 border border-slate-300 rounded px-2.5 py-1.5 text-xs outline-none focus:border-cyan-500" required>
+                    <select id="newCompanyColorInput" class="border border-slate-300 rounded px-2 py-1.5 text-xs font-bold text-slate-700 bg-white cursor-pointer outline-none shadow-2xs">
+                        <option value="biru">🔵 Biru</option>
+                        <option value="merah">🔴 Merah</option>
+                    </select>
+                    <button type="submit" class="bg-[#0891b2] hover:bg-cyan-700 text-white font-bold px-3 py-1.5 rounded text-xs transition-colors shadow-sm flex items-center gap-1 shrink-0">
+                        <i class="fa-solid fa-plus"></i> Tambah
+                    </button>
+                </form>
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                    ${list.map((item, idx) => {
+                        const col = getCompanyWoColor(item);
+                        const isRed = col === 'merah';
+                        return `
+                        <div class="flex items-center justify-between p-2 bg-slate-50 border ${isRed ? 'border-red-200 bg-red-50/30' : 'border-slate-200'} rounded-md gap-2 shadow-2xs">
+                            <div class="flex items-center gap-1.5 min-w-0 flex-1">
+                                <span class="w-2 h-2 rounded-full ${isRed ? 'bg-red-500' : 'bg-cyan-600'} shrink-0"></span>
+                                <span class="font-bold text-slate-800 text-[11px] truncate" title="${item}">${item}</span>
+                            </div>
+                            <div class="flex items-center gap-1.5 shrink-0">
+                                <select onchange="setCompanyWoColor('${item}', this.value)" class="text-[9px] font-bold rounded px-1.5 py-1 border ${isRed ? 'border-red-300 bg-white text-red-600' : 'border-cyan-200 bg-white text-cyan-700'} cursor-pointer outline-none shadow-2xs" title="Ubah warna No WO untuk ${item}">
+                                    <option value="biru" ${!isRed ? 'selected' : ''}>🔵 Biru</option>
+                                    <option value="merah" ${isRed ? 'selected' : ''}>🔴 Merah</option>
+                                </select>
+                                <button onclick="deleteMasterDataItem('perusahaan', ${idx})" class="text-slate-400 hover:text-red-500 text-xs ml-1" title="Hapus Perusahaan"><i class="fa-solid fa-trash"></i></button>
+                            </div>
+                        </div>`;
+                    }).join('')}
+                </div>
+            </div>`;
         } else {
             const list = m[currentMasterTab] || [];
             contentHtml = `
@@ -3359,10 +3467,35 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
         }
     }
 
+    function addCompanyMasterItem(e) {
+        e.preventDefault();
+        const input = document.getElementById('newMasterItemInput');
+        const colorInput = document.getElementById('newCompanyColorInput');
+        const val = input.value.trim().toUpperCase();
+        const color = colorInput ? colorInput.value : 'biru';
+        if (!val) return;
+        const m = getMasterData();
+        if (!m.perusahaan) m.perusahaan = [];
+        if (!m.perusahaan.includes(val)) {
+            m.perusahaan.push(val);
+        }
+        if (!m.perusahaan_colors) m.perusahaan_colors = {};
+        m.perusahaan_colors[val] = color;
+        m.perusahaan_colors[normalizeName(val)] = color;
+        saveMasterData(m);
+        showToast(`Perusahaan ${val} berhasil ditambahkan (${color.toUpperCase()})`);
+        renderApp(true);
+    }
+
     function deleteMasterDataItem(key, idx) {
         const m = getMasterData();
         if (m[key] && m[key][idx] !== undefined) {
+            const removedItem = m[key][idx];
             m[key].splice(idx, 1);
+            if (key === 'perusahaan' && m.perusahaan_colors) {
+                delete m.perusahaan_colors[removedItem];
+                delete m.perusahaan_colors[normalizeName(removedItem)];
+            }
             saveMasterData(m);
             showToast('Item dihapus');
             renderApp(true);
@@ -3953,15 +4086,19 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
                 });
             }
 
-            // Urutkan data sesuai kolom dan arah sort aktif di tabel
-            jobs.sort((a, b) => {
-                let valA = (a[sortColumn] || '').toString().toLowerCase(); 
-                let valB = (b[sortColumn] || '').toString().toLowerCase();
-                let comparison = valA.localeCompare(valB, undefined, {numeric: true});
-                if (comparison < 0) return sortDirection === 'asc' ? -1 : 1; 
-                if (comparison > 0) return sortDirection === 'asc' ? 1 : -1; 
-                return 0;
-            });
+            // Urutkan data sesuai kolom dan arah sort aktif di tabel jika ada
+            if (sortColumn && sortDirection) {
+                jobs.sort((a, b) => {
+                    let valA = (a[sortColumn] || '').toString().toLowerCase(); 
+                    let valB = (b[sortColumn] || '').toString().toLowerCase();
+                    let comparison = valA.localeCompare(valB, undefined, {numeric: true});
+                    if (comparison < 0) return sortDirection === 'asc' ? -1 : 1; 
+                    if (comparison > 0) return sortDirection === 'asc' ? 1 : -1; 
+                    return 0;
+                });
+            } else {
+                jobs.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+            }
         }
 
         if (typeof XLSX !== 'undefined') {
@@ -4202,21 +4339,31 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
                 });
             }
 
-            jobs.sort((a, b) => {
-                let valA = (a[sortColumn] || '').toString().toLowerCase(); 
-                let valB = (b[sortColumn] || '').toString().toLowerCase();
-                let comparison = valA.localeCompare(valB, undefined, {numeric: true});
-                if (comparison < 0) return sortDirection === 'asc' ? -1 : 1; 
-                if (comparison > 0) return sortDirection === 'asc' ? 1 : -1; 
-                return 0;
-            });
+            if (sortColumn && sortDirection) {
+                jobs.sort((a, b) => {
+                    let valA = (a[sortColumn] || '').toString().toLowerCase(); 
+                    let valB = (b[sortColumn] || '').toString().toLowerCase();
+                    let comparison = valA.localeCompare(valB, undefined, {numeric: true});
+                    if (comparison < 0) return sortDirection === 'asc' ? -1 : 1; 
+                    if (comparison > 0) return sortDirection === 'asc' ? 1 : -1; 
+                    return 0;
+                });
 
-            if (sortColumn === 'status' || sortColumn === 'timestamp') {
-               jobs.sort((a,b) => {
-                   let aNeed = (a.status === 'SCHEDULED' || a.status === 'UNSCHEDULED' || (a.status === 'PENDING' && !a.gl)) ? 1 : 0;
-                   let bNeed = (b.status === 'SCHEDULED' || b.status === 'UNSCHEDULED' || (b.status === 'PENDING' && !b.gl)) ? 1 : 0;
-                   return bNeed - aNeed;
-               });
+                if (sortColumn === 'status' || sortColumn === 'timestamp') {
+                   jobs.sort((a,b) => {
+                       let aNeed = (a.status === 'SCHEDULED' || a.status === 'UNSCHEDULED' || (a.status === 'PENDING' && !a.gl)) ? 1 : 0;
+                       let bNeed = (b.status === 'SCHEDULED' || b.status === 'UNSCHEDULED' || (b.status === 'PENDING' && !b.gl)) ? 1 : 0;
+                       return bNeed - aNeed;
+                   });
+                }
+            } else {
+                // Non-aktif (Urutan default: Prioritas order butuh validasi di paling atas, lalu urut waktu terbaru)
+                jobs.sort((a, b) => {
+                    let aNeed = (a.status === 'SCHEDULED' || a.status === 'UNSCHEDULED' || (a.status === 'PENDING' && !a.gl)) ? 1 : 0;
+                    let bNeed = (b.status === 'SCHEDULED' || b.status === 'UNSCHEDULED' || (b.status === 'PENDING' && !b.gl)) ? 1 : 0;
+                    if (bNeed !== aNeed) return bNeed - aNeed;
+                    return new Date(b.timestamp || 0) - new Date(a.timestamp || 0);
+                });
             }
 
             let pendingCount = jobs.filter(j => j.status === 'SCHEDULED' || j.status === 'UNSCHEDULED' || (j.status === 'PENDING' && (!j.gl || !j.operator || !j.rigger))).length;
@@ -5812,8 +5959,18 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
 
         document.getElementById('editJobContent').innerHTML = `
             <form onsubmit="saveAdminEditJob(event, '${wo}')" class="space-y-2">
-                <div class="bg-cyan-50 border border-cyan-100 p-1.5 rounded-sm mb-1 text-center">
-                    <p class="text-[10px] font-bold text-cyan-700">${job.no_wo} (${job.kategori})</p>
+                <div class="bg-cyan-50 border border-cyan-100 p-2 rounded-sm mb-2 flex items-center justify-between">
+                    <div>
+                        <div class="text-[8px] text-cyan-600 font-bold uppercase">No WO & Perusahaan</div>
+                        <div class="text-[11px] font-mono font-bold ${getWoColorClass(job)}">${job.no_wo} <span class="text-slate-500 font-sans font-normal text-[10px]">(${job.perusahaan || '-'})</span></div>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <label class="text-[9px] font-bold text-slate-600">Warna WO:</label>
+                        <select id="edit_wo_color" class="text-[9px] font-bold border border-slate-300 rounded px-1.5 py-0.5 bg-white cursor-pointer outline-none shadow-2xs">
+                            <option value="biru" ${getCompanyWoColor(job) === 'biru' ? 'selected' : ''}>🔵 Biru</option>
+                            <option value="merah" ${getCompanyWoColor(job) === 'merah' ? 'selected' : ''}>🔴 Merah</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="grid grid-cols-2 gap-2">
                     <div><label class="block text-[10px] font-bold text-slate-500 mb-0.5">Tgl Pelaksanaan</label><input type="date" id="edit_tgl" value="${job.tgl_pelaksanaan}" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500" required></div>
@@ -5911,6 +6068,18 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
         jobs[idx].operator = op;
         jobs[idx].rigger = rig;
         jobs[idx].rigger2 = rig2;
+
+        const chosenWoColor = document.getElementById('edit_wo_color')?.value;
+        if (chosenWoColor) {
+            jobs[idx].warna_wo = chosenWoColor;
+            if (jobs[idx].perusahaan) {
+                let m = getMasterData();
+                if (!m.perusahaan_colors) m.perusahaan_colors = {};
+                m.perusahaan_colors[jobs[idx].perusahaan] = chosenWoColor;
+                m.perusahaan_colors[normalizeName(jobs[idx].perusahaan)] = chosenWoColor;
+                saveMasterData(m);
+            }
+        }
 
         if (jobs[idx].status === 'COMPLETED') {
             jobs[idx].jam_start_aktual = document.getElementById('edit_start').value;
