@@ -1097,11 +1097,12 @@
                 return {
                     order_masuk: saved.order_masuk !== false,
                     tindakan_validasi: saved.tindakan_validasi !== false,
+                    status_order: saved.status_order !== false,
                     notif_umum: saved.notif_umum !== false
                 };
             }
         } catch(e) {}
-        return { order_masuk: true, tindakan_validasi: true, notif_umum: true };
+        return { order_masuk: true, tindakan_validasi: true, status_order: true, notif_umum: true };
     }
 
     function saveNotificationPref(prefKey, value) {
@@ -1110,6 +1111,9 @@
         const storageKey = `lifting_notif_prefs_${nrp}`;
         let prefs = getNotificationPrefs();
         prefs[prefKey] = Boolean(value);
+        if (prefKey === 'status_order') {
+            prefs['notif_umum'] = Boolean(value);
+        }
         localStorage.setItem(storageKey, JSON.stringify(prefs));
         showToast(`Pengaturan notifikasi berhasil diperbarui!`, 'success');
     }
@@ -1117,8 +1121,7 @@
     function renderNotificationSettingsUI() {
         const user = JSON.parse(localStorage.getItem('lifting_user')) || {};
         const role = String(user.role || '').toUpperCase().trim();
-        const isGlOrAdmin = ['ADMIN', 'GL', 'GROUP LEADER', 'LEADER'].includes(role) || 
-                            (user.jabatan && /GROUP LEADER|DISPATCHER|ADMIN/i.test(user.jabatan));
+        const isGlOrAdmin = (role === 'ADMIN' || role === 'GL');
         
         const prefs = getNotificationPrefs();
         const container = document.getElementById('notifSettingsContainer');
@@ -1155,28 +1158,41 @@
                     </label>
                 </div>
             `;
-        } else {
-            // USER & MANPOWER (MP) - Hanya 1 tombol
-            const isMP = ['MANPOWER', 'MP', 'OPERATOR', 'RIGGER'].includes(role) || (user.jabatan && /OPERATOR|RIGGER/i.test(user.jabatan));
-            const labelTitle = isMP ? 'Notifikasi Penugasan & Tugas' : 'Notifikasi Pemberitahuan Order';
-            const labelDesc = isMP 
-                ? 'Pemberitahuan suara & pop-up banner saat Anda ditugaskan ke job baru atau perubahan status pekerjaan' 
-                : 'Pemberitahuan suara & pop-up banner saat order Anda divalidasi, sedang berjalan, dipending, atau selesai';
-
+        } else if (role === 'USER') {
             container.innerHTML = `
                 <div class="text-[11px] font-bold text-slate-700 flex items-center justify-between">
                     <span class="flex items-center gap-1.5"><i class="fa-solid fa-bell text-cyan-600"></i> Pengaturan Notifikasi</span>
                     <span class="text-[9px] text-cyan-600 font-bold bg-cyan-50 px-1.5 py-0.5 rounded border border-cyan-200 uppercase">${user.role}</span>
                 </div>
                 
-                <!-- 1 Tombol Saklar Notifikasi untuk User & MP -->
+                <!-- 1 Tombol Saklar Notifikasi Perubahan Status Order untuk User -->
                 <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-3 shadow-2xs">
                     <div class="flex-1 min-w-0">
-                        <div class="text-xs font-bold text-slate-800 leading-tight">${labelTitle}</div>
-                        <div class="text-[10px] text-slate-500 mt-0.5 leading-snug">${labelDesc}</div>
+                        <div class="text-xs font-bold text-slate-800 leading-tight">Notifikasi Perubahan Status Order</div>
+                        <div class="text-[10px] text-slate-500 mt-0.5 leading-snug">Pemberitahuan suara & pop-up banner saat status order divalidasi, sedang berjalan, dipending, atau selesai</div>
                     </div>
                     <label class="relative inline-flex items-center cursor-pointer shrink-0">
-                        <input type="checkbox" id="pref_notif_umum" ${prefs.notif_umum ? 'checked' : ''} onchange="saveNotificationPref('notif_umum', this.checked)" class="sr-only peer">
+                        <input type="checkbox" id="pref_status_order" ${prefs.status_order !== false ? 'checked' : ''} onchange="saveNotificationPref('status_order', this.checked)" class="sr-only peer">
+                        <div class="w-10 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#0891b2]"></div>
+                    </label>
+                </div>
+            `;
+        } else {
+            // MANPOWER (MP)
+            container.innerHTML = `
+                <div class="text-[11px] font-bold text-slate-700 flex items-center justify-between">
+                    <span class="flex items-center gap-1.5"><i class="fa-solid fa-bell text-cyan-600"></i> Pengaturan Notifikasi</span>
+                    <span class="text-[9px] text-cyan-600 font-bold bg-cyan-50 px-1.5 py-0.5 rounded border border-cyan-200 uppercase">${user.role}</span>
+                </div>
+                
+                <!-- 1 Tombol Saklar Notifikasi Penugasan & Tugas untuk MP -->
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-3 shadow-2xs">
+                    <div class="flex-1 min-w-0">
+                        <div class="text-xs font-bold text-slate-800 leading-tight">Notifikasi Penugasan & Tugas</div>
+                        <div class="text-[10px] text-slate-500 mt-0.5 leading-snug">Pemberitahuan suara & pop-up banner saat Anda ditugaskan ke job baru atau perubahan status pekerjaan</div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer shrink-0">
+                        <input type="checkbox" id="pref_notif_umum" ${prefs.notif_umum !== false ? 'checked' : ''} onchange="saveNotificationPref('notif_umum', this.checked)" class="sr-only peer">
                         <div class="w-10 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#0891b2]"></div>
                     </label>
                 </div>
@@ -1211,10 +1227,8 @@
         const orderNrp = String(newRecord.nrp_pemohon || '').toUpperCase().trim();
         const orderName = normalizeName(newRecord.nama_pemohon);
 
-        const isGlOrAdmin = ['ADMIN', 'GL', 'GROUP LEADER', 'LEADER'].includes(curRole) ||
-                            (currentUser.jabatan && /GROUP LEADER|DISPATCHER|ADMIN/i.test(currentUser.jabatan));
-        const isMP = ['MANPOWER', 'MP', 'OPERATOR', 'RIGGER'].includes(curRole) ||
-                     (currentUser.jabatan && /OPERATOR|RIGGER/i.test(currentUser.jabatan));
+        const isGlOrAdmin = (curRole === 'ADMIN' || curRole === 'GL');
+        const isMP = (curRole === 'MANPOWER' || curRole === 'MP');
         const isOrderOwner = (orderNrp && orderNrp === curNrp) || (orderName && orderName === curName);
 
         const newOp = normalizeName(newRecord.operator);
@@ -1310,7 +1324,7 @@
 
         // 3. NOTIFIKASI UNTUK USER (PEMOHON)
         if (isOrderOwner) {
-            if (!prefs.notif_umum) return;
+            if (prefs.status_order === false || prefs.notif_umum === false) return;
             if (eventType === 'INSERT' && newRecord.no_wo && newRecord.no_wo.includes('-L')) {
                 triggerAppNotification(
                     "Order Lanjutan Diterbitkan!",
