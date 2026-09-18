@@ -24,6 +24,9 @@
     <!-- Supabase JS Client for Realtime WebSockets -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
+    <!-- html2canvas for High Resolution Dashboard KPI Export -->
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
         html, body {
@@ -2019,7 +2022,7 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
                         </div>
                     </div>` : ''}
                     
-                    <div class="flex-1 overflow-y-auto p-2 sm:p-2.5 pb-24 sm:pb-2 relative w-full flex flex-col min-h-0 hide-scrollbar ${animClass}">
+                    <div class="flex-1 overflow-y-auto p-2 sm:p-3 pb-24 sm:pb-3 relative w-full flex flex-col min-h-0 hide-scrollbar ${animClass}">
                         ${currentTab === 'dashboard' && (user.role === 'ADMIN' || user.role === 'GL') ? getDashboardView() : ''}
                         ${currentTab === 'monitoring' ? (user.role === 'MANPOWER' ? getManpowerWorkflow() : getMonitoringView()) : ''}
                         ${currentTab === 'order' ? getOrderFormView() : ''}
@@ -3497,15 +3500,18 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
         let pieStyle = `background: conic-gradient(#0d9488 0deg ${degCT}deg, #4ade80 ${degCT}deg ${degBC}deg, #a7f3d0 ${degBC}deg 360deg);`;
 
         return `
-        <div class="w-full px-3.5 sm:px-6 lg:px-8 py-3.5 space-y-4 relative z-10">
-            <!-- Header Simetris: Kiri Judul & Sync, Kanan Filter Terpadu -->
+        <div id="dashboardCaptureArea" class="w-full space-y-3 relative z-10">
+            <!-- Header Simetris: Kiri Judul, Sync & Download, Kanan Filter Terpadu -->
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-wrap">
                     <h2 class="text-sm font-bold text-slate-800 shrink-0 flex items-center gap-1.5">
                         <i class="fa-solid fa-chart-pie text-cyan-600"></i> Dashboard Analytics
                     </h2>
-                    <button onclick="fetchFromSupabase(true)" class="bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-600 font-bold px-2 py-0.5 rounded text-[9px] flex items-center gap-1 transition-colors shadow-2xs">
+                    <button onclick="fetchFromSupabase(true)" class="dashboard-no-export bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-600 font-bold px-2 py-0.5 rounded text-[9px] flex items-center gap-1 transition-colors shadow-2xs cursor-pointer">
                         <i class="fa-solid fa-rotate"></i> Refresh Sync
+                    </button>
+                    <button id="btnDownloadKPI" onclick="downloadDashboardForPPT()" class="dashboard-no-export bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2.5 py-0.5 rounded text-[9px] flex items-center gap-1 transition-colors shadow-2xs cursor-pointer" title="Download Screenshot HD untuk Presentasi Slide PPT">
+                        <i class="fa-solid fa-file-powerpoint"></i> Download KPI (PPT)
                     </button>
                 </div>
                 
@@ -3519,7 +3525,7 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
                         <span class="text-[10px] text-slate-500 font-medium mr-1.5 select-none">Ke:</span>
                         <input type="date" id="dash_tgl_selesai" class="bg-transparent text-slate-700 font-semibold focus:outline-none text-[10px] cursor-pointer" value="${tglSelesai}" onchange="renderApp(true)">
                     </div>
-                    <button type="button" onclick="resetDashFilter()" class="w-7 h-7 rounded-full bg-white border border-slate-200 hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-700 transition-colors shadow-2xs shrink-0 cursor-pointer" title="Reset Filter Tanggal">
+                    <button type="button" onclick="resetDashFilter()" class="dashboard-no-export w-7 h-7 rounded-full bg-white border border-slate-200 hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-700 transition-colors shadow-2xs shrink-0 cursor-pointer" title="Reset Filter Tanggal">
                         <i class="fa-solid fa-rotate-left text-[10px]"></i>
                     </button>
                     
@@ -3543,28 +3549,28 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
             </div>
 
             <!-- Baris 5 Kartu Status Simetris -->
-            <div class="grid grid-cols-2 sm:grid-cols-5 gap-3.5 relative z-0">
-                <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 shadow-sm relative overflow-hidden flex flex-col justify-start">
+            <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 relative z-0">
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-3.5 shadow-sm relative overflow-hidden flex flex-col justify-start">
                     <div class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 relative z-10">Total Order</div>
                     <div class="text-3xl font-black text-slate-700 relative z-10 leading-none">${cntOrder}</div>
                     <i class="fa-solid fa-file-invoice absolute -bottom-3 -right-2 text-6xl text-slate-300 opacity-20 rotate-[-10deg]"></i>
                 </div>
-                <div class="bg-blue-50 border border-blue-100 rounded-xl p-4 shadow-sm relative overflow-hidden flex flex-col justify-start">
+                <div class="bg-blue-50 border border-blue-100 rounded-xl p-3.5 shadow-sm relative overflow-hidden flex flex-col justify-start">
                     <div class="text-[9px] font-black text-blue-600 uppercase tracking-widest mb-1 relative z-10">ON PROGRESS</div>
                     <div class="text-3xl font-black text-blue-700 relative z-10 leading-none">${cntProg}</div>
                     <i class="fa-solid fa-arrows-rotate absolute -bottom-3 -right-2 text-6xl text-blue-500 opacity-10"></i>
                 </div>
-                <div class="bg-orange-50 border border-orange-100 rounded-xl p-4 shadow-sm relative overflow-hidden flex flex-col justify-start">
+                <div class="bg-orange-50 border border-orange-100 rounded-xl p-3.5 shadow-sm relative overflow-hidden flex flex-col justify-start">
                     <div class="text-[9px] font-black text-orange-600 uppercase tracking-widest mb-1 relative z-10">PENDING</div>
                     <div class="text-3xl font-black text-orange-700 relative z-10 leading-none">${cntPend}</div>
                     <i class="fa-solid fa-clock absolute -bottom-3 -right-2 text-6xl text-orange-500 opacity-10"></i>
                 </div>
-                <div class="bg-emerald-50 border border-emerald-100 rounded-xl p-4 shadow-sm relative overflow-hidden flex flex-col justify-start">
+                <div class="bg-emerald-50 border border-emerald-100 rounded-xl p-3.5 shadow-sm relative overflow-hidden flex flex-col justify-start">
                     <div class="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-1 relative z-10">COMPLETED</div>
                     <div class="text-3xl font-black text-emerald-700 relative z-10 leading-none">${cntDone}</div>
                     <i class="fa-solid fa-circle-check absolute -bottom-3 -right-2 text-6xl text-emerald-500 opacity-10"></i>
                 </div>
-                <div class="bg-red-50 border border-red-100 rounded-xl p-4 shadow-sm relative overflow-hidden flex flex-col justify-start col-span-2 sm:col-span-1">
+                <div class="bg-red-50 border border-red-100 rounded-xl p-3.5 shadow-sm relative overflow-hidden flex flex-col justify-start col-span-2 sm:col-span-1">
                     <div class="text-[9px] font-black text-red-600 uppercase tracking-widest mb-1 relative z-10">CANCELED</div>
                     <div class="text-3xl font-black text-red-700 relative z-10 leading-none">${cntCancel}</div>
                     <i class="fa-solid fa-xmark absolute -bottom-3 -right-2 text-6xl text-red-500 opacity-10"></i>
@@ -3572,8 +3578,8 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
             </div>
 
             <!-- Kartu Data Perusahaan & Dept Plant Sejajar & Simetris -->
-            <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm mt-3.5">
-                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            <div class="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
                     <!-- Kolom 1: Donut Chart -->
                     <div class="lg:col-span-4 xl:col-span-3 flex flex-col items-center justify-start">
                         <h3 class="text-xs font-bold text-slate-700 mb-2 w-full text-left">Data Perusahaan</h3>
@@ -3583,7 +3589,7 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
                     </div>
                     
                     <!-- Kolom 2 & 3: Rincian Perusahaan & Dept Plant Sejajar (50% / 50%) -->
-                    <div class="lg:col-span-8 xl:col-span-9 grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                    <div class="lg:col-span-8 xl:col-span-9 grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
                         <!-- Rincian Perusahaan -->
                         <div class="flex flex-col justify-start">
                             <div class="grid grid-cols-12 text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase border-b border-slate-100 pb-1.5 mb-2 select-none tracking-wider">
@@ -3596,7 +3602,7 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
                         </div>
                         
                         <!-- Rincian Dept Plant Bergaris Pemisah Sejajar -->
-                        <div class="md:border-l border-slate-100 md:pl-6 flex flex-col justify-start">
+                        <div class="md:border-l border-slate-100 md:pl-4 flex flex-col justify-start">
                             <div class="grid grid-cols-12 text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase border-b border-slate-100 pb-1.5 mb-2 select-none tracking-wider">
                                 <span class="col-span-4 text-left text-blue-600 font-extrabold">DEPT PLANT</span>
                                 <span class="col-span-2 text-center">PERSENTASE</span>
@@ -3635,20 +3641,20 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
             </div>
 
             <!-- Baris 2 Grafik Berdampingan 50% / 50% -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-3.5 mt-3.5">
-                <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex flex-col">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                <div class="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm flex flex-col">
                     <h3 class="text-xs font-bold text-slate-700 mb-2">Weekly Trend Order (vs Minggu Lalu)</h3>
                     <div class="relative h-52 w-full"><canvas id="lineChart"></canvas></div>
                 </div>
-                <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex flex-col">
+                <div class="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm flex flex-col">
                     <h3 class="text-xs font-bold text-slate-700 mb-2 uppercase">DEPARTEMENT ORDER</h3>
                     <div class="relative h-52 w-full"><canvas id="deptOrderChart"></canvas></div>
                 </div>
             </div>
 
             <!-- Baris Distribusi Unit & Scheduled vs Unscheduled -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-3.5 mt-3.5">
-                <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex flex-col sm:flex-row items-center justify-center gap-6">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                <div class="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm flex flex-col sm:flex-row items-center justify-center gap-4">
                     <div class="w-full sm:w-auto">
                         <h3 class="text-xs font-bold text-slate-700 mb-3 text-center sm:text-left uppercase">Distribusi & Total Unit</h3>
                         ${totalUnits > 1 ? `
@@ -3662,14 +3668,14 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
                     ` : `<div class="text-[9px] text-slate-400 italic my-auto mx-auto">Data kosong</div></div>`}
                 </div>
                 
-                <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex flex-col">
+                <div class="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm flex flex-col">
                     <h3 class="text-xs font-bold text-slate-700 mb-2 uppercase">Scheduled vs Unscheduled</h3>
                     <div class="relative h-40 w-full"><canvas id="schedChart"></canvas></div>
                 </div>
             </div>
 
             <!-- Baris Performa Rigger Full Width -->
-            <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm mt-3.5 flex flex-col w-full">
+            <div class="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm flex flex-col w-full">
                 <h3 class="text-xs font-bold text-slate-700 mb-2 uppercase">Performa Rigger (Total Jam Kerja)</h3>
                 <div class="relative h-64 w-full"><canvas id="riggerChart"></canvas></div>
             </div>
@@ -3997,6 +4003,86 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
             showToast("Data Excel berhasil diekspor!", "success");
         } else {
             showToast("Library SheetJS belum siap", "error");
+        }
+    }
+
+    async function downloadDashboardForPPT() {
+        const targetEl = document.getElementById('dashboardCaptureArea');
+        const btn = document.getElementById('btnDownloadKPI');
+        if (!targetEl) return showToast('Area dashboard tidak ditemukan', 'error');
+        if (typeof html2canvas === 'undefined') {
+            return showToast('Library html2canvas belum termuat, silakan refresh', 'error');
+        }
+
+        const origBtnHtml = btn ? btn.innerHTML : '';
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyiapkan...';
+        }
+        showToast('Menyiapkan gambar dashboard HD untuk presentasi...', 'success');
+
+        // 1. Ambil nilai filter saat ini untuk header presentasi KPI
+        const tglMulai = document.getElementById('dash_tgl_mulai')?.value || '-';
+        const tglSelesai = document.getElementById('dash_tgl_selesai')?.value || '-';
+        const shiftVal = document.getElementById('dash_shift')?.value || 'Semua Shift';
+        const unitVal = document.getElementById('dash_unit')?.value || 'Semua Armada';
+
+        // 2. Buat elemen kop presentasi formal khusus ekspor
+        const banner = document.createElement('div');
+        banner.id = 'tempKpiBanner';
+        banner.className = 'w-full bg-slate-900 text-white p-4 rounded-xl mb-3 flex items-center justify-between shadow-md border border-slate-800 select-none';
+        banner.innerHTML = `
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-cyan-600 flex items-center justify-center text-white text-xl shadow-inner">
+                    <i class="fa-solid fa-truck-moving"></i>
+                </div>
+                <div>
+                    <h1 class="text-sm font-black tracking-wider uppercase">SUPPORT EQUIPMENT - KEY PERFORMANCE INDICATOR (KPI)</h1>
+                    <p class="text-[10px] text-cyan-400 font-bold uppercase mt-0.5">PT PUTRA PERKASA ABADI &bull; OPERATION & MAINTENANCE</p>
+                </div>
+            </div>
+            <div class="text-right text-[9px] text-slate-300 font-medium">
+                <div><strong class="text-white">Periode:</strong> ${tglMulai} s/d ${tglSelesai}</div>
+                <div class="mt-0.5"><strong class="text-white">Filter:</strong> ${shiftVal} | ${unitVal}</div>
+                <div class="text-slate-400 text-[8px] mt-0.5">Dibuat: ${new Date().toLocaleString('id-ID')}</div>
+            </div>
+        `;
+        targetEl.insertBefore(banner, targetEl.firstChild);
+
+        // 3. Sembunyikan tombol aksi dan kontrol form sementara agar hasil capture bersih
+        const noExportEls = targetEl.querySelectorAll('.dashboard-no-export');
+        noExportEls.forEach(el => el.style.display = 'none');
+
+        try {
+            // Beri jeda singkat agar DOM dan canvas stabil
+            await new Promise(res => setTimeout(res, 250));
+
+            const canvas = await html2canvas(targetEl, {
+                scale: 2, // Kualitas HD Retina 2x agar sangat tajam di slide PPT
+                useCORS: true,
+                backgroundColor: '#f8fafc',
+                logging: false
+            });
+
+            const link = document.createElement('a');
+            link.download = `KPI_Dashboard_Lifting_${tglMulai}_sd_${tglSelesai}.png`;
+            link.href = canvas.toDataURL('image/png');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            showToast('Gambar Dashboard KPI berhasil diunduh!', 'success');
+        } catch (err) {
+            console.error("Gagal mendownload dashboard:", err);
+            showToast('Gagal membuat gambar dashboard: ' + (err.message || 'Error'), 'error');
+        } finally {
+            // Bersihkan banner kop sementara dan kembalikan tombol
+            if (banner && banner.parentNode) banner.parentNode.removeChild(banner);
+            noExportEls.forEach(el => el.style.display = '');
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = origBtnHtml;
+            }
         }
     }
 
