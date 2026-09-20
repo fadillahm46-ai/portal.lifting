@@ -2718,6 +2718,38 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
         setTimeout(() => { m.classList.add('hidden'); }, 2500);
     }
 
+    function getMpDashboardView() {
+        return `
+        <div class="max-w-md w-full mx-auto pt-6 pb-8 px-4 flex flex-col items-center justify-center min-h-[60vh] text-center">
+            <div class="w-16 h-16 bg-cyan-50 border border-cyan-200 text-cyan-600 rounded-2xl flex items-center justify-center text-2xl mb-4 shadow-xs">
+                <i class="fa-solid fa-chart-pie"></i>
+            </div>
+            <h2 class="text-sm sm:text-base font-bold text-slate-800 tracking-tight uppercase">Dashboard Manpower</h2>
+            <p class="text-xs text-slate-500 font-medium mt-1.5 max-w-xs leading-relaxed">
+                Ringkasan performa jam kerja dan statistik operasional lapangan segera hadir.
+            </p>
+            <div class="mt-4 px-3 py-1 bg-cyan-50 border border-cyan-200 rounded-full text-[10px] font-bold text-cyan-700 shadow-2xs">
+                <i class="fa-solid fa-clock-rotate-left mr-1"></i> Segera Hadir
+            </div>
+        </div>`;
+    }
+
+    function getMpP2hView() {
+        return `
+        <div class="max-w-md w-full mx-auto pt-6 pb-8 px-4 flex flex-col items-center justify-center min-h-[60vh] text-center">
+            <div class="w-16 h-16 bg-amber-50 border border-amber-200 text-amber-600 rounded-2xl flex items-center justify-center text-2xl mb-4 shadow-xs">
+                <i class="fa-solid fa-screwdriver-wrench"></i>
+            </div>
+            <h2 class="text-sm sm:text-base font-bold text-slate-800 tracking-tight uppercase">P2H Tools</h2>
+            <p class="text-xs text-slate-500 font-medium mt-1.5 max-w-xs leading-relaxed">
+                Pemeriksaan dan Pemeliharaan Harian (P2H) unit & perlengkapan lifting lapangan segera hadir.
+            </p>
+            <div class="mt-4 px-3 py-1 bg-amber-50 border border-amber-200 rounded-full text-[10px] font-bold text-amber-700 shadow-2xs">
+                <i class="fa-solid fa-clock-rotate-left mr-1"></i> Segera Hadir
+            </div>
+        </div>`;
+    }
+
     function renderApp(isSilentSync = false) {
         const app = document.getElementById('app');
         const user = JSON.parse(localStorage.getItem('lifting_user'));
@@ -2745,10 +2777,12 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
             const savedScrollTop = mainContentEl.scrollTop;
 
             let tabContentHtml = '';
-            if (currentTab === 'dashboard' && (user.role === 'ADMIN' || user.role === 'GL')) {
-                tabContentHtml = getDashboardView();
+            if (currentTab === 'dashboard') {
+                tabContentHtml = (user.role === 'MANPOWER' ? getMpDashboardView() : ((user.role === 'ADMIN' || user.role === 'GL') ? getDashboardView() : ''));
             } else if (currentTab === 'monitoring') {
                 tabContentHtml = (user.role === 'MANPOWER' ? getManpowerWorkflow() : getMonitoringView());
+            } else if (currentTab === 'p2h' && user.role === 'MANPOWER') {
+                tabContentHtml = getMpP2hView();
             } else if (currentTab === 'jadwal' && (user.role === 'ADMIN' || user.role === 'GL')) {
                 tabContentHtml = getKalenderBcView();
             } else if (currentTab === 'master' && user.role === 'ADMIN') {
@@ -2806,8 +2840,9 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
                     </div>` : ''}
                     
                     <div id="mainTabContentArea" class="flex-1 overflow-y-auto p-2 sm:p-3 pb-24 sm:pb-3 relative w-full flex flex-col min-h-0 hide-scrollbar ${animClass}">
-                        ${currentTab === 'dashboard' && (user.role === 'ADMIN' || user.role === 'GL') ? getDashboardView() : ''}
+                        ${currentTab === 'dashboard' ? (user.role === 'MANPOWER' ? getMpDashboardView() : ((user.role === 'ADMIN' || user.role === 'GL') ? getDashboardView() : '')) : ''}
                         ${currentTab === 'monitoring' ? (user.role === 'MANPOWER' ? getManpowerWorkflow() : getMonitoringView()) : ''}
+                        ${currentTab === 'p2h' && user.role === 'MANPOWER' ? getMpP2hView() : ''}
                         ${currentTab === 'order' ? getOrderFormView() : ''}
                         ${currentTab === 'jadwal' && (user.role === 'ADMIN' || user.role === 'GL') ? getKalenderBcView() : ''}
                         ${currentTab === 'master' && user.role === 'ADMIN' ? getMasterDataView() : ''}
@@ -3294,10 +3329,12 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
             <div class="flex-1 overflow-y-auto py-3 px-2 flex flex-col gap-1 hide-scrollbar">
                 <div class="text-[9px] font-bold text-slate-400 tracking-wider mb-1 ml-1 uppercase">${isMP ? 'Panel Lapangan' : 'Menu Utama'}</div>
                 
-                ${(isAdmin || isGL) ? `<button onclick="switchTab('dashboard')" class="w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold transition-all duration-300 flex items-center gap-2 ${currentTab === 'dashboard' ? 'nav-active shadow-sm' : 'text-slate-600 hover:bg-slate-50'}"><i class="fa-solid fa-chart-pie w-5 text-center text-sm"></i> Dashboard</button>` : ''}
+                ${(isAdmin || isGL || isMP) ? `<button onclick="switchTab('dashboard')" class="w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold transition-all duration-300 flex items-center gap-2 ${currentTab === 'dashboard' ? 'nav-active shadow-sm' : 'text-slate-600 hover:bg-slate-50'}"><i class="fa-solid fa-chart-pie w-5 text-center text-sm"></i> Dashboard</button>` : ''}
                 
                 <button onclick="switchTab('monitoring')" class="w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold transition-all duration-300 flex items-center gap-2 ${currentTab === 'monitoring' ? 'nav-active shadow-sm' : 'text-slate-600 hover:bg-slate-50'}"><i class="fa-solid ${isMP ? 'fa-hard-hat' : 'fa-list-check'} w-5 text-center text-sm"></i> ${isMP ? 'Tugas Aktif' : 'Data Order'}</button>
                 
+                ${isMP ? `<button onclick="switchTab('p2h')" class="w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold transition-all duration-300 flex items-center gap-2 ${currentTab === 'p2h' ? 'nav-active shadow-sm' : 'text-slate-600 hover:bg-slate-50'}"><i class="fa-solid fa-screwdriver-wrench w-5 text-center text-sm"></i> P2H Tools</button>` : ''}
+
                 ${(isUSER || isAdmin || isGL) ? `<button onclick="switchTab('order')" class="w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold transition-all duration-300 flex items-center gap-2 ${currentTab === 'order' ? 'nav-active shadow-sm' : 'text-slate-600 hover:bg-slate-50'}"><i class="fa-solid fa-plus w-5 text-center text-sm"></i> Buat Order</button>` : ''}
                 
                 ${(isAdmin || isGL) ? `<button onclick="switchTab('jadwal')" class="w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold transition-all duration-300 flex items-center gap-2 ${currentTab === 'jadwal' ? 'nav-active shadow-sm' : 'text-slate-600 hover:bg-slate-50'}"><i class="fa-regular fa-calendar-days w-5 text-center text-sm"></i> Jadwal BC</button>` : ''}
@@ -3333,9 +3370,11 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
                 { id: 'profile', label: 'Profil', icon: 'fa-solid fa-user' }
             ];
         } else {
-            // MANPOWER (MP)
+            // MANPOWER (MP): 4 Menu berurutan (Dashboard, Tugas Aktif, P2H Tools, Profil)
             tabs = [
-                { id: 'monitoring', label: 'Tugas', icon: 'fa-solid fa-hard-hat' },
+                { id: 'dashboard', label: 'Dashboard', icon: 'fa-solid fa-chart-pie' },
+                { id: 'monitoring', label: 'Tugas Aktif', icon: 'fa-solid fa-hard-hat' },
+                { id: 'p2h', label: 'P2H Tools', icon: 'fa-solid fa-screwdriver-wrench' },
                 { id: 'profile', label: 'Profil', icon: 'fa-solid fa-user' }
             ];
         }
@@ -3409,7 +3448,8 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
         } else if (user.role === 'USER') {
             tabs = ['monitoring', 'order', 'profile'];
         } else {
-            tabs = ['monitoring', 'profile'];
+            // MANPOWER (MP): Menghitung posisi 4 tab (Dashboard, Monitoring/Tugas, P2H, Profile)
+            tabs = ['dashboard', 'monitoring', 'p2h', 'profile'];
         }
 
         let newIdx = tabs.indexOf(currentTab);
@@ -3637,7 +3677,7 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
             localStorage.setItem('lifting_user', JSON.stringify(user));
             // Bersihkan draf umum legacy jika pernah ada
             localStorage.removeItem('lifting_order_draft');
-            const homeTab = (user.role === 'ADMIN' || user.role === 'GL') ? 'dashboard' : (user.role === 'USER' ? 'order' : 'monitoring');
+            const homeTab = (user.role === 'ADMIN' || user.role === 'GL') ? 'dashboard' : (user.role === 'USER' ? 'order' : 'dashboard');
             currentTab = homeTab;
             window.location.hash = homeTab;
             
@@ -7389,7 +7429,7 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
                 if (draft && draft.fleetMode) {
                     userOrderFleetMode = draft.fleetMode;
                 }
-                const homeTab = (user.role === 'ADMIN' || user.role === 'GL') ? 'dashboard' : (user.role === 'USER' ? 'order' : 'monitoring');
+                const homeTab = (user.role === 'ADMIN' || user.role === 'GL') ? 'dashboard' : (user.role === 'USER' ? 'order' : 'dashboard');
                 if(!window.location.hash) {
                     history.replaceState(null, null, '#' + (userOrderFleetMode ? 'order' : homeTab));
                     currentTab = userOrderFleetMode ? 'order' : homeTab;
@@ -7409,7 +7449,7 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
     window.addEventListener('hashchange', () => {
         const user = JSON.parse(localStorage.getItem('lifting_user'));
         if (!user) return;
-        const homeTab = (user.role === 'ADMIN' || user.role === 'GL') ? 'dashboard' : (user.role === 'USER' ? 'order' : 'monitoring');
+        const homeTab = (user.role === 'ADMIN' || user.role === 'GL') ? 'dashboard' : (user.role === 'USER' ? 'order' : 'dashboard');
         
         let hash = window.location.hash.substring(1);
         if (!hash) {
