@@ -1253,6 +1253,7 @@
                 return !isOpened && needAction;
             });
         } else if (isMP && myName) {
+            const todayShiftDate = getShiftDateString();
             unread = orders.filter(j => {
                 const isOpened = opened.includes(String(j.no_wo || '').trim());
                 const op = normalizeName(j.operator);
@@ -1260,7 +1261,9 @@
                 const rg2 = normalizeName(j.rigger2);
                 const isAssigned = (op === myName || rg1 === myName || rg2 === myName);
                 const isActive = ['ON PROGRESS', 'SCHEDULED', 'PENDING'].includes(j.status);
-                return !isOpened && isAssigned && isActive;
+                const opDate = getJobOperationalDate(j);
+                const isTodayOrPast = opDate ? opDate <= todayShiftDate : true;
+                return !isOpened && isAssigned && isActive && isTodayOrPast;
             });
         }
 
@@ -1825,17 +1828,23 @@
         // 2. NOTIFIKASI UNTUK MANPOWER (OPERATOR & RIGGER)
         if (isMP && isAssignedToMe) {
             if (!prefs.notif_umum) return;
+            const opDate = getJobOperationalDate(newRecord);
+            const todayShiftDate = getShiftDateString();
+            const isTodayOrPast = opDate ? opDate <= todayShiftDate : true;
+
             const isActiveState = ['ON PROGRESS', 'SCHEDULED'].includes(newRecord.status);
             if ((eventType === 'INSERT' || newlyAssigned || (statusChanged && isActiveState)) && isActiveState) {
-                triggerAppNotification(
-                    "Penugasan Job Baru!",
-                    `Job ${newRecord.no_wo} (${newRecord.kategori || 'Armada'}) ditugaskan kepada Anda (Unit: ${newRecord.unit || '-'}). Segera laksanakan.`,
-                    'mp',
-                    newRecord
-                );
-                // Hanya buka modal alert jika MP sedang tidak membuka modal lain
-                if (!isAnyModalOpen()) {
-                    openAssignedJobAlert(newRecord);
+                if (isTodayOrPast) {
+                    triggerAppNotification(
+                        "Penugasan Job Baru!",
+                        `Job ${newRecord.no_wo} (${newRecord.kategori || 'Armada'}) ditugaskan kepada Anda (Unit: ${newRecord.unit || '-'}). Segera laksanakan.`,
+                        'mp',
+                        newRecord
+                    );
+                    // Hanya buka modal alert jika MP sedang tidak membuka modal lain
+                    if (!isAnyModalOpen()) {
+                        openAssignedJobAlert(newRecord);
+                    }
                 }
             } else if (statusChanged && newRecord.status === 'CANCELED') {
                 triggerAppNotification(
@@ -5536,7 +5545,20 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
             });
         }
         
-        if (currentMpPanel === 'PENDING') jobs = jobs.filter(j => j.status === 'PENDING'); else jobs = jobs.filter(j => j.status === currentMpPanel);
+        // Khusus tab ON PROGRESS (Progres Pekerjaan): Hanya tampilkan job dengan tanggal hari ini atau sebelumnya (<= hari ini)
+        // Job dengan tanggal masa depan (besok/lusa) disembunyikan sampai tanggal operasionalnya tiba
+        const todayShiftDate = getShiftDateString();
+        if (currentMpPanel === 'ON PROGRESS') {
+            jobs = jobs.filter(j => {
+                if (j.status !== 'ON PROGRESS') return false;
+                const opDate = getJobOperationalDate(j);
+                return opDate ? opDate <= todayShiftDate : true;
+            });
+        } else if (currentMpPanel === 'PENDING') {
+            jobs = jobs.filter(j => j.status === 'PENDING');
+        } else {
+            jobs = jobs.filter(j => j.status === currentMpPanel);
+        }
         if (mpFleetMode === 'Crane Truck' && filterUnit !== 'ALL') jobs = jobs.filter(j => j.unit === filterUnit);
 
         let unitFilterHtml = mpFleetMode === 'Crane Truck' ? `<select id="mp_filter_unit" onchange="renderApp(true)" class="text-[9px] font-bold bg-white border border-slate-300 text-slate-700 rounded-full px-2 py-1 outline-none shadow-sm focus:border-cyan-500 cursor-pointer ml-auto"><option value="ALL">Semua Unit</option>${unitOptions.map(u => `<option value="${u}" ${filterUnit === u ? 'selected' : ''}>${u}</option>`).join('')}</select>` : '';
