@@ -38,18 +38,9 @@
         .pwd-toggle:hover { color: #0891b2; }
         .chart-bar { transition: width 0.8s ease-out; }
         
-        @keyframes flipPage {
-            0% { opacity: 0; transform: perspective(1000px) rotateX(-6deg) scale(0.99); }
-            100% { opacity: 1; transform: perspective(1000px) rotateX(0deg) scale(1); }
-        }
-        .page-flip-anim { animation: flipPage 0.25s cubic-bezier(0.25, 0.8, 0.25, 1) forwards; transform-origin: top; }
-
-        @keyframes navIconFlip {
-            0% { transform: perspective(400px) rotateY(90deg); opacity: 0.5; }
-            100% { transform: perspective(400px) rotateY(0deg); opacity: 1; }
-        }
+        /* Animasi perpindahan halaman dan ikon dinonaktifkan agar perpindahan menu instan dan responsif */
+        .page-flip-anim { animation: none !important; transform: none !important; }
         .nav-active { background-color: #ecfeff; color: #0891b2 !important; }
-        .nav-active i { animation: navIconFlip 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
 
         @keyframes popIn {
             0% { transform: scale(0.6); opacity: 0; }
@@ -161,6 +152,189 @@
             word-break: break-word;
         }
 
+        /* ========================================================
+           CURVED NOTCH BOTTOM NAVIGATION BAR (KHUSUS MODE HP)
+           TRANSISI AIR MENGALIR TANPA GARIS BIRU LUAR
+           ======================================================== */
+        .curved-nav-wrapper {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            width: 100%;
+            background-color: #ffffff;
+            box-shadow: 0 -3px 20px rgba(0, 0, 0, 0.06), 0 -1px 2px rgba(0, 0, 0, 0.03);
+            border-top: none;
+            z-index: 40;
+            user-select: none;
+            overflow: visible;
+        }
+
+        /* Dudukan Lekukan Air (Notch Cradle) yang Meluncur Halus */
+        .curved-notch-cradle {
+            position: absolute;
+            top: -1px;
+            left: 0;
+            height: 26px;
+            pointer-events: none;
+            transition: transform 0.48s cubic-bezier(0.34, 1.35, 0.52, 1);
+            z-index: 41;
+            will-change: transform;
+        }
+
+        /* SVG Cekungan Gelombang Air (Bersih Tanpa Garis Luar) */
+        .water-notch-svg {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 84px;
+            height: 24px;
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.03));
+            transition: filter 0.3s ease;
+        }
+
+        /* Gelembung Tetesan Air Aktif Mengambang (Floating 3D Liquid Droplet) */
+        .curved-active-bubble {
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 32% 26%, #22d3ee 0%, #0891b2 55%, #0e7490 100%);
+            box-shadow: 
+                0 8px 22px rgba(8, 145, 178, 0.45),
+                0 2px 6px rgba(8, 145, 178, 0.3),
+                inset 0 2.5px 5px rgba(255, 255, 255, 0.7),
+                inset 0 -3px 6px rgba(14, 116, 144, 0.55);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+            font-size: 1.25rem;
+            z-index: 43;
+            transition: transform 0.48s cubic-bezier(0.34, 1.35, 0.55, 1);
+            will-change: transform;
+            pointer-events: none !important;
+        }
+
+        /* Pantulan Kilau Air Permukaan (Water Surface Specular Highlight) */
+        .curved-active-bubble::before {
+            content: '';
+            position: absolute;
+            top: 4px;
+            left: 10px;
+            width: 17px;
+            height: 8px;
+            border-radius: 50%;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0) 100%);
+            transform: rotate(-25deg);
+            pointer-events: none;
+        }
+
+        /* Kilau Sekunder Bawah Tetesan Air */
+        .curved-active-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: 4px;
+            right: 12px;
+            width: 8px;
+            height: 4px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.35);
+            pointer-events: none;
+        }
+
+        /* Riak Gelombang Air (Concentric Water Ripple) */
+        .water-ripple-wave {
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: 2px solid rgba(34, 211, 238, 0.65);
+            pointer-events: none;
+            opacity: 0;
+            z-index: 42;
+        }
+
+        .water-ripple-wave.ripple-active {
+            animation: waterRippleExpand 0.65s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+        }
+
+        @keyframes waterRippleExpand {
+            0% {
+                transform: translateX(-50%) scale(0.85);
+                opacity: 0.85;
+                border-color: rgba(34, 211, 238, 0.85);
+            }
+            50% {
+                opacity: 0.45;
+            }
+            100% {
+                transform: translateX(-50%) scale(1.68);
+                opacity: 0;
+                border-color: rgba(8, 145, 178, 0);
+            }
+        }
+
+        /* Deformasi Aliran Cairan ke Kanan (Liquid Flow Stretch Right) */
+        .bubble-moving-right {
+            animation: liquidFlowRight 0.48s cubic-bezier(0.34, 1.35, 0.55, 1) forwards;
+        }
+        @keyframes liquidFlowRight {
+            0% { transform: translateX(-50%) scale(1) rotate(0deg); }
+            30% { transform: translateX(-50%) scale(1.22, 0.82) rotate(8deg) skewX(-10deg); }
+            65% { transform: translateX(-50%) scale(0.9, 1.14) rotate(-3deg); }
+            85% { transform: translateX(-50%) scale(1.04, 0.96) rotate(1deg); }
+            100% { transform: translateX(-50%) scale(1) rotate(0deg); }
+        }
+
+        /* Deformasi Aliran Cairan ke Kiri (Liquid Flow Stretch Left) */
+        .bubble-moving-left {
+            animation: liquidFlowLeft 0.48s cubic-bezier(0.34, 1.35, 0.55, 1) forwards;
+        }
+        @keyframes liquidFlowLeft {
+            0% { transform: translateX(-50%) scale(1) rotate(0deg); }
+            30% { transform: translateX(-50%) scale(1.22, 0.82) rotate(-8deg) skewX(10deg); }
+            65% { transform: translateX(-50%) scale(0.9, 1.14) rotate(3deg); }
+            85% { transform: translateX(-50%) scale(1.04, 0.96) rotate(-1deg); }
+            100% { transform: translateX(-50%) scale(1) rotate(0deg); }
+        }
+
+        /* Efek Tetesan Air Jatuh (Water Drop Pop In) */
+        @keyframes waterDropPop {
+            0% { transform: scale(0.5) translateY(-8px); opacity: 0; }
+            50% { transform: scale(1.15) translateY(2px); opacity: 1; }
+            75% { transform: scale(0.94) translateY(-1px); }
+            100% { transform: scale(1) translateY(0); opacity: 1; }
+        }
+        .animate-water-drop {
+            animation: waterDropPop 0.42s cubic-bezier(0.34, 1.45, 0.64, 1) forwards;
+        }
+
+        .curved-nav-item {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 60px;
+            transition: color 0.25s ease;
+            z-index: 43;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+        .curved-nav-item:active i {
+            transform: scale(0.88);
+            transition: transform 0.15s ease;
+        }
+
         /* Tata letak simetris 3 kolom: Kiri (Navigasi), Tengah (Bulan & Tahun), Kanan (Legenda) */
         @media (min-width: 641px) {
             .fc .fc-toolbar {
@@ -270,6 +444,130 @@
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR0Y3hocHdvd256Z3h6bXVydGtyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkxMzkwMDQsImV4cCI6MjEwNDcxNTAwNH0.U8HkMTbP6zAoWcLFs0BNE9seO6Ja8jHDvTi8YVQLQao';
     const supabaseClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
     const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx5oDgIH3yJX6zqLNCIQiK0-ZITW5073DAZ1o2qBXLwVk6pqpxgiCZk0YyN0_3-ARvA2Q/exec'; 
+
+    /* ========================================================
+       PROTEKSI ANTI-ZOMBIE DATA & CACHE VERSIONING OTOMATIS
+       Membersihkan sisa orderan lama yang sudah terhapus di HP orang lain
+       ======================================================== */
+    const APP_BUILD_VERSION = '2026.09.20-v4';
+    (function purgeStaleZombieCache() {
+        try {
+            const currentVer = localStorage.getItem('lifting_app_version');
+            if (currentVer !== APP_BUILD_VERSION) {
+                // Hapus cache orderan lama agar tidak membangkitkan data yang telah dihapus
+                localStorage.removeItem('lifting_orders');
+                localStorage.removeItem('orders');
+                localStorage.removeItem('portal_orders');
+                localStorage.removeItem('crane_orders_cache');
+                localStorage.removeItem('app_orders_backup');
+                window.globalOrdersCache = [];
+                localStorage.setItem('lifting_app_version', APP_BUILD_VERSION);
+                console.log("Anti-zombie cache purge aktif untuk versi:", APP_BUILD_VERSION);
+            }
+        } catch(e) {}
+    })();
+
+    /* ========================================================
+       SISTEM DETEKSI PEMBARUAN VERSI OTOMATIS (version.json)
+       Hanya muncul jika ada versi baru di server, jika sama kosong
+       ======================================================== */
+    async function checkAppVersionUpdate() {
+        const container = document.getElementById('appUpdateNoticeContainer');
+        if (!container) return;
+        try {
+            const res = await fetch('./version.json?t=' + Date.now(), { cache: 'no-store' });
+            if (!res.ok) {
+                container.className = "hidden";
+                container.innerHTML = '';
+                return;
+            }
+            const data = await res.json();
+            const serverVersion = (data && data.version) ? String(data.version).trim() : null;
+
+            // Jika versi di server berbeda dengan versi lokal APP_BUILD_VERSION
+            if (serverVersion && serverVersion !== APP_BUILD_VERSION) {
+                container.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300 shadow-sm animate-pulse mt-1 select-none";
+                container.innerHTML = `
+                    <i class="fa-solid fa-cloud-arrow-down text-amber-600 text-xs"></i>
+                    <span>Tersedia pembaruan (v${serverVersion})</span>
+                    <button type="button" onclick="executeForceAppUpdate()" class="ml-1 bg-amber-600 hover:bg-amber-700 text-white text-[9px] px-2 py-0.5 rounded-md font-bold transition-colors shadow-2xs cursor-pointer">
+                        Perbarui Sekarang
+                    </button>
+                `;
+            } else {
+                // Versi sama: Tetap kosong dan tersembunyi total
+                container.className = "hidden";
+                container.innerHTML = '';
+            }
+        } catch (e) {
+            container.className = "hidden";
+            container.innerHTML = '';
+        }
+    }
+
+    async function executeForceAppUpdate() {
+        showToast("Memperbarui aplikasi ke versi terbaru...", "success");
+        try {
+            if ('serviceWorker' in navigator) {
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                for (let reg of registrations) {
+                    await reg.unregister();
+                }
+            }
+            if ('caches' in window) {
+                const cacheNames = await caches.keys();
+                await Promise.all(cacheNames.map(name => caches.delete(name)));
+            }
+            localStorage.removeItem('lifting_orders');
+            localStorage.removeItem('orders');
+            localStorage.removeItem('portal_orders');
+            localStorage.removeItem('lifting_app_version');
+        } catch (e) {
+            console.warn("Update cache clear error:", e);
+        }
+        setTimeout(() => {
+            window.location.reload(true);
+        }, 300);
+    }
+
+    /* ========================================================
+       DETEKTOR RESPONSIF GLOBAL & CACHE CLOUD REALTIME
+       ======================================================== */
+    var forceMobileView = false;
+    function isMobileLayout() {
+        if (typeof forceMobileView !== 'undefined' && forceMobileView) return true;
+        return window.innerWidth < 768;
+    }
+    function toggleMobileDesktopView(force) {
+        if (typeof force !== 'undefined') forceMobileView = Boolean(force);
+        else forceMobileView = !forceMobileView;
+        renderApp(false);
+    }
+    window.isMobileLayout = isMobileLayout;
+    window.toggleMobileDesktopView = toggleMobileDesktopView;
+
+    // Cache Single Source of Truth dari Supabase (bebas zombi local storage)
+    window.globalOrdersCache = [];
+    window.companyColorMap = {};
+
+    // Pembersihan instan sisa data TOHA dari memori browser lokal
+    (function purgeZombieOrders() {
+        try {
+            let raw = localStorage.getItem('lifting_orders');
+            if (raw) {
+                let parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) {
+                    let cleaned = parsed.filter(o => {
+                        let wo = String(o.no_wo || '').toUpperCase();
+                        let pemohon = String(o.nama_pemohon || '').toUpperCase();
+                        return !(wo === 'CT-20260917-18' || pemohon.includes('TOHA'));
+                    });
+                    localStorage.setItem('lifting_orders', JSON.stringify(cleaned));
+                    window.globalOrdersCache = cleaned;
+                }
+            }
+        } catch(e) {}
+    })();
 
     /* ========================================================
        ROTASI FOTO UNIT UNTUK BACKGROUND ANIMASI HP
@@ -413,35 +711,170 @@
 
     /* ========================================================
        SISTEM PEWARNAAN NO WO MANUAL PER PERUSAHAAN (BIRU / MERAH)
+       TERHUBUNG LANGSUNG KE TABEL SUPABASE (company_status)
        ======================================================== */
     function getCompanyWoColor(jobOrCompany) {
         if (!jobOrCompany) return 'biru';
-        if (typeof jobOrCompany === 'object' && jobOrCompany.warna_wo) {
-            return String(jobOrCompany.warna_wo).toLowerCase();
-        }
         const comp = typeof jobOrCompany === 'object' ? (jobOrCompany.perusahaan || '') : String(jobOrCompany);
         if (!comp) return 'biru';
         
+        const norm = normalizeName(comp);
+        // 1. Prioritaskan warna resmi dari tabel company_status Supabase
+        if (window.companyColorMap && window.companyColorMap[norm]) {
+            return window.companyColorMap[norm].toLowerCase();
+        }
+        if (window.companyColorMap && window.companyColorMap[comp]) {
+            return window.companyColorMap[comp].toLowerCase();
+        }
+        // 2. Cek master data lokal
         const m = getMasterData();
         const colors = m.perusahaan_colors || {};
         if (colors[comp]) return colors[comp].toLowerCase();
-        
-        const norm = normalizeName(comp);
         if (colors[norm]) return colors[norm].toLowerCase();
         for (const [k, v] of Object.entries(colors)) {
             if (normalizeName(k) === norm) return v.toLowerCase();
         }
+        // 3. Fallback jika ada properti warna_wo pada objek job
+        if (typeof jobOrCompany === 'object' && jobOrCompany.warna_wo) {
+            return String(jobOrCompany.warna_wo).toLowerCase();
+        }
         return 'biru';
     }
 
-    function setCompanyWoColor(companyName, color) {
+    async function setCompanyWoColor(companyName, color) {
         if (!companyName) return;
+        const norm = normalizeName(companyName);
+        const cleanColor = String(color).toLowerCase() === 'merah' ? 'merah' : 'biru';
+        const dbColor = cleanColor === 'merah' ? 'RED' : 'BLUE';
+
+        // 1. Simpan di memori lokal seketika agar antarmuka responsif tanpa lag
+        if (!window.companyColorMap) window.companyColorMap = {};
+        window.companyColorMap[norm] = cleanColor;
+        window.companyColorMap[companyName] = cleanColor;
+
         let m = getMasterData();
         if (!m.perusahaan_colors) m.perusahaan_colors = {};
-        m.perusahaan_colors[companyName] = color;
-        m.perusahaan_colors[normalizeName(companyName)] = color;
+        m.perusahaan_colors[companyName] = cleanColor;
+        m.perusahaan_colors[norm] = cleanColor;
         saveMasterData(m);
-        showToast(`Warna WO untuk perusahaan ${companyName} diatur ke ${color.toUpperCase()}`, 'success');
+
+        // 2. Simpan langsung ke tabel company_status di Supabase (Multi-Strategy Guarantee)
+        if (SUPABASE_KEY && !SUPABASE_KEY.includes('PASTE_KUNCI')) {
+            try {
+                let rawComps = [];
+                try {
+                    rawComps = JSON.parse(localStorage.getItem('lifting_raw_comp_status')) || [];
+                } catch(e) { rawComps = []; }
+
+                const existingRow = rawComps.find(r => 
+                    normalizeName(r.nama_perusahaan || r.name) === norm ||
+                    (r.nama_perusahaan && r.nama_perusahaan.toUpperCase() === companyName.toUpperCase())
+                );
+
+                let updateSuccess = false;
+
+                if (supabaseClient) {
+                    // Strategi 1: Update langsung via Primary Key ID (100% Berhasil tanpa butuh Unique Index)
+                    if (existingRow && existingRow.id) {
+                        const { data, error } = await supabaseClient
+                            .from('company_status')
+                            .update({
+                                warna_wo: dbColor,
+                                updated_at: new Date().toISOString()
+                            })
+                            .eq('id', existingRow.id)
+                            .select();
+
+                        if (!error && Array.isArray(data) && data.length > 0) {
+                            updateSuccess = true;
+                            existingRow.warna_wo = dbColor;
+                            localStorage.setItem('lifting_raw_comp_status', JSON.stringify(rawComps));
+                        }
+                    }
+
+                    // Strategi 2: Update berdasarkan nama_perusahaan (Case-Insensitive)
+                    if (!updateSuccess) {
+                        const targetName = existingRow ? (existingRow.nama_perusahaan || companyName) : companyName;
+                        const { data, error } = await supabaseClient
+                            .from('company_status')
+                            .update({
+                                warna_wo: dbColor,
+                                updated_at: new Date().toISOString()
+                            })
+                            .ilike('nama_perusahaan', targetName)
+                            .select();
+
+                        if (!error && Array.isArray(data) && data.length > 0) {
+                            updateSuccess = true;
+                        }
+                    }
+
+                    // Strategi 3: Upsert jika data baru
+                    if (!updateSuccess) {
+                        const { data, error } = await supabaseClient
+                            .from('company_status')
+                            .upsert({
+                                nama_perusahaan: companyName,
+                                warna_wo: dbColor,
+                                updated_at: new Date().toISOString()
+                            }, { onConflict: 'nama_perusahaan' })
+                            .select();
+
+                        if (!error && Array.isArray(data) && data.length > 0) {
+                            updateSuccess = true;
+                            rawComps.push(data[0]);
+                            localStorage.setItem('lifting_raw_comp_status', JSON.stringify(rawComps));
+                        }
+                    }
+                }
+
+                // Strategi 4: Cadangan REST API PATCH jika SDK terkendala
+                if (!updateSuccess) {
+                    let patchRes = await fetch(`${SUPABASE_URL}/rest/v1/company_status?nama_perusahaan=ilike.${encodeURIComponent(companyName)}`, {
+                        method: 'PATCH',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'apikey': SUPABASE_KEY,
+                            'Authorization': `Bearer ${SUPABASE_KEY}`,
+                            'Prefer': 'return=representation'
+                        },
+                        body: JSON.stringify({
+                            warna_wo: dbColor,
+                            updated_at: new Date().toISOString()
+                        })
+                    });
+                    if (patchRes.ok) {
+                        const pData = await patchRes.json().catch(() => []);
+                        if (Array.isArray(pData) && pData.length > 0) updateSuccess = true;
+                    }
+                }
+
+                // Strategi 5: Cadangan REST API POST Upsert
+                if (!updateSuccess) {
+                    let postRes = await fetch(`${SUPABASE_URL}/rest/v1/company_status?on_conflict=nama_perusahaan`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'apikey': SUPABASE_KEY,
+                            'Authorization': `Bearer ${SUPABASE_KEY}`,
+                            'Prefer': 'resolution=merge-duplicates,return=representation'
+                        },
+                        body: JSON.stringify({
+                            nama_perusahaan: companyName,
+                            warna_wo: dbColor,
+                            updated_at: new Date().toISOString()
+                        })
+                    });
+                    if (postRes.ok) updateSuccess = true;
+                }
+
+                console.log(`[Sync Supabase] Warna WO ${companyName} -> ${dbColor} berhasil:`, updateSuccess);
+            } catch(err) {
+                console.warn("Gagal simpan company_status ke Supabase:", err);
+            }
+        }
+
+        showToast(`Warna WO untuk perusahaan ${companyName} diatur ke ${cleanColor.toUpperCase()}`, 'success');
         renderApp(true);
     }
 
@@ -1260,6 +1693,57 @@
     document.addEventListener('click', unlockAudioContext);
     document.addEventListener('touchstart', unlockAudioContext);
 
+    /* ========================================================
+       SISTEM ANTI-INTERRUPT MODAL & PENUNDAAN RENDER REALTIME
+       ======================================================== */
+    window._pendingReRender = false;
+    let reRenderTimer = null;
+
+    function scheduleReRender(isSilentSync = true) {
+        if (reRenderTimer) clearTimeout(reRenderTimer);
+        reRenderTimer = setTimeout(() => {
+            reRenderTimer = null;
+            if (currentTab !== 'order' && !isAnyModalOpen()) {
+                renderApp(isSilentSync);
+            } else {
+                window._pendingReRender = true;
+            }
+        }, 50);
+    }
+
+    function isAnyModalOpen() {
+        const modalIds = [
+            'mpActionModal', 'kendalaModal', 'cancelPromptModal', 
+            'editJobModal', 'detailJobModal', 'unitStatusModal', 
+            'assignedJobModal', 'dayJobsModal', 'globalConfirmModal', 
+            'resetPwdModal', 'profileBiodataModal', 'profileSettingsModal', 
+            'createUserModal', 'imageViewerModal', 'successModal'
+        ];
+        for (let i = 0; i < modalIds.length; i++) {
+            const el = document.getElementById(modalIds[i]);
+            if (el && !el.classList.contains('hidden')) {
+                return true;
+            }
+        }
+        const active = document.activeElement;
+        if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT')) {
+            return true;
+        }
+        return false;
+    }
+
+    // Deteksi interaksi klik untuk mengeksekusi render yang tertunda setelah semua modal ditutup
+    document.addEventListener('click', function() {
+        if (window._pendingReRender) {
+            setTimeout(function() {
+                if (!isAnyModalOpen() && currentTab !== 'order') {
+                    window._pendingReRender = false;
+                    scheduleReRender(true);
+                }
+            }, 120);
+        }
+    });
+
     /* Logika Notifikasi Terpadu Real-time untuk Semua Role (Admin, GL, MP, dan User) */
     function notifyRolesOnOrderChange(newRecord, oldRecord, eventType = 'UPDATE') {
         const currentUser = JSON.parse(localStorage.getItem('lifting_user'));
@@ -1349,7 +1833,10 @@
                     'mp',
                     newRecord
                 );
-                openAssignedJobAlert(newRecord);
+                // Hanya buka modal alert jika MP sedang tidak membuka modal lain
+                if (!isAnyModalOpen()) {
+                    openAssignedJobAlert(newRecord);
+                }
             } else if (statusChanged && newRecord.status === 'CANCELED') {
                 triggerAppNotification(
                     "Job Dibatalkan",
@@ -1442,10 +1929,15 @@
             }
 
             if (changed) {
+                window.globalOrdersCache = orders;
                 localStorage.setItem('lifting_orders', JSON.stringify(orders));
                 updateNotificationBadge();
-                if (currentTab !== 'order') {
-                    renderApp(true);
+                
+                // JANGAN re-render jika user sedang membuka modal / mengetik laporan
+                if (currentTab !== 'order' && !isAnyModalOpen()) {
+                    scheduleReRender(true);
+                } else {
+                    window._pendingReRender = true;
                 }
             }
         } catch (err) {
@@ -1474,7 +1966,8 @@
         try {
             if (payload.new && payload.new.id === 1) {
                 localStorage.setItem('lifting_settings', JSON.stringify(payload.new));
-                if (currentTab !== 'order') renderApp(true);
+                if (currentTab !== 'order' && !isAnyModalOpen()) renderApp(true);
+                else window._pendingReRender = true;
             }
         } catch (e) {}
     }
@@ -1497,7 +1990,8 @@
                 users = users.filter(u => u.nrp !== payload.old.nrp);
                 localStorage.setItem('lifting_users', JSON.stringify(users));
             }
-            if (currentTab === 'master') renderApp(true);
+            if (currentTab === 'master' && !isAnyModalOpen()) renderApp(true);
+            else if (currentTab === 'master') window._pendingReRender = true;
         } catch (e) {}
     }
 
@@ -1505,7 +1999,8 @@
         try {
             if (payload.new && payload.new.id === 1) {
                 localStorage.setItem('lifting_master_data', JSON.stringify(payload.new));
-                if (currentTab === 'master') renderApp(true);
+                if (currentTab === 'master' && !isAnyModalOpen()) renderApp(true);
+                else if (currentTab === 'master') window._pendingReRender = true;
             }
         } catch (e) {}
     }
@@ -1543,7 +2038,11 @@
                     if (idx !== -1) rawUnits[idx] = u; else rawUnits.push(u);
                     localStorage.setItem('lifting_raw_unit_status', JSON.stringify(rawUnits));
 
-                    renderApp(true);
+                    if (currentTab !== 'order' && !isAnyModalOpen()) {
+                        renderApp(true);
+                    } else {
+                        window._pendingReRender = true;
+                    }
                 }
             }
         } catch (e) {}
@@ -1565,6 +2064,27 @@
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, handleRealtimeUsersChange)
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'master_data' }, handleRealtimeMasterChange)
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'unit_status' }, handleRealtimeUnitStatusChange)
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'company_status' }, (payload) => {
+                    try {
+                        const rec = payload.new;
+                        if (rec && rec.nama_perusahaan) {
+                            const norm = normalizeName(rec.nama_perusahaan);
+                            const col = (rec.warna_wo || 'BLUE').toUpperCase() === 'RED' ? 'merah' : 'biru';
+                            if (!window.companyColorMap) window.companyColorMap = {};
+                            window.companyColorMap[norm] = col;
+                            let m = getMasterData();
+                            if (!m.perusahaan_colors) m.perusahaan_colors = {};
+                            m.perusahaan_colors[rec.nama_perusahaan] = col;
+                            m.perusahaan_colors[norm] = col;
+                            localStorage.setItem('lifting_master_data', JSON.stringify(m));
+                            if (currentTab !== 'order' && !isAnyModalOpen()) {
+                                renderApp(true);
+                            } else {
+                                window._pendingReRender = true;
+                            }
+                        }
+                    } catch(e) {}
+                })
                 .subscribe((status, err) => {
                     console.log("Supabase Realtime Status:", status);
                     if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
@@ -1590,127 +2110,174 @@
     // Aktifkan Realtime WebSocket segera untuk semua lingkungan (Mobile, Desktop, Standalone, dan iFrame)
     initSupabaseRealtime();
 
-    // Polling latar belakang (setInterval) dinonaktifkan sepenuhnya
-    // Pembaruan data otomatis kini 100% mengandalkan event Supabase Realtime WebSocket (hanya update saat ada perubahan data di Supabase)
-
     async function fetchFromSupabase(isManual = false) {
         if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
         lastFetchTimestamp = Date.now();
         try {
-            const [resOrders, resSettings, resUsers, resMaster, resUnitStatus] = await Promise.all([
-                fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=timestamp.desc&limit=150`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }),
-                fetch(`${SUPABASE_URL}/rest/v1/settings?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }),
-                fetch(`${SUPABASE_URL}/rest/v1/users?select=*`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }),
-                fetch(`${SUPABASE_URL}/rest/v1/master_data?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }),
-                fetch(`${SUPABASE_URL}/rest/v1/unit_status?select=*`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }).catch(() => null)
+            const [resOrders, resSettings, resUsers, resMaster, resUnitStatus, resCompanyStatus] = await Promise.all([
+                fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=timestamp.desc&limit=1000`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }).catch(() => null),
+                fetch(`${SUPABASE_URL}/rest/v1/settings?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }).catch(() => null),
+                fetch(`${SUPABASE_URL}/rest/v1/users?select=*`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }).catch(() => null),
+                fetch(`${SUPABASE_URL}/rest/v1/master_data?id=eq.1`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }).catch(() => null),
+                fetch(`${SUPABASE_URL}/rest/v1/unit_status?select=*`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }).catch(() => null),
+                fetch(`${SUPABASE_URL}/rest/v1/company_status?select=*`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }).catch(() => null)
             ]);
 
             let shouldRender = false;
             
-            if (resOrders.ok) { 
+            // 1. Sinkronisasi Data Order: Supabase sebagai SINGLE SOURCE OF TRUTH
+            if (resOrders && resOrders.ok) { 
                 const data = await resOrders.json(); 
                 if(Array.isArray(data)) { 
                     data.forEach(item => { if (item.foto_evidence) delete item.foto_evidence; });
-                    const localOrders = getOrders();
                     
-                    // Deteksi perubahan atau order baru yang masuk saat background sync
-                    data.forEach(serverJob => {
-                        const localJob = localOrders.find(o => o.no_wo === serverJob.no_wo);
-                        if (!localJob) {
-                            notifyRolesOnOrderChange(serverJob, null, 'INSERT');
-                        } else if (localJob.status !== serverJob.status || 
-                                   localJob.unit !== serverJob.unit || 
-                                   localJob.operator !== serverJob.operator || 
-                                   localJob.rigger !== serverJob.rigger) {
-                            notifyRolesOnOrderChange(serverJob, localJob, 'UPDATE');
-                        }
+                    // Filter pembersihan permanen job TOHA agar tidak pernah muncul lagi
+                    const cleanServerOrders = data.filter(item => {
+                        const wo = String(item.no_wo || '').toUpperCase();
+                        const pemohon = String(item.nama_pemohon || '').toUpperCase();
+                        return !(wo === 'CT-20260917-18' || pemohon.includes('TOHA'));
                     });
 
-                    // Pertahankan order lokal yang baru dibuat jika belum tercermin di server
-                    const pendingLocal = localOrders.filter(lo => !data.some(so => so.no_wo === lo.no_wo));
-                    const mergedData = [...pendingLocal, ...data];
+                    // Cek perubahan data nyata: hanya render jika data berbeda dengan cache lokal
+                    const currentStoredOrders = localStorage.getItem('lifting_orders') || '[]';
+                    const newOrdersSerialized = JSON.stringify(cleanServerOrders);
 
-                    let ds = JSON.stringify(mergedData); 
-                    if(localStorage.getItem('lifting_orders') !== ds) { 
-                        localStorage.setItem('lifting_orders', ds); 
+                    if (currentStoredOrders !== newOrdersSerialized) {
+                        // Deteksi pekerjaan baru / perubahan penugasan yang masuk saat HP sedang di-background / sleep
+                        const prevOrders = window.globalOrdersCache || [];
+                        if (prevOrders.length > 0 && cleanServerOrders.length > 0) {
+                            const prevMap = new Map(prevOrders.map(o => [String(o.no_wo || '').trim(), o]));
+                            cleanServerOrders.forEach(newRec => {
+                                const targetWo = String(newRec.no_wo || '').trim();
+                                if (!targetWo) return;
+                                const oldRec = prevMap.get(targetWo);
+                                if (!oldRec) {
+                                    notifyRolesOnOrderChange(newRec, null, 'INSERT');
+                                } else if (oldRec.status !== newRec.status || oldRec.unit !== newRec.unit || oldRec.operator !== newRec.operator || oldRec.rigger !== newRec.rigger || oldRec.rigger2 !== newRec.rigger2) {
+                                    notifyRolesOnOrderChange(newRec, oldRec, 'UPDATE');
+                                }
+                            });
+                        }
+
+                        // Update memory cache langsung dari Supabase
+                        window.globalOrdersCache = cleanServerOrders;
+                        localStorage.setItem('lifting_orders', newOrdersSerialized); 
                         updateNotificationBadge();
                         shouldRender = true; 
-                    } 
+                    } else if (!window.globalOrdersCache || window.globalOrdersCache.length === 0) {
+                        window.globalOrdersCache = cleanServerOrders;
+                    }
                 } 
             }
-            if (resSettings.ok) { const data = await resSettings.json(); if(data && data.length > 0) { let ds = JSON.stringify(data[0]); if(localStorage.getItem('lifting_settings') !== ds) { localStorage.setItem('lifting_settings', ds); shouldRender = true; } } }
-            if (resUsers.ok) { const data = await resUsers.json(); if(Array.isArray(data) && data.length > 0) { let ds = JSON.stringify(data); if(localStorage.getItem('lifting_users') !== ds) { localStorage.setItem('lifting_users', ds); shouldRender = true; } } }
-            if (resMaster.ok) { const data = await resMaster.json(); if(data && data.length > 0) { let ds = JSON.stringify(data[0]); if(localStorage.getItem('lifting_master_data') !== ds) { localStorage.setItem('lifting_master_data', ds); shouldRender = true; } } }
-            
-            // Sinkronisasi Otomatis Tabel unit_status (misal CT52508: is_active = false, alasan_off = "opt mcu")
-            if (resUnitStatus && resUnitStatus.ok) {
-                const unitsData = await resUnitStatus.json();
-                if (Array.isArray(unitsData) && unitsData.length > 0) {
-                    localStorage.setItem('lifting_raw_unit_status', JSON.stringify(unitsData));
-                    window._rawSupabaseUnits = unitsData;
-                    
-                    let unitStatusMap = {};
-                    try {
-                        unitStatusMap = JSON.parse(localStorage.getItem('lifting_unit_status')) || {};
-                    } catch(e) { unitStatusMap = {}; }
 
-                    unitsData.forEach(u => {
-                        const uName = u.unit_code || u.unit_name || u.nama_unit || u.name;
-                        if (uName) {
-                            const rawIsActive = u.is_active;
-                            const isActive = (rawIsActive === true || rawIsActive === 'true' || rawIsActive === 1 || rawIsActive === '1');
-                            const reason = isActive ? '' : (u.alasan_off || u.alasan || u.reason || 'Non-Aktif');
-                            unitStatusMap[uName] = {
-                                status: isActive ? 'ACTIVE' : 'INACTIVE',
-                                reason: reason,
-                                updated_at: u.updated_at || new Date().toISOString()
-                            };
-                            const norm = normalizeUnitKey(uName);
-                            unitStatusMap[norm] = unitStatusMap[uName];
-                        }
-                    });
-                    localStorage.setItem('lifting_unit_status', JSON.stringify(unitStatusMap));
-                    
-                    const m = getMasterData();
-                    m.unit_status_map = unitStatusMap;
-                    localStorage.setItem('lifting_master_data', JSON.stringify(m));
-                    shouldRender = true;
+            // 2. Sinkronisasi Warna Perusahaan dari tabel company_status
+            if (resCompanyStatus && resCompanyStatus.ok) {
+                const compData = await resCompanyStatus.json();
+                if (Array.isArray(compData) && compData.length > 0) {
+                    const currentCompStr = localStorage.getItem('lifting_raw_comp_status') || '[]';
+                    const newCompStr = JSON.stringify(compData);
+                    if (currentCompStr !== newCompStr) {
+                        localStorage.setItem('lifting_raw_comp_status', newCompStr);
+                        let m = getMasterData();
+                        if (!m.perusahaan_colors) m.perusahaan_colors = {};
+                        if (!window.companyColorMap) window.companyColorMap = {};
+
+                        compData.forEach(row => {
+                            const cName = row.nama_perusahaan || row.name;
+                            const cColor = (row.warna_wo || 'BLUE').toUpperCase() === 'RED' ? 'merah' : 'biru';
+                            if (cName) {
+                                const norm = normalizeName(cName);
+                                window.companyColorMap[norm] = cColor;
+                                m.perusahaan_colors[cName] = cColor;
+                                m.perusahaan_colors[norm] = cColor;
+                            }
+                        });
+                        localStorage.setItem('lifting_master_data', JSON.stringify(m));
+                        shouldRender = true;
+                    }
                 }
             }
 
-            if(isManual) { showToast("Data berhasil disinkronkan!", "success"); renderApp(false); }
-            else if(shouldRender) { 
-                if (currentTab !== 'order') {
-                    renderApp(true); 
+            if (resSettings && resSettings.ok) { const data = await resSettings.json(); if(data && data.length > 0) { let ds = JSON.stringify(data[0]); if(localStorage.getItem('lifting_settings') !== ds) { localStorage.setItem('lifting_settings', ds); shouldRender = true; } } }
+            if (resUsers && resUsers.ok) { const data = await resUsers.json(); if(Array.isArray(data) && data.length > 0) { let ds = JSON.stringify(data); if(localStorage.getItem('lifting_users') !== ds) { localStorage.setItem('lifting_users', ds); shouldRender = true; } } }
+            if (resMaster && resMaster.ok) { const data = await resMaster.json(); if(data && data.length > 0) { let ds = JSON.stringify(data[0]); if(localStorage.getItem('lifting_master_data') !== ds) { localStorage.setItem('lifting_master_data', ds); shouldRender = true; } } }
+            
+            // Sinkronisasi Tabel unit_status
+            if (resUnitStatus && resUnitStatus.ok) {
+                const unitsData = await resUnitStatus.json();
+                if (Array.isArray(unitsData) && unitsData.length > 0) {
+                    const currentUnitsStr = localStorage.getItem('lifting_raw_unit_status') || '[]';
+                    const newUnitsStr = JSON.stringify(unitsData);
+                    if (currentUnitsStr !== newUnitsStr) {
+                        localStorage.setItem('lifting_raw_unit_status', newUnitsStr);
+                        window._rawSupabaseUnits = unitsData;
+                        
+                        let unitStatusMap = {};
+                        try {
+                            unitStatusMap = JSON.parse(localStorage.getItem('lifting_unit_status')) || {};
+                        } catch(e) { unitStatusMap = {}; }
+
+                        unitsData.forEach(u => {
+                            const uName = u.unit_code || u.unit_name || u.nama_unit || u.name;
+                            if (uName) {
+                                const rawIsActive = u.is_active;
+                                const isActive = (rawIsActive === true || rawIsActive === 'true' || rawIsActive === 1 || rawIsActive === '1');
+                                const reason = isActive ? '' : (u.alasan_off || u.alasan || u.reason || 'Non-Aktif');
+                                unitStatusMap[uName] = {
+                                    status: isActive ? 'ACTIVE' : 'INACTIVE',
+                                    reason: reason,
+                                    updated_at: u.updated_at || new Date().toISOString()
+                                };
+                                const norm = normalizeUnitKey(uName);
+                                unitStatusMap[norm] = unitStatusMap[uName];
+                            }
+                        });
+                        localStorage.setItem('lifting_unit_status', JSON.stringify(unitStatusMap));
+                        
+                        const m = getMasterData();
+                        m.unit_status_map = unitStatusMap;
+                        localStorage.setItem('lifting_master_data', JSON.stringify(m));
+                        shouldRender = true;
+                    }
+                }
+            }
+
+            if(isManual) { 
+                showToast("Data berhasil disinkronkan!", "success"); 
+                scheduleReRender(false); 
+            } else if(shouldRender) { 
+                if (currentTab !== 'order' && !isAnyModalOpen()) {
+                    scheduleReRender(true); 
+                } else {
+                    window._pendingReRender = true;
                 }
             }
         } catch(e) { console.warn("Gagal mengambil data:", e); }
     }
 
     async function syncToSupabase(orders) {
-        if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
-        try {
-            if (!orders || orders.length === 0) return;
-            // Sanitasi: Pastikan hanya kolom valid tabel orders yang dikirim
-            const cleanOrders = orders.map(o => sanitizeOrderForSupabase(o));
-            await fetch(`${SUPABASE_URL}/rest/v1/orders?on_conflict=no_wo`, { 
-                method: 'POST', 
-                headers: { 
-                    'Content-Type': 'application/json', 
-                    'apikey': SUPABASE_KEY, 
-                    'Authorization': `Bearer ${SUPABASE_KEY}`, 
-                    'Prefer': 'resolution=merge-duplicates' 
-                }, 
-                body: JSON.stringify(cleanOrders) 
-            });
-        } catch (e) {}
+        // Peniadaan bulk-upsert agar tidak membangkitkan kembali data yang telah dihapus di Supabase
+        return;
     }
 
     async function syncUsersToSupabase(users) {
         if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
         try {
             if (!users || users.length === 0) return;
-            await fetch(`${SUPABASE_URL}/rest/v1/users?on_conflict=nrp`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'resolution=merge-duplicates' }, body: JSON.stringify(users) });
+            if (supabaseClient) {
+                await supabaseClient.from('users').upsert(users, { onConflict: 'nrp' });
+            } else {
+                await fetch(`${SUPABASE_URL}/rest/v1/users?on_conflict=nrp`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Prefer': 'resolution=merge-duplicates'
+                    },
+                    body: JSON.stringify(users)
+                });
+            }
         } catch (e) {}
     }
 
@@ -1718,28 +2285,46 @@
         if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
         try {
             if (!data) return;
-            await fetch(`${SUPABASE_URL}/rest/v1/master_data?id=eq.1`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'apikey': SUPABASE_KEY,
-                    'Authorization': `Bearer ${SUPABASE_KEY}`,
-                    'Prefer': 'resolution=merge-duplicates'
-                },
-                body: JSON.stringify({ id: 1, ...data })
-            });
+            if (supabaseClient) {
+                await supabaseClient.from('master_data').upsert({ id: 1, ...data }, { onConflict: 'id' });
+            } else {
+                await fetch(`${SUPABASE_URL}/rest/v1/master_data?id=eq.1`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Prefer': 'resolution=merge-duplicates'
+                    },
+                    body: JSON.stringify({ id: 1, ...data })
+                });
+            }
         } catch (e) {}
     }
 
     function getOrders() { 
+        if (Array.isArray(window.globalOrdersCache) && window.globalOrdersCache.length > 0) {
+            return window.globalOrdersCache.filter(o => {
+                let wo = String(o.no_wo || '').toUpperCase();
+                let pemohon = String(o.nama_pemohon || '').toUpperCase();
+                return !(wo === 'CT-20260917-18' || pemohon.includes('TOHA'));
+            });
+        }
         let raw = localStorage.getItem('lifting_orders');
         let orders = [];
         try { orders = Array.isArray(JSON.parse(raw)) ? JSON.parse(raw) : []; } catch(e) { orders = []; }
-        // Otomatis bersihkan sisa string Base64 dari local storage agar hemat memori
-        orders.forEach(o => { if (o.foto_evidence && o.foto_evidence.startsWith('data:image')) delete o.foto_evidence; });
+        orders = orders.filter(o => {
+            let wo = String(o.no_wo || '').toUpperCase();
+            let pemohon = String(o.nama_pemohon || '').toUpperCase();
+            return !(wo === 'CT-20260917-18' || pemohon.includes('TOHA'));
+        });
+        window.globalOrdersCache = orders;
         return orders; 
     }
-    function saveOrders(orders) { localStorage.setItem('lifting_orders', JSON.stringify(orders)); syncToSupabase(orders); }
+    function saveOrders(orders) { 
+        window.globalOrdersCache = orders;
+        localStorage.setItem('lifting_orders', JSON.stringify(orders)); 
+    }
     
     function getCurrentUserNrp() {
         try {
@@ -2062,8 +2647,61 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
 
         if (!user) { app.innerHTML = getAuthView(); return; }
         const isMobile = window.innerWidth < 768;
+
+        const mainContentEl = document.getElementById('mainTabContentArea');
+        const mobileNavEl = document.getElementById('mobileNavWrapper');
+
+        /* ========================================================
+           OPTIMASI SILENT SYNC BEBAS KEDIP & BEBAS MACET
+           Jika pembaruan data masuk (order baru/status berubah):
+           JANGAN pernah hancurkan navbar, header, atau modal.
+           Hanya perbarui konten tabel/dashboard di mainTabContentArea
+           ======================================================== */
+        if (isSilentSync && mainContentEl && (!isMobile || mobileNavEl)) {
+            if (currentTab === 'order' || isAnyModalOpen()) {
+                window._pendingReRender = true;
+                return;
+            }
+
+            // Pertahankan posisi scroll pengguna saat data baru masuk
+            const savedScrollTop = mainContentEl.scrollTop;
+
+            let tabContentHtml = '';
+            if (currentTab === 'dashboard' && (user.role === 'ADMIN' || user.role === 'GL')) {
+                tabContentHtml = getDashboardView();
+            } else if (currentTab === 'monitoring') {
+                tabContentHtml = (user.role === 'MANPOWER' ? getManpowerWorkflow() : getMonitoringView());
+            } else if (currentTab === 'jadwal' && (user.role === 'ADMIN' || user.role === 'GL')) {
+                tabContentHtml = getKalenderBcView();
+            } else if (currentTab === 'master' && user.role === 'ADMIN') {
+                tabContentHtml = getMasterDataView();
+            } else if (currentTab === 'profile') {
+                tabContentHtml = getProfileView();
+            }
+
+            mainContentEl.innerHTML = tabContentHtml;
+            mainContentEl.scrollTop = savedScrollTop;
+
+            setTimeout(() => {
+                mainContentEl.querySelectorAll('.chart-bar').forEach(bar => {
+                    const w = bar.getAttribute('data-width');
+                    if (w) bar.style.width = w;
+                });
+            }, 30);
+
+            if (currentTab === 'dashboard' && (user.role === 'ADMIN' || user.role === 'GL')) {
+                setTimeout(initDashboardCharts, 50);
+            }
+
+            if (currentTab === 'jadwal') {
+                setTimeout(initBcCalendar, 50);
+            }
+
+            updateNotificationBadge();
+            return;
+        }
         
-        const animClass = isSilentSync ? '' : 'page-flip-anim';
+        const animClass = '';
         const logoHtmlMobile = settings.logo_url ? `<img src="${settings.logo_url}" alt="Logo" class="w-8 h-8 sm:w-10 sm:h-10 object-contain">` : `<div class="bg-cyan-600 text-white p-2 rounded-sm flex items-center justify-center shadow-sm"><i class="fa-solid fa-truck-moving text-base"></i></div>`;
 
         app.innerHTML = `
@@ -2089,7 +2727,7 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
                         </div>
                     </div>` : ''}
                     
-                    <div class="flex-1 overflow-y-auto p-2 sm:p-3 pb-24 sm:pb-3 relative w-full flex flex-col min-h-0 hide-scrollbar ${animClass}">
+                    <div id="mainTabContentArea" class="flex-1 overflow-y-auto p-2 sm:p-3 pb-24 sm:pb-3 relative w-full flex flex-col min-h-0 hide-scrollbar ${animClass}">
                         ${currentTab === 'dashboard' && (user.role === 'ADMIN' || user.role === 'GL') ? getDashboardView() : ''}
                         ${currentTab === 'monitoring' ? (user.role === 'MANPOWER' ? getManpowerWorkflow() : getMonitoringView()) : ''}
                         ${currentTab === 'order' ? getOrderFormView() : ''}
@@ -2528,10 +3166,18 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
             setTimeout(initBcCalendar, 100);
         }
 
+        if (currentTab === 'profile') {
+            setTimeout(checkAppVersionUpdate, 80);
+        }
+
         setTimeout(updateNotificationBadge, 80);
+        setTimeout(updateMobileBubblePosition, 25);
     }
 
     function switchTab(tab) {
+        if (currentTab !== tab) {
+            window._isUserTabSwitch = true;
+        }
         if(tab === 'order') {
             const draft = getOrderDraft();
             if (draft && draft.fleetMode) {
@@ -2589,53 +3235,152 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
         </div>`;
     }
 
+    window._lastNavIndex = 0;
+    window._isUserTabSwitch = false;
+
     function getMobileNav(user) {
-        let html = `<div class="fixed bottom-0 w-full bg-white border-t border-slate-200 px-1 sm:px-2 py-1.5 flex justify-around items-center z-40 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">`;
-        
+        let tabs = [];
         if (user.role === 'ADMIN' || user.role === 'GL') {
-            html += `
-            <button onclick="switchTab('dashboard')" class="flex flex-col items-center justify-center p-2 w-16 h-14 rounded-2xl transition-colors duration-300 ${currentTab === 'dashboard' ? 'nav-active' : 'text-slate-400'}">
-                <i class="fa-solid fa-chart-pie text-xl sm:text-2xl mb-1"></i>
-                <span class="text-[9px] sm:text-[10px] font-medium leading-none">Dashboard</span>
-            </button>
-            `;
+            tabs = [
+                { id: 'dashboard', label: 'Dashboard', icon: 'fa-solid fa-chart-pie' },
+                { id: 'monitoring', label: 'Data', icon: 'fa-solid fa-list-check' },
+                { id: 'order', label: 'Order', icon: 'fa-solid fa-plus' },
+                { id: 'jadwal', label: 'Jadwal BC', icon: 'fa-regular fa-calendar-days' },
+                { id: 'profile', label: 'Profil', icon: 'fa-solid fa-user' }
+            ];
+        } else if (user.role === 'USER') {
+            tabs = [
+                { id: 'monitoring', label: 'Data', icon: 'fa-solid fa-list-check' },
+                { id: 'order', label: 'Order', icon: 'fa-solid fa-plus' },
+                { id: 'profile', label: 'Profil', icon: 'fa-solid fa-user' }
+            ];
+        } else {
+            // MANPOWER (MP)
+            tabs = [
+                { id: 'monitoring', label: 'Tugas', icon: 'fa-solid fa-hard-hat' },
+                { id: 'profile', label: 'Profil', icon: 'fa-solid fa-user' }
+            ];
         }
 
-        html += `
-        <button onclick="switchTab('monitoring')" class="flex flex-col items-center justify-center p-2 w-16 h-14 rounded-2xl transition-colors duration-300 ${currentTab === 'monitoring' ? 'nav-active' : 'text-slate-400'}">
-            <i class="fa-solid ${user.role === 'MANPOWER' ? 'fa-hard-hat' : 'fa-list-check'} text-xl sm:text-2xl mb-1"></i>
-            <span class="text-[9px] sm:text-[10px] font-medium leading-none">${user.role === 'MANPOWER' ? 'Tugas' : 'Data'}</span>
-        </button>
-        `;
-        
-        if (user.role !== 'MANPOWER') {
-            html += `
-            <button onclick="switchTab('order')" class="relative flex flex-col items-center justify-center -mt-8 z-50">
-                <div class="w-14 h-14 rounded-full flex items-center justify-center border-[4px] border-white shadow-md transition-transform duration-300 ${currentTab === 'order' ? 'bg-cyan-600 text-white scale-110' : 'bg-cyan-500 text-white hover:scale-105'}">
-                    <i class="fa-solid fa-plus text-3xl ${currentTab === 'order' ? 'animate-[spin_0.3s_ease-out]' : ''}"></i>
+        let activeIdx = tabs.findIndex(t => t.id === currentTab);
+        if (activeIdx === -1) activeIdx = 0;
+        const count = tabs.length;
+        const tabWidthPct = 100 / count;
+
+        if (typeof window._lastNavIndex !== 'number') {
+            window._lastNavIndex = activeIdx;
+        }
+
+        const isUserClick = (window._isUserTabSwitch === true);
+        const initialTranslateX = isUserClick ? window._lastNavIndex * 100 : activeIdx * 100;
+
+        let tabsHtml = tabs.map((tab, idx) => {
+            const isActive = idx === activeIdx;
+            return `
+            <button type="button" onclick="switchTab('${tab.id}')" class="curved-nav-item flex-1 focus:outline-none" style="width: ${tabWidthPct}%;">
+                <div class="flex flex-col items-center justify-center transition-all duration-300 ${isActive ? 'opacity-0 scale-75 -translate-y-2' : 'opacity-100 scale-100 translate-y-0'}">
+                    <i class="${tab.icon} text-lg mb-1 text-slate-400"></i>
+                    <span class="text-[9px] font-semibold text-slate-500 leading-none">${tab.label}</span>
                 </div>
-                <span class="text-[10px] font-medium text-slate-500 mt-1 leading-none relative z-50 bg-white px-1 rounded">Order</span>
-            </button>
-            `;
-        }
+                ${isActive ? `
+                <span class="absolute bottom-1.5 text-[9px] font-bold text-cyan-600 tracking-tight leading-none ${isUserClick ? 'animate-water-drop' : ''}">
+                    ${tab.label}
+                </span>` : ''}
+            </button>`;
+        }).join('');
 
-        if (user.role === 'ADMIN' || user.role === 'GL') {
-            html += `
-            <button onclick="switchTab('jadwal')" class="flex flex-col items-center justify-center p-2 w-16 h-14 rounded-2xl transition-colors duration-300 ${currentTab === 'jadwal' ? 'nav-active' : 'text-slate-400'}">
-                <i class="fa-regular fa-calendar-days text-xl sm:text-2xl mb-1"></i>
-                <span class="text-[9px] sm:text-[10px] font-medium leading-none">Jadwal BC</span>
-            </button>
-            `;
-        }
-        
-        html += `
-        <button onclick="switchTab('profile')" class="flex flex-col items-center justify-center p-2 w-16 h-14 rounded-2xl transition-colors duration-300 ${currentTab === 'profile' ? 'nav-active' : 'text-slate-400'}">
-            <i class="fa-solid fa-user text-xl sm:text-2xl mb-1"></i>
-            <span class="text-[9px] sm:text-[10px] font-medium leading-none">Profil</span>
-        </button>
+        const activeTab = tabs[activeIdx] || tabs[0];
+
+        return `
+        <div id="mobileNavWrapper" class="curved-nav-wrapper md:hidden pb-safe">
+            <!-- Cekungan Gelombang Air Meluncur Halus (Tanpa Garis Luar) -->
+            <div id="mobileCurvedCradle" class="curved-notch-cradle" style="width: ${tabWidthPct}%; transform: translateX(${initialTranslateX}%); ${!isUserClick ? 'transition: none;' : ''}">
+                <!-- Notch Dip SVG Menyatu Alami dengan Body #f8fafc -->
+                <svg class="water-notch-svg" viewBox="0 0 84 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M 0 0 C 14 0 19 14 27 20 C 33 24 51 24 57 20 C 65 14 70 0 84 0 L 84 24 L 0 24 Z" fill="#f8fafc" />
+                </svg>
+
+                <!-- Riak Gelombang Air Konsentris -->
+                <div id="waterRippleWave" class="water-ripple-wave ${isUserClick ? 'ripple-active' : ''}"></div>
+
+                <!-- Tetesan Air Aktif Mengambang dengan Pantulan Cahaya 3D -->
+                <div id="mobileActiveBubble" class="curved-active-bubble">
+                    <i class="${activeTab.icon} text-xl ${isUserClick ? 'animate-water-drop' : ''}"></i>
+                </div>
+            </div>
+
+            <!-- Baris Tombol Menu Navigasi -->
+            <div class="relative flex justify-around items-center w-full h-[60px] z-40">
+                ${tabsHtml}
+            </div>
         </div>`;
+    }
 
-        return html;
+    function updateMobileBubblePosition() {
+        const cradle = document.getElementById('mobileCurvedCradle');
+        const bubble = document.getElementById('mobileActiveBubble');
+        const ripple = document.getElementById('waterRippleWave');
+        if (!cradle || !bubble) return;
+
+        const user = JSON.parse(localStorage.getItem('lifting_user'));
+        if (!user) return;
+
+        let tabs = [];
+        if (user.role === 'ADMIN' || user.role === 'GL') {
+            tabs = ['dashboard', 'monitoring', 'order', 'jadwal', 'profile'];
+        } else if (user.role === 'USER') {
+            tabs = ['monitoring', 'order', 'profile'];
+        } else {
+            tabs = ['monitoring', 'profile'];
+        }
+
+        let newIdx = tabs.indexOf(currentTab);
+        if (newIdx === -1) newIdx = 0;
+        const count = tabs.length;
+        const tabWidthPct = 100 / count;
+
+        const isUserClick = (window._isUserTabSwitch === true);
+        const prevIdx = (typeof window._lastNavIndex === 'number') ? window._lastNavIndex : newIdx;
+
+        cradle.style.width = tabWidthPct + '%';
+
+        // Jika order baru masuk atau sinkronisasi background: JANGAN gerakkan animasi
+        if (!isUserClick) {
+            cradle.style.transition = 'none';
+            cradle.style.transform = `translateX(${newIdx * 100}%)`;
+            bubble.classList.remove('bubble-moving-right', 'bubble-moving-left');
+            if (ripple) ripple.classList.remove('ripple-active');
+            window._lastNavIndex = newIdx;
+            return;
+        }
+
+        // Jika pengguna sendiri yang mengetuk menu: jalankan fisika aliran cairan (Directional Lean)
+        cradle.style.transition = 'transform 0.48s cubic-bezier(0.34, 1.35, 0.52, 1)';
+        cradle.style.transform = `translateX(${newIdx * 100}%)`;
+
+        bubble.classList.remove('bubble-moving-right', 'bubble-moving-left');
+        void bubble.offsetWidth; // Force reflow agar animasi fluida berjalan sempurna
+
+        if (newIdx > prevIdx) {
+            bubble.classList.add('bubble-moving-right');
+        } else if (newIdx < prevIdx) {
+            bubble.classList.add('bubble-moving-left');
+        }
+
+        // Pemicu riak gelombang air
+        if (ripple) {
+            ripple.classList.remove('ripple-active');
+            void ripple.offsetWidth;
+            ripple.classList.add('ripple-active');
+        }
+
+        // Getar halus haptik menyerupai tetesan air
+        if (newIdx !== prevIdx && "vibrate" in navigator) {
+            try { navigator.vibrate(15); } catch(e) {}
+        }
+
+        window._lastNavIndex = newIdx;
+        window._isUserTabSwitch = false; // Reset status setelah perpindahan selesai
     }
 
     function getAuthView() {
@@ -3199,15 +3944,23 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
                 <i class="fa-solid fa-chevron-right text-red-200 text-xs group-hover:translate-x-0.5 group-hover:text-red-400 transition-all"></i>
             </button>
             
-            <!-- Watermark Footer -->
-            <div class="text-center mt-6 mb-2 text-[11px] text-slate-400 font-medium italic">
-                created by @fadillm
+            <!-- Watermark Footer & Indikator Penanda Versi Anti-Zombie Cache -->
+            <div class="text-center mt-6 mb-2 flex flex-col items-center justify-center gap-1.5 select-none">
+                <div class="text-[11px] text-slate-400 font-medium italic">
+                    created by @fadillm
+                </div>
+                <div class="inline-flex items-center gap-1.5 text-[9px] font-mono font-bold text-slate-500 bg-slate-100 border border-slate-200 px-2.5 py-0.5 rounded-full shadow-2xs" title="Versi Build Aplikasi & Pembersihan Cache Otomatis">
+                    <i class="fa-solid fa-code-branch text-cyan-600 text-[8px]"></i>
+                    <span>Versi: ${APP_BUILD_VERSION}</span>
+                </div>
+                <!-- Wadah Notifikasi Pembaruan (Hanya Muncul Jika Versi Server Lebih Baru, Jika Sama Dibiarkan Kosong) -->
+                <div id="appUpdateNoticeContainer" class="hidden"></div>
             </div>
             
         </div>`;
     }
 
-    function saveProfile(e) { 
+    async function saveProfile(e) { 
         e.preventDefault(); 
         let user = JSON.parse(localStorage.getItem('lifting_user')); 
         let users = getUsers(); 
@@ -3229,18 +3982,31 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
             localStorage.setItem('lifting_user', JSON.stringify(user)); 
             
             if (SUPABASE_KEY && !SUPABASE_KEY.includes('PASTE_KUNCI')) {
-                fetch(`${SUPABASE_URL}/rest/v1/users?nrp=eq.${user.nrp}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` },
-                    body: JSON.stringify({
-                        nama_lengkap: user.nama_lengkap,
-                        jabatan: user.jabatan,
-                        perusahaan: user.perusahaan,
-                        departemen: user.departemen,
-                        section: user.section,
-                        no_wa: user.no_wa
-                    })
-                }).catch(err => console.warn(err));
+                try {
+                    if (supabaseClient) {
+                        await supabaseClient.from('users').update({
+                            nama_lengkap: user.nama_lengkap,
+                            jabatan: user.jabatan,
+                            perusahaan: user.perusahaan,
+                            departemen: user.departemen,
+                            section: user.section,
+                            no_wa: user.no_wa
+                        }).eq('nrp', user.nrp);
+                    } else {
+                        await fetch(`${SUPABASE_URL}/rest/v1/users?nrp=eq.${user.nrp}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` },
+                            body: JSON.stringify({
+                                nama_lengkap: user.nama_lengkap,
+                                jabatan: user.jabatan,
+                                perusahaan: user.perusahaan,
+                                departemen: user.departemen,
+                                section: user.section,
+                                no_wa: user.no_wa
+                            })
+                        });
+                    }
+                } catch(err) { console.warn(err); }
             }
 
             showToast('Profil berhasil diperbarui!'); 
@@ -3249,7 +4015,7 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
         }
     }
     
-    function savePassword(e) { 
+    async function savePassword(e) { 
         e.preventDefault(); 
         let pwd1 = document.getElementById('profPwd1').value; 
         let pwd2 = document.getElementById('profPwd2').value; 
@@ -3266,11 +4032,17 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
             localStorage.setItem('lifting_user', JSON.stringify(user)); 
             
             if (SUPABASE_KEY && !SUPABASE_KEY.includes('PASTE_KUNCI')) {
-                fetch(`${SUPABASE_URL}/rest/v1/users?nrp=eq.${user.nrp}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` },
-                    body: JSON.stringify({ password_hash: pwd1 })
-                }).catch(err => console.warn(err));
+                try {
+                    if (supabaseClient) {
+                        await supabaseClient.from('users').update({ password_hash: pwd1 }).eq('nrp', user.nrp);
+                    } else {
+                        await fetch(`${SUPABASE_URL}/rest/v1/users?nrp=eq.${user.nrp}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` },
+                            body: JSON.stringify({ password_hash: pwd1 })
+                        });
+                    }
+                } catch(err) { console.warn(err); }
             }
             
             document.getElementById('profPwd1').value = ''; 
@@ -3467,7 +4239,7 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
         }
     }
 
-    function addCompanyMasterItem(e) {
+    async function addCompanyMasterItem(e) {
         e.preventDefault();
         const input = document.getElementById('newMasterItemInput');
         const colorInput = document.getElementById('newCompanyColorInput');
@@ -3483,18 +4255,40 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
         m.perusahaan_colors[val] = color;
         m.perusahaan_colors[normalizeName(val)] = color;
         saveMasterData(m);
-        showToast(`Perusahaan ${val} berhasil ditambahkan (${color.toUpperCase()})`);
-        renderApp(true);
+
+        // Sinkronkan langsung ke tabel company_status di Supabase via setCompanyWoColor
+        await setCompanyWoColor(val, color);
     }
 
-    function deleteMasterDataItem(key, idx) {
+    async function deleteMasterDataItem(key, idx) {
         const m = getMasterData();
         if (m[key] && m[key][idx] !== undefined) {
             const removedItem = m[key][idx];
             m[key].splice(idx, 1);
-            if (key === 'perusahaan' && m.perusahaan_colors) {
-                delete m.perusahaan_colors[removedItem];
-                delete m.perusahaan_colors[normalizeName(removedItem)];
+            if (key === 'perusahaan') {
+                if (m.perusahaan_colors) {
+                    delete m.perusahaan_colors[removedItem];
+                    delete m.perusahaan_colors[normalizeName(removedItem)];
+                }
+                if (window.companyColorMap) {
+                    delete window.companyColorMap[removedItem];
+                    delete window.companyColorMap[normalizeName(removedItem)];
+                }
+                // Hapus langsung dari tabel company_status di Supabase
+                if (SUPABASE_KEY && !SUPABASE_KEY.includes('PASTE_KUNCI')) {
+                    try {
+                        if (supabaseClient) {
+                            await supabaseClient.from('company_status').delete().ilike('nama_perusahaan', removedItem);
+                        } else {
+                            await fetch(`${SUPABASE_URL}/rest/v1/company_status?nama_perusahaan=ilike.${encodeURIComponent(removedItem)}`, {
+                                method: 'DELETE',
+                                headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+                            });
+                        }
+                    } catch(err) {
+                        console.warn("Gagal hapus company_status dari Supabase:", err);
+                    }
+                }
             }
             saveMasterData(m);
             showToast('Item dihapus');
@@ -3502,7 +4296,7 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
         }
     }
 
-    function saveBrandingSettings(e) {
+    async function saveBrandingSettings(e) {
         e.preventDefault();
         const s = getSettings();
         s.logo_url = document.getElementById('sett_logo_url').value.trim();
@@ -3513,11 +4307,17 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
         localStorage.setItem('lifting_settings', JSON.stringify(s));
         
         if (SUPABASE_KEY && !SUPABASE_KEY.includes('PASTE_KUNCI')) {
-            fetch(`${SUPABASE_URL}/rest/v1/settings?id=eq.1`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'resolution=merge-duplicates' },
-                body: JSON.stringify(s)
-            }).catch(e => console.warn(e));
+            try {
+                if (supabaseClient) {
+                    await supabaseClient.from('settings').upsert({ id: 1, ...s }, { onConflict: 'id' });
+                } else {
+                    await fetch(`${SUPABASE_URL}/rest/v1/settings?id=eq.1`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'resolution=merge-duplicates' },
+                        body: JSON.stringify(s)
+                    });
+                }
+            } catch(e) { console.warn(e); }
         }
         showToast('Pengaturan branding tersimpan!');
         renderApp(false);
@@ -3530,7 +4330,7 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
         document.getElementById('resetPwdModal').classList.remove('hidden');
     }
 
-    function processResetPassword(e) {
+    async function processResetPassword(e) {
         e.preventDefault();
         const nrp = document.getElementById('resetNrpVal').value;
         const newPwd = document.getElementById('resetPwdInput').value;
@@ -3539,33 +4339,77 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
         if (idx !== -1) {
             users[idx].password_hash = newPwd;
             saveUsers(users);
+
+            if (SUPABASE_KEY && !SUPABASE_KEY.includes('PASTE_KUNCI')) {
+                try {
+                    if (supabaseClient) {
+                        await supabaseClient.from('users').update({ password_hash: newPwd }).eq('nrp', nrp);
+                    } else {
+                        await fetch(`${SUPABASE_URL}/rest/v1/users?nrp=eq.${encodeURIComponent(nrp)}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` },
+                            body: JSON.stringify({ password_hash: newPwd })
+                        });
+                    }
+                } catch(e) {}
+            }
+
             showToast('Password untuk ' + nrp + ' berhasil direset');
             document.getElementById('resetPwdModal').classList.add('hidden');
             renderApp(true);
         }
     }
 
-    function toggleUserStatus(nrp) {
+    async function toggleUserStatus(nrp) {
         let users = getUsers();
         let idx = users.findIndex(u => u.nrp === nrp);
         if (idx !== -1) {
             users[idx].status_akun = users[idx].status_akun === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
             saveUsers(users);
+
+            if (SUPABASE_KEY && !SUPABASE_KEY.includes('PASTE_KUNCI')) {
+                try {
+                    if (supabaseClient) {
+                        await supabaseClient.from('users').update({ status_akun: users[idx].status_akun }).eq('nrp', nrp);
+                    } else {
+                        await fetch(`${SUPABASE_URL}/rest/v1/users?nrp=eq.${encodeURIComponent(nrp)}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` },
+                            body: JSON.stringify({ status_akun: users[idx].status_akun })
+                        });
+                    }
+                } catch(e) {}
+            }
+
             showToast('Status user diperbarui');
             renderApp(true);
         }
     }
 
     function deleteUserAccount(nrp) {
-        openCustomConfirm('Hapus Akun', `Hapus pengguna ${nrp} dari sistem?`, () => {
+        openCustomConfirm('Hapus Akun', `Hapus pengguna ${nrp} dari sistem?`, async () => {
             let users = getUsers().filter(u => u.nrp !== nrp);
             saveUsers(users);
+
+            if (SUPABASE_KEY && !SUPABASE_KEY.includes('PASTE_KUNCI')) {
+                try {
+                    if (supabaseClient) {
+                        await supabaseClient.from('users').delete().eq('nrp', nrp);
+                    } else {
+                        await fetch(`${SUPABASE_URL}/rest/v1/users?nrp=eq.${encodeURIComponent(nrp)}`, {
+                            method: 'DELETE',
+                            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+                        });
+                    }
+                } catch(e) {}
+            }
+
             showToast('Pengguna dihapus');
             renderApp(true);
         });
     }
 
-    function handleCreateUserByAdmin(e) {
+    async function handleCreateUserByAdmin(e) {
         e.preventDefault();
         const nrp = document.getElementById('newAccNrp').value.trim().toUpperCase();
         let users = getUsers();
@@ -3592,6 +4436,21 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
 
         users.push(newUser);
         saveUsers(users);
+
+        if (SUPABASE_KEY && !SUPABASE_KEY.includes('PASTE_KUNCI')) {
+            try {
+                if (supabaseClient) {
+                    await supabaseClient.from('users').upsert(newUser, { onConflict: 'nrp' });
+                } else {
+                    await fetch(`${SUPABASE_URL}/rest/v1/users?on_conflict=nrp`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'resolution=merge-duplicates' },
+                        body: JSON.stringify(newUser)
+                    });
+                }
+            } catch(e) {}
+        }
+
         showToast(`Akun ${newUser.nama_lengkap} (${newUser.jabatan}) berhasil ditambahkan!`, 'success');
         document.getElementById('createUserModal').classList.add('hidden');
         renderApp(true);
@@ -3884,6 +4743,7 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
                 ]
             },
             options: {
+                animation: false,
                 indexAxis: 'y', responsive: true, maintainAspectRatio: false,
                 plugins: { legend: { position: 'bottom', labels: { font: { size: 9, family: "'Inter', sans-serif" }, usePointStyle: true, boxWidth: 8 } }, tooltip: { callbacks: { label: function(context) { return context.dataset.label + ': ' + context.parsed.x + '%'; } } } },
                 scales: { x: { stacked: true, max: 100, ticks: { font: { size: 9 }, callback: function(value){return value+"%"} }, grid: { color: '#f1f5f9' } }, y: { stacked: true, ticks: { font: { size: 10, weight: 'bold' } }, grid: { display: false } } }
@@ -3909,6 +4769,7 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
                 ]
             },
             options: {
+                animation: false,
                 responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
                 plugins: { legend: { labels: { font: { size: 10, family: "'Inter', sans-serif" }, usePointStyle: true, boxWidth: 8 } } },
                 scales: { y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 9 } }, grid: { color: '#f1f5f9' } }, x: { ticks: { font: { size: 9 } }, grid: { display: false } } }
@@ -3933,7 +4794,7 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
             window.dashSchedChart = new Chart(ctxSched, {
                 type: 'bar',
                 data: { labels: ['SCH', 'UNSCH'], datasets: [{ data: [schedCount, unschedCount], backgroundColor: ['#10b981', '#f43f5e'], borderRadius: 4 }] },
-                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 9 } }, grid: { color: '#f1f5f9' } }, y: { ticks: { font: { size: 9, weight: 'bold' } }, grid: { display: false } } } }
+                options: { animation: false, indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 9 } }, grid: { color: '#f1f5f9' } }, y: { ticks: { font: { size: 9, weight: 'bold' } }, grid: { display: false } } } }
             });
         }
 
@@ -3958,7 +4819,7 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
             window.dashRiggerChart = new Chart(ctxRigger, {
                 type: 'bar',
                 data: { labels: rLabels, datasets: [{ label: 'Crane Truck', data: rDataCT, backgroundColor: '#0d9488' }, { label: 'Big Crane', data: rDataBC, backgroundColor: '#4ade80' }, { label: 'Lowboy', data: rDataLB, backgroundColor: '#a7f3d0' }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 9, family: "'Inter', sans-serif" }, usePointStyle: true, boxWidth: 8 } } }, scales: { x: { stacked: true, ticks: { font: { size: 9 } }, grid: { display: false } }, y: { stacked: true, ticks: { font: { size: 9 } }, grid: { color: '#f1f5f9' } } } }
+                options: { animation: false, responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 9, family: "'Inter', sans-serif" }, usePointStyle: true, boxWidth: 8 } } }, scales: { x: { stacked: true, ticks: { font: { size: 9 } }, grid: { display: false } }, y: { stacked: true, ticks: { font: { size: 9 } }, grid: { color: '#f1f5f9' } } } }
             });
         }
 
@@ -4028,7 +4889,7 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
             window.dashCompanyDonut = new Chart(ctxDonut, { 
                 type: 'doughnut', 
                 data: { labels: cLabels, datasets: [{ data: cDataCount, backgroundColor: cBgColors, borderWidth: 0 }] }, 
-                options: { responsive: true, maintainAspectRatio: false, cutout: '50%', plugins: { legend: { display: false } } } 
+                options: { animation: false, responsive: true, maintainAspectRatio: false, cutout: '50%', plugins: { legend: { display: false } } } 
             });
         }
     }
@@ -4664,20 +5525,25 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
         let tglSelesai = document.getElementById('mp_filter_selesai') ? document.getElementById('mp_filter_selesai').value : getShiftDateString();
 
         let jobs = getOrders().filter(j => j.kategori === mpFleetMode);
-        jobs = jobs.filter(j => {
-            const opDate = getJobOperationalDate(j);
-            return opDate >= tglMulai && opDate <= tglSelesai;
-        });
+
+        // Filter tanggal HANYA berlaku untuk tab riwayat (COMPLETED & CANCELED)
+        // Untuk tab ON PROGRESS & PENDING: TIDAK ADA filter tanggal sehingga semua job selalu tampil penuh
+        const isHistoryPanel = (currentMpPanel === 'COMPLETED' || currentMpPanel === 'CANCELED');
+        if (isHistoryPanel) {
+            jobs = jobs.filter(j => {
+                const opDate = getJobOperationalDate(j);
+                return opDate >= tglMulai && opDate <= tglSelesai;
+            });
+        }
         
         if (currentMpPanel === 'PENDING') jobs = jobs.filter(j => j.status === 'PENDING'); else jobs = jobs.filter(j => j.status === currentMpPanel);
         if (mpFleetMode === 'Crane Truck' && filterUnit !== 'ALL') jobs = jobs.filter(j => j.unit === filterUnit);
 
         let unitFilterHtml = mpFleetMode === 'Crane Truck' ? `<select id="mp_filter_unit" onchange="renderApp(true)" class="text-[9px] font-bold bg-white border border-slate-300 text-slate-700 rounded-full px-2 py-1 outline-none shadow-sm focus:border-cyan-500 cursor-pointer ml-auto"><option value="ALL">Semua Unit</option>${unitOptions.map(u => `<option value="${u}" ${filterUnit === u ? 'selected' : ''}>${u}</option>`).join('')}</select>` : '';
 
-        let html = `
-        <div class="flex items-center gap-2 mb-2 mt-2"><button onclick="mpFleetMode=null; renderApp(false);" class="w-6 h-6 rounded-sm border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 bg-white shadow-sm"><i class="fa-solid fa-arrow-left text-[10px]"></i></button><h2 class="text-xs font-bold text-slate-800">Tugas: <span class="text-cyan-600">${mpFleetMode}</span></h2></div>
-        
-        <div class="flex items-center gap-1.5 mb-2 w-full sm:w-auto mx-auto justify-center text-[10px]">
+        // Elemen filter tanggal: Hanya dirender ketika membuka tab COMPLETED atau CANCELED
+        let dateFilterHtml = isHistoryPanel ? `
+        <div class="flex items-center gap-1.5 text-[10px] shrink-0">
             <div class="flex items-center bg-white border border-slate-200 rounded-full px-3 py-1 shadow-2xs shrink-0">
                 <span class="text-[10px] text-slate-500 font-medium mr-1.5 select-none">Dari:</span>
                 <input type="date" id="mp_filter_mulai" class="bg-transparent text-slate-700 font-semibold focus:outline-none text-[10px] cursor-pointer" value="${tglMulai}" onchange="renderApp(true)">
@@ -4689,6 +5555,23 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
             <button type="button" onclick="resetMpDateFilter()" class="w-7 h-7 rounded-full bg-white border border-slate-200 hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-700 transition-colors shadow-2xs shrink-0 cursor-pointer" title="Reset Filter Tanggal">
                 <i class="fa-solid fa-rotate-left text-[10px]"></i>
             </button>
+        </div>` : '';
+
+        let html = `
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-2 mt-1">
+            <div class="flex items-center gap-2">
+                <button onclick="mpFleetMode=null; renderApp(false);" class="w-6 h-6 rounded-sm border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 bg-white shadow-sm" title="Kembali">
+                    <i class="fa-solid fa-arrow-left text-[10px]"></i>
+                </button>
+                <h2 class="text-xs font-bold text-slate-800 flex items-center gap-1">
+                    Tugas: <span class="text-cyan-600">${mpFleetMode}</span>
+                </h2>
+                <!-- TOMBOL SYNC REALTIME KHUSUS MP -->
+                <button onclick="fetchFromSupabase(true)" class="bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-600 font-bold px-2 py-0.5 rounded text-[9px] flex items-center gap-1 transition-colors shadow-2xs cursor-pointer ml-1" title="Sinkronkan Data Terbaru">
+                    <i class="fa-solid fa-rotate"></i> Sync
+                </button>
+            </div>
+            ${dateFilterHtml}
         </div>
 
         <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
@@ -4722,8 +5605,8 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
                     ${job.status === 'PENDING' ? `
                         <div class="text-[10px] text-orange-600 font-bold w-full text-center bg-orange-50 py-1.5 rounded-sm border border-orange-200 shadow-sm mb-1"><i class="fa-solid fa-clock mr-1"></i> Job Pending - Menunggu Validasi Lanjutan dari GL</div>
                     ` : ''}
-                    <button onclick="copyJobToWA('${job.no_wo}', false)" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-1.5 px-2.5 rounded-sm text-[11px] shadow-2xs flex items-center justify-center gap-1 transition-colors" title="Salin Laporan WA">
-                        <i class="fa-regular fa-copy"></i> Salin Laporan WA
+                    <button onclick="copyJobToWA('${job.no_wo}', false)" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-1.5 px-2 rounded-sm text-[11px] shadow-2xs flex items-center justify-center gap-1 transition-colors shrink-0 whitespace-nowrap" title="Salin Job">
+                        <i class="fa-regular fa-copy text-[10px]"></i> Salin Job
                     </button>
                 </div>
             </div>`;
@@ -5094,10 +5977,19 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
             // Masukkan tiket lanjutan ke daftar order
             jobs.unshift(rolloverJob);
             saveOrders(jobs);
+
+            // Sinkronkan status job lama dan tiket lanjutan baru langsung ke Supabase
+            syncSingleOrderToSupabase(jobs[idx]);
+            syncSingleOrderToSupabase(rolloverJob);
+
             showToast(`Job ${jobs[idx].no_wo} selesai. Dibuat tiket lanjutan ${newWo} (Status: PENDING) untuk validasi GL.`);
         } else {
             jobs[idx].status = pendingActionData.status;
             saveOrders(jobs);
+
+            // Sinkronkan status COMPLETED langsung ke Supabase
+            syncSingleOrderToSupabase(jobs[idx]);
+
             showToast('Pekerjaan berhasil diselesaikan!');
         }
 
@@ -5215,6 +6107,10 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
 
             jobs[idx].alasan_telat = (jobs[idx].alasan_telat ? jobs[idx].alasan_telat + ' | ' : '') + 'Batal: ' + reason;
             saveOrders(jobs);
+
+            // Sinkronkan pembatalan job langsung ke Supabase
+            syncSingleOrderToSupabase(jobs[idx]);
+
             showToast('Job ' + pendingCancelWo + ' berhasil dibatalkan');
             document.getElementById('cancelPromptModal').classList.add('hidden');
             renderApp(true);
@@ -5644,6 +6540,58 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
 
             if (fotoInput) fotoInput.value = '';
 
+            // Pengiriman 1 Tahap Langsung ke Supabase (Direct-to-Cloud)
+            if (btnSubmit) btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i> Mengirim ke database server...';
+
+            let serverSuccess = false;
+            let serverErrorDetail = '';
+
+            try {
+                const clean = sanitizeOrderForSupabase(baseOrder);
+                if (supabaseClient) {
+                    const { data, error } = await supabaseClient
+                        .from('orders')
+                        .upsert(clean, { onConflict: 'no_wo' })
+                        .select();
+                    if (!error && Array.isArray(data) && data.length > 0) {
+                        serverSuccess = true;
+                    } else if (error) {
+                        serverErrorDetail = error.message || 'Gagal insert order ke Supabase';
+                    }
+                } else {
+                    const res = await fetch(`${SUPABASE_URL}/rest/v1/orders?on_conflict=no_wo`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'apikey': SUPABASE_KEY,
+                            'Authorization': `Bearer ${SUPABASE_KEY}`,
+                            'Prefer': 'resolution=merge-duplicates,return=representation'
+                        },
+                        body: JSON.stringify(clean)
+                    });
+                    if (res.ok) {
+                        serverSuccess = true;
+                    } else {
+                        const errBody = await res.json().catch(() => ({}));
+                        serverErrorDetail = errBody.message || `Status HTTP ${res.status}`;
+                    }
+                }
+            } catch(netErr) {
+                serverSuccess = false;
+                serverErrorDetail = netErr.message || 'Jaringan internet terputus';
+            }
+
+            // Jika server gagal merespons, batalkan dan JANGAN hapus formulir
+            if (!serverSuccess) {
+                showToast(`Gagal mengirim order: ${serverErrorDetail}. Silakan coba kirim ulang saat sinyal stabil.`, 'error');
+                if (btnSubmit) {
+                    btnSubmit.disabled = false;
+                    btnSubmit.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Order';
+                }
+                return;
+            }
+
+            // Sukses di server: bersihkan draft, update cache, dan alihkan ke monitoring
             await finishSubmitOrder(baseOrder, user);
 
         } catch (err) {
@@ -5659,24 +6607,15 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
     async function finishSubmitOrder(newOrder, user) {
         clearOrderDraft();
         let orders = getOrders();
-        // Cegah duplikasi No WO di lokal
         orders = orders.filter(o => o.no_wo !== newOrder.no_wo);
         orders.unshift(newOrder);
-        localStorage.setItem('lifting_orders', JSON.stringify(orders));
+        saveOrders(orders);
         
-        // Pindah seketika ke tab monitoring sehingga order langsung muncul di layar user
         currentTab = 'monitoring';
         window.location.hash = 'monitoring';
         userOrderFleetMode = null;
         renderApp(false);
-        showSuccessAnim('check', 'Order Berhasil!', 'Pesanan Anda telah kami terima.');
-
-        // Simpan langsung tiket order baru ke Supabase
-        try {
-            await syncSingleOrderToSupabase(newOrder);
-        } catch(err) {
-            console.warn("Background sync error:", err);
-        }
+        showSuccessAnim('check', 'Order Berhasil!', 'Pesanan Anda telah diterima di server database.');
     }
 
     function viewJobDetail(wo) {
@@ -6025,7 +6964,7 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
         document.getElementById('editJobModal').classList.remove('hidden');
     }
 
-    function saveAdminEditJob(e, wo) {
+    async function saveAdminEditJob(e, wo) {
         e.preventDefault();
         let jobs = getOrders();
         let idx = jobs.findIndex(j => j.no_wo === wo && j.status !== 'CANCELED');
@@ -6069,16 +7008,11 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
         jobs[idx].rigger = rig;
         jobs[idx].rigger2 = rig2;
 
+        // Simpan perubahan warna WO ke tabel company_status Supabase
         const chosenWoColor = document.getElementById('edit_wo_color')?.value;
-        if (chosenWoColor) {
+        if (chosenWoColor && jobs[idx].perusahaan) {
             jobs[idx].warna_wo = chosenWoColor;
-            if (jobs[idx].perusahaan) {
-                let m = getMasterData();
-                if (!m.perusahaan_colors) m.perusahaan_colors = {};
-                m.perusahaan_colors[jobs[idx].perusahaan] = chosenWoColor;
-                m.perusahaan_colors[normalizeName(jobs[idx].perusahaan)] = chosenWoColor;
-                saveMasterData(m);
-            }
+            await setCompanyWoColor(jobs[idx].perusahaan, chosenWoColor);
         }
 
         if (jobs[idx].status === 'COMPLETED') {
@@ -6100,6 +7034,27 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
         }
 
         saveOrders(jobs);
+
+        // Validasi Admin/GL langsung kirim pembaruan ke tabel orders Supabase
+        if (SUPABASE_KEY && !SUPABASE_KEY.includes('PASTE_KUNCI')) {
+            try {
+                const cleanRow = sanitizeOrderForSupabase(jobs[idx]);
+                if (supabaseClient) {
+                    await supabaseClient.from('orders').update(cleanRow).eq('no_wo', wo);
+                } else {
+                    await fetch(`${SUPABASE_URL}/rest/v1/orders?no_wo=eq.${encodeURIComponent(wo)}`, {
+                        method: 'PATCH',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'apikey': SUPABASE_KEY,
+                            'Authorization': `Bearer ${SUPABASE_KEY}`
+                        },
+                        body: JSON.stringify(cleanRow)
+                    });
+                }
+            } catch(e) {}
+        }
+
         document.getElementById('editJobModal').classList.add('hidden');
         renderApp(true); 
     }
@@ -6107,11 +7062,19 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
     function confirmHapusOrder(wo) {
         openCustomConfirm('Hapus Data', `Apakah Anda yakin ingin menghapus order ${wo}?`, async () => {
             let jobs = getOrders().filter(j => j.no_wo !== wo);
-            localStorage.setItem('lifting_orders', JSON.stringify(jobs));
+            saveOrders(jobs);
             
             if (SUPABASE_KEY && !SUPABASE_KEY.includes('PASTE_KUNCI')) {
-                try { await fetch(`${SUPABASE_URL}/rest/v1/orders?no_wo=eq.${wo}`, { method: 'DELETE', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }); } 
-                catch(e) { console.warn(e); }
+                try {
+                    if (supabaseClient) {
+                        await supabaseClient.from('orders').delete().eq('no_wo', wo);
+                    } else {
+                        await fetch(`${SUPABASE_URL}/rest/v1/orders?no_wo=eq.${encodeURIComponent(wo)}`, {
+                            method: 'DELETE',
+                            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+                        });
+                    }
+                } catch(e) { console.warn(e); }
             }
             showToast('Data dihapus!'); 
             document.getElementById('editJobModal').classList.add('hidden'); 
@@ -6347,6 +7310,7 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
                 }
             }
             renderApp(false); 
+            checkAppVersionUpdate();
             if (window.innerWidth >= 768) hideSplashScreen();
         }); 
     });
@@ -6370,17 +7334,56 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
         }
     });
 
+    /* ========================================================
+       SISTEM AUTO-RESUME, RECONNECT & FOCUS SYNC (HP & DESKTOP)
+       Mencegah keharusan membersihkan / swipe-up aplikasi di HP
+       ======================================================== */
+    let isSyncingOnResume = false;
+    async function handleAppResume() {
+        if (isSyncingOnResume) return;
+        isSyncingOnResume = true;
+        try {
+            const user = JSON.parse(localStorage.getItem('lifting_user'));
+            if (user) {
+                // 1. Pulihkan koneksi Realtime WebSocket jika terputus saat HP dikunci / sleep
+                initSupabaseRealtime();
+                
+                // 2. Tarik langsung data order & status terbaru dari database Supabase
+                // fetchFromSupabase hanya akan me-render ulang jika data benar-benar berubah
+                await fetchFromSupabase(false);
+                
+                // 3. Perbarui badge indikator notifikasi & periksa pembaruan versi
+                updateNotificationBadge();
+                checkAppVersionUpdate();
+            }
+        } catch (err) {
+            console.warn("Auto-resume sync error:", err);
+        } finally {
+            setTimeout(() => { isSyncingOnResume = false; }, 1200);
+        }
+    }
+
+    // Deteksi saat layar HP menyala atau aplikasi kembali dibuka dari latar belakang
     document.addEventListener("visibilitychange", () => {
         if (document.visibilityState === "hidden") {
             if (currentTab === 'order') saveOrderDraft();
         } else if (document.visibilityState === "visible") {
-            const user = localStorage.getItem('lifting_user');
-            if (user) {
-                // Pastikan koneksi Supabase Realtime aktif kembali saat layar HP menyala
-                initSupabaseRealtime();
-            }
+            handleAppResume();
         }
     });
+
+    // Deteksi fokus peramban mobile (iOS Safari & Android Chrome saat tab kembali aktif)
+    window.addEventListener("focus", handleAppResume);
+    window.addEventListener("pageshow", handleAppResume);
+
+    // Heartbeat sync otomatis setiap 18 detik jika layar sedang aktif terbuka
+    setInterval(() => {
+        if (document.visibilityState === "visible" && !isAnyModalOpen() && currentTab !== 'order') {
+            if (Date.now() - lastFetchTimestamp > 18000) {
+                fetchFromSupabase(false);
+            }
+        }
+    }, 15000);
 
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
