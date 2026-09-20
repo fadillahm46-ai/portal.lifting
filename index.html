@@ -619,21 +619,45 @@
     ];
 
     const defaultMasterData = {
-        perusahaan: ['PPA', 'SUBKON A', 'SUBKON B', 'PT. BIB'],
+        perusahaan: [
+            'PPA', 'BIB', 'BOSTON',
+            'KME', 'MNK', 'UT',
+            'BTB', 'SES', 'TRIATRA',
+            'AMM', 'SRJ', 'SWI',
+            'SUI', 'EDJS'
+        ],
         perusahaan_colors: {
-            'PPA': 'biru',
-            'SUBKON A': 'biru',
-            'SUBKON B': 'biru',
-            'PT. BIB': 'biru'
+            'PPA': 'biru', 'BIB': 'biru', 'BOSTON': 'biru',
+            'KME': 'biru', 'MNK': 'biru', 'UT': 'biru',
+            'BTB': 'biru', 'SES': 'biru', 'TRIATRA': 'biru',
+            'AMM': 'biru', 'SRJ': 'biru', 'SWI': 'biru',
+            'SUI': 'biru', 'EDJS': 'biru'
         },
-        departemen: ['MINING', 'PLANT', 'SAFETY', 'HR'],
-        section: ['OPERATION', 'MAINTENANCE', 'HSE', 'RECRUITMENT', 'SE'],
-        unit_ct: ['CT-01', 'CT-02', 'CT-03'],
-        unit_big_crane: ['BC-01', 'BC-02'],
-        unit_lowboy: ['LB-01', 'LB-02'],
-        gl: ['ACHMAD HARIYANTO', 'LUKMANUL HAKIM'],
-        operator: ['JOKO OPERATOR', 'SUPRIADI'],
-        rigger: ['AGUS RIGGER', 'BAMBANG', 'CANDRA']
+        departemen: [
+            'PLANT', 'PRODUKSI', 'HCGA',
+            'SHE', 'COE', 'ENG',
+            'OPD', 'MNG', 'ERC',
+            'SCM-FAT', 'LAIN-LAIN'
+        ],
+        section: [
+            'TRACK', 'WHEEL', 'FABRIKASI',
+            'SUPPORT', 'HAULING', 'TYRE',
+            'PE', 'PPD', 'SE',
+            'PIT SERVICE', 'MANPOWER', 'PURCHASING',
+            'WAREHOUSE', 'LAIN - LAIN'
+        ],
+        unit_ct: [
+            'CT2514', 'CT2515', 'CT52503', 'CT52505', 'CT52508'
+        ],
+        unit_big_crane: [
+            'MC7001 (LIEBHERR)', 'GR501 (TADANO)'
+        ],
+        unit_lowboy: [
+            'LB5801 (LOWBOY)'
+        ],
+        gl: [],
+        operator: [],
+        rigger: []
     };
 
     if (!localStorage.getItem('lifting_users')) localStorage.setItem('lifting_users', JSON.stringify(defaultUsers));
@@ -1526,6 +1550,19 @@
         return [...new Set(list)].sort();
     }
 
+    /* Helper Penarikan Data GL Khusus dari Akun yang Memiliki Role GL */
+    function getAccountGLs() {
+        const users = getUsers();
+        const list = users
+            .filter(u => u.status_akun === 'ACTIVE' && (
+                (u.role || '').toUpperCase().trim() === 'GL' ||
+                (u.role || '').toUpperCase().trim() === 'GROUP LEADER'
+            ))
+            .map(u => (u.nama_lengkap || '').trim().toUpperCase())
+            .filter(Boolean);
+        return [...new Set(list)].sort();
+    }
+
     function getJobOperationalDate(j) {
         return getOrderScheduleDate(j);
     }
@@ -2311,8 +2348,23 @@
         if (!SUPABASE_KEY || SUPABASE_KEY.includes('PASTE_KUNCI')) return;
         try {
             if (!data) return;
+            const payload = {
+                id: 1,
+                perusahaan: data.perusahaan || [],
+                departemen: data.departemen || [],
+                section: data.section || [],
+                unit_ct: data.unit_ct || [],
+                unit_big_crane: data.unit_big_crane || [],
+                unit_lowboy: data.unit_lowboy || [],
+                gl: [],
+                operator: [],
+                rigger: [],
+                perusahaan_colors: data.perusahaan_colors || {},
+                unit_status_map: data.unit_status_map || {},
+                updated_at: new Date().toISOString()
+            };
             if (supabaseClient) {
-                await supabaseClient.from('master_data').upsert({ id: 1, ...data }, { onConflict: 'id' });
+                await supabaseClient.from('master_data').upsert(payload, { onConflict: 'id' });
             } else {
                 await fetch(`${SUPABASE_URL}/rest/v1/master_data?id=eq.1`, {
                     method: 'POST',
@@ -2322,7 +2374,7 @@
                         'Authorization': `Bearer ${SUPABASE_KEY}`,
                         'Prefer': 'resolution=merge-duplicates'
                     },
-                    body: JSON.stringify({ id: 1, ...data })
+                    body: JSON.stringify(payload)
                 });
             }
         } catch (e) {}
@@ -4085,7 +4137,9 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
         const users = getUsers();
         const settings = getSettings();
 
-        // Mengalihkan pengelolaan Operator dan Rigger agar dikelola langsung pada Manajemen Akun
+        if (currentMasterTab === 'gl') currentMasterTab = 'perusahaan';
+
+        // Mengalihkan pengelolaan GL, Operator, dan Rigger langsung ke Manajemen Akun
         const tabs = [
             { id: 'perusahaan', label: 'Perusahaan' },
             { id: 'departemen', label: 'Departemen' },
@@ -4093,7 +4147,6 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
             { id: 'unit_ct', label: 'Unit CT' },
             { id: 'unit_big_crane', label: 'Unit BC' },
             { id: 'unit_lowboy', label: 'Unit Lowboy' },
-            { id: 'gl', label: 'Group Leader' },
             { id: 'users', label: 'Manajemen Akun' },
             { id: 'branding', label: 'Branding & Tampilan' }
         ];
@@ -6889,7 +6942,10 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
 
         const unitOptions = availableUnits.map(u => `<option value="${u}" ${job.unit===u?'selected':''}>${u}</option>`).join('');
 
-        const glOptions = (m.gl || []).map(g => `<option value="${g}" ${job.gl===g?'selected':''}>${g}</option>`).join('');
+        // Mengambil daftar Group Leader (GL) langsung dari Manajemen Akun (users)
+        const glList = getAccountGLs();
+        if (job.gl && !glList.includes(job.gl)) glList.unshift(job.gl);
+        const glOptions = glList.map(g => `<option value="${g}" ${job.gl===g?'selected':''}>${g}</option>`).join('');
         
         // Mengambil daftar Operator & Rigger langsung dari Manajemen Akun (users)
         const operatorsList = getAccountOperators();
@@ -6967,7 +7023,7 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
                 <div class="grid grid-cols-2 gap-2">
                     <div>
                         <label class="block text-[10px] font-bold text-slate-500 mb-0.5">Group Leader *</label>
-                        <select id="edit_gl" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500 bg-white" required><option value="">-- Pilih --</option>${glOptions}</select>
+                        <select id="edit_gl" class="w-full border border-slate-300 rounded-sm px-1.5 py-1 text-xs focus:outline-none focus:border-cyan-500 bg-white" required><option value="">-- Pilih Group Leader --</option>${glOptions}</select>
                     </div>
                     <div>
                         <div class="flex items-center justify-between mb-0.5">
