@@ -1173,34 +1173,40 @@
             });
         }
 
-        // Tampilkan notifikasi sistem level OS
+        // Tampilkan notifikasi sistem level OS / Windows Desktop (Kanan Bawah Layar PC)
         if ("Notification" in window && Notification.permission === "granted") {
             try {
-                if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+                const notifOptions = {
+                    body: message,
+                    icon: "https://lh3.googleusercontent.com/d/1hQZopiZU-_bQC9aRmyZndlmEF--k4h5U",
+                    badge: "https://lh3.googleusercontent.com/d/1hQZopiZU-_bQC9aRmyZndlmEF--k4h5U",
+                    tag: 'portal-lifting-notif-' + Date.now(),
+                    renotify: true,
+                    requireInteraction: true // Banner tetap melayang di kanan bawah Windows sampai diklik/disilang
+                };
+
+                // Di PC Desktop: Panggil Web Notification API langsung agar pasti muncul di kanan bawah Windows
+                if (window.innerWidth >= 768) {
+                    const desktopNotif = new Notification(title, notifOptions);
+                    desktopNotif.onclick = function() {
+                        window.focus();
+                        if (jobData && jobData.no_wo) {
+                            viewJobDetail(jobData.no_wo);
+                        }
+                        this.close();
+                    };
+                } else if (navigator.serviceWorker && navigator.serviceWorker.ready) {
                     navigator.serviceWorker.ready.then(reg => {
-                        reg.showNotification(title, {
-                            body: message,
-                            icon: "https://lh3.googleusercontent.com/d/1hQZopiZU-_bQC9aRmyZndlmEF--k4h5U",
-                            badge: "https://lh3.googleusercontent.com/d/1hQZopiZU-_bQC9aRmyZndlmEF--k4h5U",
-                            vibrate: [200, 100, 200],
-                            tag: 'portal-lifting-single-order-notif',
-                            renotify: true
-                        });
+                        reg.showNotification(title, notifOptions);
                     }).catch(() => {
-                        new Notification(title, {
-                            body: message,
-                            icon: "https://lh3.googleusercontent.com/d/1hQZopiZU-_bQC9aRmyZndlmEF--k4h5U",
-                            tag: 'portal-lifting-single-order-notif'
-                        });
+                        new Notification(title, notifOptions);
                     });
                 } else {
-                    new Notification(title, {
-                        body: message,
-                        icon: "https://lh3.googleusercontent.com/d/1hQZopiZU-_bQC9aRmyZndlmEF--k4h5U",
-                        tag: 'portal-lifting-single-order-notif'
-                    });
+                    new Notification(title, notifOptions);
                 }
-            } catch(e) {}
+            } catch(e) {
+                console.warn("Desktop notification trigger error:", e);
+            }
         }
     }
 
@@ -1261,9 +1267,10 @@
                 const rg2 = normalizeName(j.rigger2);
                 const isAssigned = (op === myName || rg1 === myName || rg2 === myName);
                 const isActive = ['ON PROGRESS', 'SCHEDULED', 'PENDING'].includes(j.status);
+                // Hanya hitung pekerjaan hari ini atau sebelumnya agar tidak membunyikan tugas masa depan
                 const opDate = getJobOperationalDate(j);
-                const isTodayOrPast = opDate ? opDate <= todayShiftDate : true;
-                return !isOpened && isAssigned && isActive && isTodayOrPast;
+                const isTodayOrEarlier = !opDate || opDate <= todayShiftDate;
+                return !isOpened && isAssigned && isActive && isTodayOrEarlier;
             });
         }
 
@@ -1728,8 +1735,9 @@
                 return true;
             }
         }
+        // Hanya cegah render jika user sedang mengetik di formulir Buat Order
         const active = document.activeElement;
-        if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT')) {
+        if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA') && currentTab === 'order') {
             return true;
         }
         return false;
@@ -1828,23 +1836,25 @@
         // 2. NOTIFIKASI UNTUK MANPOWER (OPERATOR & RIGGER)
         if (isMP && isAssignedToMe) {
             if (!prefs.notif_umum) return;
+
+            // Pekerjaan bertanggal masa depan (besok/lusa) tidak memicu notifikasi sampai harinya tiba
             const opDate = getJobOperationalDate(newRecord);
-            const todayShiftDate = getShiftDateString();
-            const isTodayOrPast = opDate ? opDate <= todayShiftDate : true;
+            const todayShift = getShiftDateString();
+            if (opDate && opDate > todayShift) {
+                return;
+            }
 
             const isActiveState = ['ON PROGRESS', 'SCHEDULED'].includes(newRecord.status);
             if ((eventType === 'INSERT' || newlyAssigned || (statusChanged && isActiveState)) && isActiveState) {
-                if (isTodayOrPast) {
-                    triggerAppNotification(
-                        "Penugasan Job Baru!",
-                        `Job ${newRecord.no_wo} (${newRecord.kategori || 'Armada'}) ditugaskan kepada Anda (Unit: ${newRecord.unit || '-'}). Segera laksanakan.`,
-                        'mp',
-                        newRecord
-                    );
-                    // Hanya buka modal alert jika MP sedang tidak membuka modal lain
-                    if (!isAnyModalOpen()) {
-                        openAssignedJobAlert(newRecord);
-                    }
+                triggerAppNotification(
+                    "Penugasan Job Baru!",
+                    `Job ${newRecord.no_wo} (${newRecord.kategori || 'Armada'}) ditugaskan kepada Anda (Unit: ${newRecord.unit || '-'}). Segera laksanakan.`,
+                    'mp',
+                    newRecord
+                );
+                // Hanya buka modal alert jika MP sedang tidak membuka modal lain
+                if (!isAnyModalOpen()) {
+                    openAssignedJobAlert(newRecord);
                 }
             } else if (statusChanged && newRecord.status === 'CANCELED') {
                 triggerAppNotification(
@@ -2063,6 +2073,10 @@
     function initSupabaseRealtime() {
         if (!supabaseClient) return;
         try {
+            // Hindari inisialisasi ganda jika channel sudah aktif terhubung
+            if (realtimeChannel && (realtimeChannel.state === 'joined' || realtimeChannel.state === 'joining')) {
+                return;
+            }
             if (realtimeChannel) {
                 supabaseClient.removeChannel(realtimeChannel);
                 realtimeChannel = null;
@@ -2096,12 +2110,15 @@
                 })
                 .subscribe((status, err) => {
                     console.log("Supabase Realtime Status:", status);
-                    if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+                    // HANYA rekoneksi saat terjadi error nyata atau timeout jaringan.
+                    // Jangan rekoneksi saat 'CLOSED' karena 'CLOSED' adalah pemutusan normal saat removeChannel
+                    if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                        realtimeChannel = null;
                         if (!realtimeReconnectTimer) {
                             realtimeReconnectTimer = setTimeout(() => {
                                 realtimeReconnectTimer = null;
                                 initSupabaseRealtime();
-                            }, 3000);
+                            }, 4000);
                         }
                     }
                 });
@@ -5535,6 +5552,8 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
 
         let jobs = getOrders().filter(j => j.kategori === mpFleetMode);
 
+        const todayShiftDate = getShiftDateString();
+
         // Filter tanggal HANYA berlaku untuk tab riwayat (COMPLETED & CANCELED)
         // Untuk tab ON PROGRESS & PENDING: TIDAK ADA filter tanggal sehingga semua job selalu tampil penuh
         const isHistoryPanel = (currentMpPanel === 'COMPLETED' || currentMpPanel === 'CANCELED');
@@ -5543,22 +5562,16 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
                 const opDate = getJobOperationalDate(j);
                 return opDate >= tglMulai && opDate <= tglSelesai;
             });
+        } else if (currentMpPanel === 'ON PROGRESS') {
+            // KHUSUS ON PROGRESS: Hanya tampilkan pekerjaan hari ini atau hari sebelumnya (<= hari ini)
+            // Pekerjaan yang dijadwalkan untuk esok hari atau tanggal mendatang otomatis disembunyikan sampai harinya tiba
+            jobs = jobs.filter(j => {
+                const opDate = getJobOperationalDate(j);
+                return !opDate || opDate <= todayShiftDate;
+            });
         }
         
-        // Khusus tab ON PROGRESS (Progres Pekerjaan): Hanya tampilkan job dengan tanggal hari ini atau sebelumnya (<= hari ini)
-        // Job dengan tanggal masa depan (besok/lusa) disembunyikan sampai tanggal operasionalnya tiba
-        const todayShiftDate = getShiftDateString();
-        if (currentMpPanel === 'ON PROGRESS') {
-            jobs = jobs.filter(j => {
-                if (j.status !== 'ON PROGRESS') return false;
-                const opDate = getJobOperationalDate(j);
-                return opDate ? opDate <= todayShiftDate : true;
-            });
-        } else if (currentMpPanel === 'PENDING') {
-            jobs = jobs.filter(j => j.status === 'PENDING');
-        } else {
-            jobs = jobs.filter(j => j.status === currentMpPanel);
-        }
+        if (currentMpPanel === 'PENDING') jobs = jobs.filter(j => j.status === 'PENDING'); else jobs = jobs.filter(j => j.status === currentMpPanel);
         if (mpFleetMode === 'Crane Truck' && filterUnit !== 'ALL') jobs = jobs.filter(j => j.unit === filterUnit);
 
         let unitFilterHtml = mpFleetMode === 'Crane Truck' ? `<select id="mp_filter_unit" onchange="renderApp(true)" class="text-[9px] font-bold bg-white border border-slate-300 text-slate-700 rounded-full px-2 py-1 outline-none shadow-sm focus:border-cyan-500 cursor-pointer ml-auto"><option value="ALL">Semua Unit</option>${unitOptions.map(u => `<option value="${u}" ${filterUnit === u ? 'selected' : ''}>${u}</option>`).join('')}</select>` : '';
@@ -7367,11 +7380,12 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
         try {
             const user = JSON.parse(localStorage.getItem('lifting_user'));
             if (user) {
-                // 1. Pulihkan koneksi Realtime WebSocket jika terputus saat HP dikunci / sleep
-                initSupabaseRealtime();
+                // 1. Pulihkan koneksi Realtime WebSocket hanya jika belum aktif / terputus
+                if (!realtimeChannel || realtimeChannel.state === 'closed' || realtimeChannel.state === 'errored') {
+                    initSupabaseRealtime();
+                }
                 
                 // 2. Tarik langsung data order & status terbaru dari database Supabase
-                // fetchFromSupabase hanya akan me-render ulang jika data benar-benar berubah
                 await fetchFromSupabase(false);
                 
                 // 3. Perbarui badge indikator notifikasi & periksa pembaruan versi
