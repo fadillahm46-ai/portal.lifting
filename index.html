@@ -1610,6 +1610,84 @@
     let lastFetchTimestamp = Date.now();
 
     /* ========================================================
+       SISTEM PAGINASI DATA ORDER & DETEKSI SCROLL PENGGUNA
+       ======================================================== */
+    const ORDERS_PER_PAGE = 50;
+    let currentOrderPage = 1;
+    let lastUserScrollTime = 0;
+    window.addEventListener('scroll', () => { lastUserScrollTime = Date.now(); }, { capture: true, passive: true });
+
+    function goToOrderPage(p) {
+        currentOrderPage = p;
+        renderApp(true);
+        const tableContainer = document.getElementById('monitoringTableContainer');
+        if (tableContainer) tableContainer.scrollTop = 0;
+        const mainContent = document.getElementById('mainTabContentArea');
+        if (mainContent) mainContent.scrollTop = 0;
+    }
+
+    function generatePaginationButtons(currentPage, totalPages) {
+        let html = '';
+        const maxButtons = 5;
+        let start = Math.max(1, currentPage - Math.floor(maxButtons / 2));
+        let end = Math.min(totalPages, start + maxButtons - 1);
+        if (end - start + 1 < maxButtons) {
+            start = Math.max(1, end - maxButtons + 1);
+        }
+
+        if (start > 1) {
+            html += `<button type="button" onclick="goToOrderPage(1)" class="w-6 h-6 rounded text-[10px] font-bold border border-slate-300 bg-white text-slate-700 hover:bg-cyan-50 hover:text-cyan-700 shadow-2xs cursor-pointer">1</button>`;
+            if (start > 2) {
+                html += `<span class="text-slate-400 text-[10px] px-0.5 font-bold select-none">...</span>`;
+            }
+        }
+
+        for (let i = start; i <= end; i++) {
+            const active = (i === currentPage);
+            html += `
+                <button type="button" onclick="goToOrderPage(${i})" class="w-6 h-6 rounded text-[10px] font-bold border transition-all cursor-pointer ${active ? 'bg-[#0891b2] text-white border-cyan-600 shadow-sm' : 'bg-white text-slate-700 border-slate-300 hover:bg-cyan-50 hover:text-cyan-700 shadow-2xs'}">
+                    ${i}
+                </button>
+            `;
+        }
+
+        if (end < totalPages) {
+            if (end < totalPages - 1) {
+                html += `<span class="text-slate-400 text-[10px] px-0.5 font-bold select-none">...</span>`;
+            }
+            html += `<button type="button" onclick="goToOrderPage(${totalPages})" class="w-6 h-6 rounded text-[10px] font-bold border border-slate-300 bg-white text-slate-700 hover:bg-cyan-50 hover:text-cyan-700 shadow-2xs cursor-pointer">${totalPages}</button>`;
+        }
+        return html;
+    }
+
+    function saveAllScrollPositions() {
+        const scrolls = {};
+        const mainEl = document.getElementById('mainTabContentArea');
+        if (mainEl) scrolls.main = mainEl.scrollTop;
+        const tableEl = document.getElementById('monitoringTableContainer');
+        if (tableEl) {
+            scrolls.tableTop = tableEl.scrollTop;
+            scrolls.tableLeft = tableEl.scrollLeft;
+        }
+        scrolls.windowY = window.pageYOffset || document.documentElement.scrollTop || 0;
+        return scrolls;
+    }
+
+    function restoreAllScrollPositions(scrolls) {
+        if (!scrolls) return;
+        const mainEl = document.getElementById('mainTabContentArea');
+        if (mainEl && scrolls.main !== undefined) mainEl.scrollTop = scrolls.main;
+        const tableEl = document.getElementById('monitoringTableContainer');
+        if (tableEl) {
+            if (scrolls.tableTop !== undefined) tableEl.scrollTop = scrolls.tableTop;
+            if (scrolls.tableLeft !== undefined) tableEl.scrollLeft = scrolls.tableLeft;
+        }
+        if (scrolls.windowY !== undefined) {
+            window.scrollTo(0, scrolls.windowY);
+        }
+    }
+
+    /* ========================================================
        SISTEM PENGATURAN PREFERENSI NOTIFIKASI PENGGUNA
        ======================================================== */
     function getNotificationPrefs() {
@@ -1748,6 +1826,8 @@
 
     function scheduleReRender(isSilentSync = true) {
         if (reRenderTimer) clearTimeout(reRenderTimer);
+        // Tunda render jika pengguna sedang aktif menggeser layar / scroll agar tidak meloncat
+        const delay = (Date.now() - lastUserScrollTime < 1200) ? 1200 : 50;
         reRenderTimer = setTimeout(() => {
             reRenderTimer = null;
             if (currentTab !== 'order' && !isAnyModalOpen()) {
@@ -1755,7 +1835,7 @@
             } else {
                 window._pendingReRender = true;
             }
-        }, 50);
+        }, delay);
     }
 
     function isAnyModalOpen() {
@@ -2491,6 +2571,7 @@
     function saveMasterData(data) { localStorage.setItem('lifting_master_data', JSON.stringify(data)); syncMasterToSupabase(data); }
 
     function handleSort(col) {
+        currentOrderPage = 1;
         if (sortColumn === col) {
             if (sortDirection === 'asc') {
                 // Klik ke-2: Ubah ke Descending
@@ -2523,12 +2604,32 @@
         const input = document.getElementById('orderSearchInput');
         if (input) {
             orderSearchQuery = input.value.trim();
+            currentOrderPage = 1;
             renderApp(true);
         }
     }
 
     function clearOrderSearch() {
         orderSearchQuery = '';
+        currentOrderPage = 1;
+        renderApp(true);
+    }
+
+    function resetMonitoringFilter() {
+        const elStart = document.getElementById('filter_tgl_mulai');
+        const elEnd = document.getElementById('filter_tgl_selesai');
+        if (elStart) elStart.value = '';
+        if (elEnd) elEnd.value = '';
+        const elShift = document.getElementById('filter_shift');
+        if (elShift) elShift.value = 'ALL';
+        const elCat = document.getElementById('filter_admin_kategori');
+        if (elCat) elCat.value = 'ALL';
+        orderSearchQuery = '';
+        const elSearch = document.getElementById('orderSearchInput');
+        if (elSearch) elSearch.value = '';
+        sortColumn = null;
+        sortDirection = null;
+        currentOrderPage = 1;
         renderApp(true);
     }
 
@@ -2773,8 +2874,8 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
                 return;
             }
 
-            // Pertahankan posisi scroll pengguna saat data baru masuk
-            const savedScrollTop = mainContentEl.scrollTop;
+            // Pertahankan posisi scroll pengguna secara presisi (kontainer utama & tabel monitoring)
+            const scrolls = saveAllScrollPositions();
 
             let tabContentHtml = '';
             if (currentTab === 'dashboard') {
@@ -2792,7 +2893,8 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
             }
 
             mainContentEl.innerHTML = tabContentHtml;
-            mainContentEl.scrollTop = savedScrollTop;
+            restoreAllScrollPositions(scrolls);
+            requestAnimationFrame(() => restoreAllScrollPositions(scrolls));
 
             setTimeout(() => {
                 mainContentEl.querySelectorAll('.chart-bar').forEach(bar => {
@@ -3291,6 +3393,7 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
         if (currentTab !== tab) {
             window._isUserTabSwitch = true;
         }
+        currentOrderPage = 1;
         if(tab === 'order') {
             const draft = getOrderDraft();
             if (draft && draft.fleetMode) {
@@ -4611,37 +4714,37 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
         let pieStyle = `background: conic-gradient(#0d9488 0deg ${degCT}deg, #4ade80 ${degCT}deg ${degBC}deg, #a7f3d0 ${degBC}deg 360deg);`;
 
         return `
-        <div id="dashboardCaptureArea" class="w-full space-y-3 relative z-10">
+        <div id="dashboardCaptureArea" class="w-full space-y-3.5 relative z-10">
             <!-- Header Simetris: Kiri Judul, Sync & Download, Kanan Filter Terpadu -->
-            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                <div class="flex items-center gap-2 flex-wrap">
-                    <h2 class="text-sm font-bold text-slate-800 shrink-0 flex items-center gap-1.5">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2.5">
+                <div class="flex items-center gap-2.5 flex-wrap">
+                    <h2 class="text-base sm:text-lg font-black text-slate-800 shrink-0 flex items-center gap-2">
                         <i class="fa-solid fa-chart-pie text-cyan-600"></i> Dashboard Analytics
                     </h2>
-                    <button onclick="fetchFromSupabase(true)" class="dashboard-no-export bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-600 font-bold px-2 py-0.5 rounded text-[9px] flex items-center gap-1 transition-colors shadow-2xs cursor-pointer">
+                    <button onclick="fetchFromSupabase(true)" class="dashboard-no-export bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-600 font-bold px-2.5 py-1 rounded-md text-[10px] flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer">
                         <i class="fa-solid fa-rotate"></i> Refresh Sync
                     </button>
-                    <button id="btnDownloadKPI" onclick="downloadDashboardForPPT()" class="dashboard-no-export bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2.5 py-0.5 rounded text-[9px] flex items-center gap-1 transition-colors shadow-2xs cursor-pointer" title="Download Screenshot HD untuk Presentasi Slide PPT">
+                    <button id="btnDownloadKPI" onclick="downloadDashboardForPPT()" class="dashboard-no-export bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1 rounded-md text-[10px] flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer" title="Download Screenshot HD untuk Presentasi Slide PPT">
                         <i class="fa-solid fa-file-powerpoint"></i> Download KPI (PPT)
                     </button>
                 </div>
                 
-                <div class="flex items-center text-[10px] gap-1.5 flex-wrap">
+                <div class="flex items-center text-xs sm:text-[13px] gap-2 flex-wrap">
                     <!-- Filter Rentang Tanggal Bentuk Pill: Dari & Ke -->
-                    <div class="flex items-center bg-white border border-slate-200 rounded-full px-3 py-1 shadow-2xs shrink-0">
-                        <span class="text-[10px] text-slate-500 font-medium mr-1.5 select-none">Dari:</span>
-                        <input type="date" id="dash_tgl_mulai" class="bg-transparent text-slate-700 font-semibold focus:outline-none text-[10px] cursor-pointer" value="${tglMulai}" onchange="renderApp(true)">
+                    <div class="flex items-center bg-white border border-slate-200 rounded-full px-3.5 py-1.5 shadow-2xs shrink-0">
+                        <span class="text-xs text-slate-500 font-bold mr-1.5 select-none">Dari:</span>
+                        <input type="date" id="dash_tgl_mulai" class="bg-transparent text-slate-800 font-bold focus:outline-none text-xs cursor-pointer" value="${tglMulai}" onchange="renderApp(true)">
                     </div>
-                    <div class="flex items-center bg-white border border-slate-200 rounded-full px-3 py-1 shadow-2xs shrink-0">
-                        <span class="text-[10px] text-slate-500 font-medium mr-1.5 select-none">Ke:</span>
-                        <input type="date" id="dash_tgl_selesai" class="bg-transparent text-slate-700 font-semibold focus:outline-none text-[10px] cursor-pointer" value="${tglSelesai}" onchange="renderApp(true)">
+                    <div class="flex items-center bg-white border border-slate-200 rounded-full px-3.5 py-1.5 shadow-2xs shrink-0">
+                        <span class="text-xs text-slate-500 font-bold mr-1.5 select-none">Ke:</span>
+                        <input type="date" id="dash_tgl_selesai" class="bg-transparent text-slate-800 font-bold focus:outline-none text-xs cursor-pointer" value="${tglSelesai}" onchange="renderApp(true)">
                     </div>
-                    <button type="button" onclick="resetDashFilter()" class="dashboard-no-export w-7 h-7 rounded-full bg-white border border-slate-200 hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-700 transition-colors shadow-2xs shrink-0 cursor-pointer" title="Reset Filter Tanggal">
-                        <i class="fa-solid fa-rotate-left text-[10px]"></i>
+                    <button type="button" onclick="resetDashFilter()" class="dashboard-no-export w-8 h-8 rounded-full bg-white border border-slate-200 hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-800 transition-colors shadow-2xs shrink-0 cursor-pointer" title="Reset Filter Tanggal">
+                        <i class="fa-solid fa-rotate-left text-xs"></i>
                     </button>
                     
                     <div class="flex items-center">
-                        <select id="dash_shift" class="bg-white border border-slate-200 rounded-full px-3 py-1 text-slate-700 font-semibold focus:outline-none cursor-pointer shadow-2xs" onchange="renderApp(true)">
+                        <select id="dash_shift" class="bg-white border border-slate-200 rounded-full px-3.5 py-1.5 text-slate-800 font-bold focus:outline-none cursor-pointer shadow-2xs text-xs" onchange="renderApp(true)">
                             <option value="ALL" ${dashShift==='ALL'?'selected':''}>All Shift</option>
                             <option value="Shift 1" ${dashShift==='Shift 1'?'selected':''}>Shift 1</option>
                             <option value="Shift 2" ${dashShift==='Shift 2'?'selected':''}>Shift 2</option>
@@ -4649,7 +4752,7 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
                     </div>
                     
                     <div class="flex items-center">
-                        <select id="dash_unit" class="bg-white border border-slate-200 rounded-full px-3 py-1 text-slate-700 font-semibold focus:outline-none cursor-pointer shadow-2xs" onchange="renderApp(true)">
+                        <select id="dash_unit" class="bg-white border border-slate-200 rounded-full px-3.5 py-1.5 text-slate-800 font-bold focus:outline-none cursor-pointer shadow-2xs text-xs" onchange="renderApp(true)">
                             <option value="ALL" ${dashUnit==='ALL'?'selected':''}>Semua Armada</option>
                             <option value="Crane Truck" ${dashUnit==='Crane Truck'?'selected':''}>Crane Truck</option>
                             <option value="Big Crane" ${dashUnit==='Big Crane'?'selected':''}>Big Crane</option>
@@ -4659,68 +4762,68 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
                 </div>
             </div>
 
-            <!-- Baris 5 Kartu Status Simetris -->
-            <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 relative z-0">
-                <div class="bg-slate-50 border border-slate-200 rounded-xl p-3.5 shadow-sm relative overflow-hidden flex flex-col justify-start">
-                    <div class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 relative z-10">Total Order</div>
-                    <div class="text-3xl font-black text-slate-700 relative z-10 leading-none">${cntOrder}</div>
+            <!-- Baris 5 Kartu Status Simetris (Ukuran Teks & Angka Lebih Besar) -->
+            <div class="grid grid-cols-2 sm:grid-cols-5 gap-3.5 relative z-0">
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 shadow-sm relative overflow-hidden flex flex-col justify-start">
+                    <div class="text-[11px] sm:text-xs font-black text-slate-500 uppercase tracking-widest mb-1 relative z-10">Total Order</div>
+                    <div class="text-3xl sm:text-4xl font-black text-slate-800 relative z-10 leading-none">${cntOrder}</div>
                     <i class="fa-solid fa-file-invoice absolute -bottom-3 -right-2 text-6xl text-slate-300 opacity-20 rotate-[-10deg]"></i>
                 </div>
-                <div class="bg-blue-50 border border-blue-100 rounded-xl p-3.5 shadow-sm relative overflow-hidden flex flex-col justify-start">
-                    <div class="text-[9px] font-black text-blue-600 uppercase tracking-widest mb-1 relative z-10">ON PROGRESS</div>
-                    <div class="text-3xl font-black text-blue-700 relative z-10 leading-none">${cntProg}</div>
+                <div class="bg-blue-50 border border-blue-100 rounded-xl p-4 shadow-sm relative overflow-hidden flex flex-col justify-start">
+                    <div class="text-[11px] sm:text-xs font-black text-blue-600 uppercase tracking-widest mb-1 relative z-10">ON PROGRESS</div>
+                    <div class="text-3xl sm:text-4xl font-black text-blue-700 relative z-10 leading-none">${cntProg}</div>
                     <i class="fa-solid fa-arrows-rotate absolute -bottom-3 -right-2 text-6xl text-blue-500 opacity-10"></i>
                 </div>
-                <div class="bg-orange-50 border border-orange-100 rounded-xl p-3.5 shadow-sm relative overflow-hidden flex flex-col justify-start">
-                    <div class="text-[9px] font-black text-orange-600 uppercase tracking-widest mb-1 relative z-10">PENDING</div>
-                    <div class="text-3xl font-black text-orange-700 relative z-10 leading-none">${cntPend}</div>
+                <div class="bg-orange-50 border border-orange-100 rounded-xl p-4 shadow-sm relative overflow-hidden flex flex-col justify-start">
+                    <div class="text-[11px] sm:text-xs font-black text-orange-600 uppercase tracking-widest mb-1 relative z-10">PENDING</div>
+                    <div class="text-3xl sm:text-4xl font-black text-orange-700 relative z-10 leading-none">${cntPend}</div>
                     <i class="fa-solid fa-clock absolute -bottom-3 -right-2 text-6xl text-orange-500 opacity-10"></i>
                 </div>
-                <div class="bg-emerald-50 border border-emerald-100 rounded-xl p-3.5 shadow-sm relative overflow-hidden flex flex-col justify-start">
-                    <div class="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-1 relative z-10">COMPLETED</div>
-                    <div class="text-3xl font-black text-emerald-700 relative z-10 leading-none">${cntDone}</div>
+                <div class="bg-emerald-50 border border-emerald-100 rounded-xl p-4 shadow-sm relative overflow-hidden flex flex-col justify-start">
+                    <div class="text-[11px] sm:text-xs font-black text-emerald-600 uppercase tracking-widest mb-1 relative z-10">COMPLETED</div>
+                    <div class="text-3xl sm:text-4xl font-black text-emerald-700 relative z-10 leading-none">${cntDone}</div>
                     <i class="fa-solid fa-circle-check absolute -bottom-3 -right-2 text-6xl text-emerald-500 opacity-10"></i>
                 </div>
-                <div class="bg-red-50 border border-red-100 rounded-xl p-3.5 shadow-sm relative overflow-hidden flex flex-col justify-start col-span-2 sm:col-span-1">
-                    <div class="text-[9px] font-black text-red-600 uppercase tracking-widest mb-1 relative z-10">CANCELED</div>
-                    <div class="text-3xl font-black text-red-700 relative z-10 leading-none">${cntCancel}</div>
+                <div class="bg-red-50 border border-red-100 rounded-xl p-4 shadow-sm relative overflow-hidden flex flex-col justify-start col-span-2 sm:col-span-1">
+                    <div class="text-[11px] sm:text-xs font-black text-red-600 uppercase tracking-widest mb-1 relative z-10">CANCELED</div>
+                    <div class="text-3xl sm:text-4xl font-black text-red-700 relative z-10 leading-none">${cntCancel}</div>
                     <i class="fa-solid fa-xmark absolute -bottom-3 -right-2 text-6xl text-red-500 opacity-10"></i>
                 </div>
             </div>
 
-            <!-- Kartu Data Perusahaan & Dept Plant Sejajar & Simetris -->
-            <div class="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
-                <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+            <!-- Kartu Data Perusahaan & Dept Plant Sejajar & Simetris (Teks Jauh Lebih Besar & Kontras) -->
+            <div class="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 shadow-sm">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                     <!-- Kolom 1: Donut Chart -->
                     <div class="lg:col-span-4 xl:col-span-3 flex flex-col items-center justify-start">
-                        <h3 class="text-xs font-bold text-slate-700 mb-2 w-full text-left">Data Perusahaan</h3>
-                        <div class="relative h-48 w-48 sm:h-52 sm:w-52 flex items-center justify-center my-auto">
+                        <h3 class="text-sm sm:text-base font-black text-slate-800 mb-3 w-full text-left">Data Perusahaan</h3>
+                        <div class="relative h-52 w-52 sm:h-60 sm:w-60 flex items-center justify-center my-auto">
                             <canvas id="companyDonutChart"></canvas>
                         </div>
                     </div>
                     
                     <!-- Kolom 2 & 3: Rincian Perusahaan & Dept Plant Sejajar (50% / 50%) -->
-                    <div class="lg:col-span-8 xl:col-span-9 grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                    <div class="lg:col-span-8 xl:col-span-9 grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
                         <!-- Rincian Perusahaan -->
                         <div class="flex flex-col justify-start">
-                            <div class="grid grid-cols-12 text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase border-b border-slate-100 pb-1.5 mb-2 select-none tracking-wider">
+                            <div class="grid grid-cols-12 text-[11px] sm:text-xs font-black text-slate-500 uppercase border-b-2 border-slate-200 pb-2 mb-2 select-none tracking-wider">
                                 <span class="col-span-4 text-left">PERUSAHAAN</span>
                                 <span class="col-span-2 text-center">PERSENTASE</span>
                                 <span class="col-span-3 text-right">TOTAL JAM</span>
                                 <span class="col-span-3 text-right">TOTAL ORDER</span>
                             </div>
-                            <div class="flex flex-col gap-1.5 hide-scrollbar overflow-y-auto max-h-72" id="legendCompanyContainer"></div>
+                            <div class="flex flex-col gap-1 hide-scrollbar overflow-y-auto max-h-80" id="legendCompanyContainer"></div>
                         </div>
                         
                         <!-- Rincian Dept Plant Bergaris Pemisah Sejajar -->
-                        <div class="md:border-l border-slate-100 md:pl-4 flex flex-col justify-start">
-                            <div class="grid grid-cols-12 text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase border-b border-slate-100 pb-1.5 mb-2 select-none tracking-wider">
-                                <span class="col-span-4 text-left text-blue-600 font-extrabold">DEPT PLANT</span>
+                        <div class="md:border-l-2 border-slate-100 md:pl-6 flex flex-col justify-start">
+                            <div class="grid grid-cols-12 text-[11px] sm:text-xs font-black text-slate-500 uppercase border-b-2 border-slate-200 pb-2 mb-2 select-none tracking-wider">
+                                <span class="col-span-4 text-left text-blue-600 font-black">DEPT PLANT</span>
                                 <span class="col-span-2 text-center">PERSENTASE</span>
                                 <span class="col-span-3 text-right">TOTAL JAM</span>
                                 <span class="col-span-3 text-right">TOTAL ORDER</span>
                             </div>
-                            <div class="flex flex-col gap-1.5 hide-scrollbar overflow-y-auto max-h-72">
+                            <div class="flex flex-col gap-1 hide-scrollbar overflow-y-auto max-h-80">
                                 ${(() => {
                                     let plantStats = {};
                                     filteredJobs.forEach(j => {
@@ -4732,16 +4835,16 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
                                         }
                                     });
                                     let plantArray = Object.entries(plantStats).sort((a,b) => b[1].count - a[1].count);
-                                    if(plantArray.length === 0) return '<div class="text-[10px] text-slate-400 italic py-2">Tidak ada order dari Dept Plant hari ini.</div>';
+                                    if(plantArray.length === 0) return '<div class="text-xs sm:text-[13px] text-slate-400 italic py-3">Tidak ada order dari Dept Plant hari ini.</div>';
                                     let totalPlantJobs = plantArray.reduce((sum, item) => sum + item[1].count, 0) || 1;
                                     return plantArray.map(item => {
                                         let pct = Math.round((item[1].count / totalPlantJobs) * 100);
                                         return `
-                                        <div class="grid grid-cols-12 text-[10px] items-center py-1 border-b border-slate-50">
-                                            <div class="col-span-4 font-semibold text-slate-700 truncate pr-1" title="${item[0]}">${item[0]}</div>
-                                            <div class="col-span-2 text-slate-500 text-center font-medium">${pct}%</div>
-                                            <div class="col-span-3 text-slate-600 font-semibold text-right pr-1">${item[1].hours.toFixed(1)}J</div>
-                                            <div class="col-span-3 text-slate-600 font-semibold text-right">${item[1].count} Job</div>
+                                        <div class="grid grid-cols-12 text-xs sm:text-[13px] items-center py-1.5 border-b border-slate-100 hover:bg-slate-50/90 transition-colors">
+                                            <div class="col-span-4 font-black text-slate-800 truncate pr-1" title="${item[0]}">${item[0]}</div>
+                                            <div class="col-span-2 text-slate-600 text-center font-extrabold">${pct}%</div>
+                                            <div class="col-span-3 text-slate-800 font-black text-right pr-1">${item[1].hours.toFixed(1)}J</div>
+                                            <div class="col-span-3 text-slate-800 font-black text-right">${item[1].count} Job</div>
                                         </div>`;
                                     }).join('');
                                 })()}
@@ -4752,43 +4855,61 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
             </div>
 
             <!-- Baris 2 Grafik Berdampingan 50% / 50% -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                <div class="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm flex flex-col">
-                    <h3 class="text-xs font-bold text-slate-700 mb-2">Weekly Trend Order (vs Minggu Lalu)</h3>
-                    <div class="relative h-52 w-full"><canvas id="lineChart"></canvas></div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
+                <div class="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 shadow-sm flex flex-col">
+                    <h3 class="text-sm sm:text-base font-black text-slate-800 mb-3">Weekly Trend Order (vs Minggu Lalu)</h3>
+                    <div class="relative h-60 w-full"><canvas id="lineChart"></canvas></div>
                 </div>
-                <div class="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm flex flex-col">
-                    <h3 class="text-xs font-bold text-slate-700 mb-2 uppercase">DEPARTEMENT ORDER</h3>
-                    <div class="relative h-52 w-full"><canvas id="deptOrderChart"></canvas></div>
+                <div class="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 shadow-sm flex flex-col">
+                    <h3 class="text-sm sm:text-base font-black text-slate-800 mb-3 uppercase">DEPARTEMENT ORDER</h3>
+                    <div class="relative h-60 w-full"><canvas id="deptOrderChart"></canvas></div>
                 </div>
             </div>
 
             <!-- Baris Distribusi Unit & Scheduled vs Unscheduled -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                <div class="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm flex flex-col sm:flex-row items-center justify-center gap-4">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
+                <div class="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 shadow-sm flex flex-col sm:flex-row items-center justify-center gap-6">
                     <div class="w-full sm:w-auto">
-                        <h3 class="text-xs font-bold text-slate-700 mb-3 text-center sm:text-left uppercase">Distribusi & Total Unit</h3>
+                        <h3 class="text-sm sm:text-base font-black text-slate-800 mb-3 text-center sm:text-left uppercase">Distribusi & Total Unit</h3>
                         ${totalUnits > 1 ? `
-                        <div class="w-24 h-24 sm:w-28 sm:h-28 rounded-full shadow-inner mx-auto sm:mx-0" style="${pieStyle}"></div>
+                        <div class="w-28 h-28 sm:w-32 sm:h-32 rounded-full shadow-inner mx-auto sm:mx-0" style="${pieStyle}"></div>
                     </div>
-                    <div class="w-full sm:w-auto flex-1 space-y-2 text-[10px] font-semibold text-slate-600">
-                        <div class="flex justify-between items-center bg-slate-50 p-2 rounded-lg border border-slate-100"><div class="flex items-center gap-2"><div class="w-3 h-3 rounded-sm bg-[#0d9488]"></div>Crane Truck</div><span class="text-slate-800">${pctCT}% <span class="text-slate-400 font-normal">(${cntCT} Order)</span></span></div>
-                        <div class="flex justify-between items-center bg-slate-50 p-2 rounded-lg border border-slate-100"><div class="flex items-center gap-2"><div class="w-3 h-3 rounded-sm bg-[#4ade80]"></div>Big Crane</div><span class="text-slate-800">${pctBC}% <span class="text-slate-400 font-normal">(${cntBC} Order)</span></span></div>
-                        <div class="flex justify-between items-center bg-slate-50 p-2 rounded-lg border border-slate-100"><div class="flex items-center gap-2"><div class="w-3 h-3 rounded-sm bg-[#a7f3d0]"></div>Lowboy</div><span class="text-slate-800">${pctLB}% <span class="text-slate-400 font-normal">(${cntLB} Order)</span></span></div>
+                    <div class="w-full sm:w-auto flex-1 space-y-2.5 text-xs sm:text-sm font-semibold text-slate-600">
+                        <div class="flex justify-between items-center bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                            <div class="flex items-center gap-2">
+                                <div class="w-3.5 h-3.5 rounded-sm bg-[#0d9488]"></div>
+                                <span class="font-bold text-slate-700">Crane Truck</span>
+                            </div>
+                            <span class="text-slate-800 font-black">${pctCT}% <span class="text-slate-400 font-medium">(${cntCT} Order)</span></span>
+                        </div>
+                        <div class="flex justify-between items-center bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                            <div class="flex items-center gap-2">
+                                <div class="w-3.5 h-3.5 rounded-sm bg-[#4ade80]"></div>
+                                <span class="font-bold text-slate-700">Big Crane</span>
+                            </div>
+                            <span class="text-slate-800 font-black">${pctBC}% <span class="text-slate-400 font-medium">(${cntBC} Order)</span></span>
+                        </div>
+                        <div class="flex justify-between items-center bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                            <div class="flex items-center gap-2">
+                                <div class="w-3.5 h-3.5 rounded-sm bg-[#a7f3d0]"></div>
+                                <span class="font-bold text-slate-700">Lowboy</span>
+                            </div>
+                            <span class="text-slate-800 font-black">${pctLB}% <span class="text-slate-400 font-medium">(${cntLB} Order)</span></span>
+                        </div>
                     </div>
-                    ` : `<div class="text-[9px] text-slate-400 italic my-auto mx-auto">Data kosong</div></div>`}
+                    ` : `<div class="text-xs text-slate-400 italic my-auto mx-auto">Data kosong</div></div>`}
                 </div>
                 
-                <div class="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm flex flex-col">
-                    <h3 class="text-xs font-bold text-slate-700 mb-2 uppercase">Scheduled vs Unscheduled</h3>
-                    <div class="relative h-40 w-full"><canvas id="schedChart"></canvas></div>
+                <div class="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 shadow-sm flex flex-col">
+                    <h3 class="text-sm sm:text-base font-black text-slate-800 mb-3 uppercase">Scheduled vs Unscheduled</h3>
+                    <div class="relative h-48 w-full"><canvas id="schedChart"></canvas></div>
                 </div>
             </div>
 
             <!-- Baris Performa Rigger Full Width -->
-            <div class="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm flex flex-col w-full">
-                <h3 class="text-xs font-bold text-slate-700 mb-2 uppercase">Performa Rigger (Total Jam Kerja)</h3>
-                <div class="relative h-64 w-full"><canvas id="riggerChart"></canvas></div>
+            <div class="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 shadow-sm flex flex-col w-full">
+                <h3 class="text-sm sm:text-base font-black text-slate-800 mb-3 uppercase">Performa Rigger (Total Jam Kerja)</h3>
+                <div class="relative h-68 w-full"><canvas id="riggerChart"></canvas></div>
             </div>
             
         </div>`;
@@ -4864,8 +4985,8 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
             options: {
                 animation: false,
                 indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { position: 'bottom', labels: { font: { size: 9, family: "'Inter', sans-serif" }, usePointStyle: true, boxWidth: 8 } }, tooltip: { callbacks: { label: function(context) { return context.dataset.label + ': ' + context.parsed.x + '%'; } } } },
-                scales: { x: { stacked: true, max: 100, ticks: { font: { size: 9 }, callback: function(value){return value+"%"} }, grid: { color: '#f1f5f9' } }, y: { stacked: true, ticks: { font: { size: 10, weight: 'bold' } }, grid: { display: false } } }
+                plugins: { legend: { position: 'bottom', labels: { font: { size: 12, weight: 'bold', family: "'Inter', sans-serif" }, usePointStyle: true, boxWidth: 10 } }, tooltip: { callbacks: { label: function(context) { return context.dataset.label + ': ' + context.parsed.x + '%'; } } } },
+                scales: { x: { stacked: true, max: 100, ticks: { font: { size: 11, weight: 'bold' }, callback: function(value){return value+"%"} }, grid: { color: '#f1f5f9' } }, y: { stacked: true, ticks: { font: { size: 12, weight: 'bold' } }, grid: { display: false } } }
             }
         });
 
@@ -4883,15 +5004,15 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
             data: {
                 labels: labels,
                 datasets: [
-                    { label: 'Minggu Ini', data: dataThisWeek, borderColor: '#0891b2', backgroundColor: 'rgba(8, 145, 178, 0.1)', tension: 0.4, fill: true, borderWidth: 2, pointBackgroundColor: '#fff', pointBorderColor: '#0891b2', pointBorderWidth: 2 },
+                    { label: 'Minggu Ini', data: dataThisWeek, borderColor: '#0891b2', backgroundColor: 'rgba(8, 145, 178, 0.1)', tension: 0.4, fill: true, borderWidth: 2.5, pointBackgroundColor: '#fff', pointBorderColor: '#0891b2', pointBorderWidth: 2.5, pointRadius: 4 },
                     { label: 'Minggu Lalu', data: dataLastWeek, borderColor: '#94a3b8', borderDash: [5, 5], tension: 0.4, fill: false, borderWidth: 2, pointRadius: 0 }
                 ]
             },
             options: {
                 animation: false,
                 responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
-                plugins: { legend: { labels: { font: { size: 10, family: "'Inter', sans-serif" }, usePointStyle: true, boxWidth: 8 } } },
-                scales: { y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 9 } }, grid: { color: '#f1f5f9' } }, x: { ticks: { font: { size: 9 } }, grid: { display: false } } }
+                plugins: { legend: { labels: { font: { size: 12, weight: 'bold', family: "'Inter', sans-serif" }, usePointStyle: true, boxWidth: 10 } } },
+                scales: { y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 11, weight: 'bold' } }, grid: { color: '#f1f5f9' } }, x: { ticks: { font: { size: 11, weight: 'bold' } }, grid: { display: false } } }
             }
         });
         
@@ -4913,7 +5034,7 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
             window.dashSchedChart = new Chart(ctxSched, {
                 type: 'bar',
                 data: { labels: ['SCH', 'UNSCH'], datasets: [{ data: [schedCount, unschedCount], backgroundColor: ['#10b981', '#f43f5e'], borderRadius: 4 }] },
-                options: { animation: false, indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 9 } }, grid: { color: '#f1f5f9' } }, y: { ticks: { font: { size: 9, weight: 'bold' } }, grid: { display: false } } } }
+                options: { animation: false, indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 11, weight: 'bold' } }, grid: { color: '#f1f5f9' } }, y: { ticks: { font: { size: 12, weight: 'black' } }, grid: { display: false } } } }
             });
         }
 
@@ -4938,7 +5059,7 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
             window.dashRiggerChart = new Chart(ctxRigger, {
                 type: 'bar',
                 data: { labels: rLabels, datasets: [{ label: 'Crane Truck', data: rDataCT, backgroundColor: '#0d9488' }, { label: 'Big Crane', data: rDataBC, backgroundColor: '#4ade80' }, { label: 'Lowboy', data: rDataLB, backgroundColor: '#a7f3d0' }] },
-                options: { animation: false, responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 9, family: "'Inter', sans-serif" }, usePointStyle: true, boxWidth: 8 } } }, scales: { x: { stacked: true, ticks: { font: { size: 9 } }, grid: { display: false } }, y: { stacked: true, ticks: { font: { size: 9 } }, grid: { color: '#f1f5f9' } } } }
+                options: { animation: false, responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 12, weight: 'bold', family: "'Inter', sans-serif" }, usePointStyle: true, boxWidth: 10 } } }, scales: { x: { stacked: true, ticks: { font: { size: 11, weight: 'bold' } }, grid: { display: false } }, y: { stacked: true, ticks: { font: { size: 11, weight: 'bold' } }, grid: { color: '#f1f5f9' } } } }
             });
         }
 
@@ -4987,19 +5108,19 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
                 if (!cColors[cName] && !cObj.isOther) idxColor++;
 
                 companyLegendHtml += `
-                    <div class="grid grid-cols-12 text-[10px] items-center py-1 border-b border-slate-50">
-                        <div class="col-span-4 flex items-center gap-1.5 truncate pr-1">
-                            <div class="w-2.5 h-2.5 rounded-sm shrink-0" style="background-color: ${color}"></div>
-                            <span class="font-semibold ${cObj.isOther ? 'text-slate-500 italic' : 'text-slate-700'} truncate" title="${cName}">${cName}</span>
+                    <div class="grid grid-cols-12 text-xs sm:text-[13px] items-center py-1.5 border-b border-slate-100 hover:bg-slate-50/90 transition-colors">
+                        <div class="col-span-4 flex items-center gap-2 truncate pr-1">
+                            <div class="w-3.5 h-3.5 rounded-sm shrink-0" style="background-color: ${color}"></div>
+                            <span class="font-black ${cObj.isOther ? 'text-slate-500 italic' : 'text-slate-800'} truncate" title="${cName}">${cName}</span>
                         </div>
-                        <div class="col-span-2 text-slate-500 text-center font-medium">${pct}%</div>
-                        <div class="col-span-3 text-slate-600 font-semibold text-right pr-1">${cObj.hours.toFixed(1)}J</div>
-                        <div class="col-span-3 text-slate-600 font-semibold text-right">${cObj.count} Job</div>
+                        <div class="col-span-2 text-slate-600 text-center font-extrabold">${pct}%</div>
+                        <div class="col-span-3 text-slate-800 font-black text-right pr-1">${cObj.hours.toFixed(1)}J</div>
+                        <div class="col-span-3 text-slate-800 font-black text-right">${cObj.count} Job</div>
                     </div>`;
             });
 
             if(!companyLegendHtml) {
-                companyLegendHtml = '<div class="text-[10px] text-slate-400 italic py-2">Data kosong</div>';
+                companyLegendHtml = '<div class="text-xs sm:text-[13px] text-slate-400 italic py-3">Data kosong</div>';
             }
             document.getElementById('legendCompanyContainer').innerHTML = companyLegendHtml;
 
@@ -5348,6 +5469,15 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
 
             let pendingCount = jobs.filter(j => j.status === 'SCHEDULED' || j.status === 'UNSCHEDULED' || (j.status === 'PENDING' && (!j.gl || !j.operator || !j.rigger))).length;
 
+            // Kalkulasi Paginasi (> 50 Order)
+            const totalJobsCount = jobs.length;
+            const totalPages = Math.ceil(totalJobsCount / ORDERS_PER_PAGE) || 1;
+            if (currentOrderPage > totalPages) currentOrderPage = totalPages;
+            if (currentOrderPage < 1) currentOrderPage = 1;
+            const startIndex = (currentOrderPage - 1) * ORDERS_PER_PAGE;
+            const endIndex = Math.min(startIndex + ORDERS_PER_PAGE, totalJobsCount);
+            const displayedJobs = totalJobsCount > ORDERS_PER_PAGE ? jobs.slice(startIndex, endIndex) : jobs;
+
             // Daftar unit armada master
             const m = getMasterData();
             let allUnitsList = [];
@@ -5368,7 +5498,7 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
                             <h2 class="text-sm font-bold text-slate-800 tracking-tight flex items-center gap-1.5">
                                 <i class="fa-solid fa-database text-cyan-600"></i> Data Order
                             </h2>
-                            <button onclick="fetchFromSupabase(true)" class="bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-600 font-bold px-2 py-0.5 rounded text-[9px] flex items-center gap-1 transition-colors shadow-2xs">
+                            <button onclick="fetchFromSupabase(true)" class="bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-600 font-bold px-2 py-0.5 rounded text-[9px] flex items-center gap-1 transition-colors shadow-2xs cursor-pointer">
                                 <i class="fa-solid fa-rotate"></i> Sync
                             </button>
                         </div>
@@ -5376,7 +5506,7 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
                             <div class="bg-red-50 text-red-600 border border-red-200 px-2 py-0.5 rounded font-bold text-[10px] shadow-2xs" title="Order Butuh Validasi / Penugasan">
                                 <i class="fa-solid fa-bell mr-0.5"></i> Validasi: ${pendingCount}
                             </div>
-                            <button onclick="downloadCSVBlob()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2.5 py-1 rounded text-[10px] transition-colors flex items-center gap-1.5 shadow-sm">
+                            <button onclick="downloadCSVBlob()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2.5 py-1 rounded text-[10px] transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer">
                                 <i class="fa-solid fa-file-excel"></i> Export
                             </button>
                         </div>
@@ -5399,13 +5529,13 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
                                     onkeydown="if(event.key === 'Enter') executeOrderSearch();"
                                 >
                                 ${orderSearchQuery ? `
-                                <button onclick="clearOrderSearch()" class="px-2 text-slate-400 hover:text-slate-600 text-xs" title="Hapus pencarian">
+                                <button onclick="clearOrderSearch()" class="px-2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer" title="Hapus pencarian">
                                     <i class="fa-solid fa-times"></i>
                                 </button>` : ''}
                                 <button 
                                     type="button" 
                                     onclick="executeOrderSearch()" 
-                                    class="bg-teal-600 hover:bg-teal-700 text-white font-bold px-4 py-1.5 text-xs transition-colors flex items-center justify-center shrink-0"
+                                    class="bg-teal-600 hover:bg-teal-700 text-white font-bold px-4 py-1.5 text-xs transition-colors flex items-center justify-center shrink-0 cursor-pointer"
                                 >
                                     Search
                                 </button>
@@ -5417,25 +5547,25 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
                             <!-- Filter Rentang Tanggal Jadwal Planning: Dari & Ke -->
                             <div class="flex items-center bg-white border border-slate-200 rounded-full px-3 py-1 shadow-2xs shrink-0" title="Filter Jadwal Planning">
                                 <span class="text-[10px] text-slate-500 font-medium mr-1.5 select-none">Jadwal:</span>
-                                <input type="date" id="filter_tgl_mulai" class="bg-transparent text-slate-700 font-semibold focus:outline-none text-[10px] cursor-pointer" value="${tglMulai}" onchange="renderApp(true)">
+                                <input type="date" id="filter_tgl_mulai" class="bg-transparent text-slate-700 font-semibold focus:outline-none text-[10px] cursor-pointer" value="${tglMulai}" onchange="currentOrderPage=1; renderApp(true);">
                             </div>
                             <div class="flex items-center bg-white border border-slate-200 rounded-full px-3 py-1 shadow-2xs shrink-0" title="Filter Jadwal Planning">
                                 <span class="text-[10px] text-slate-500 font-medium mr-1.5 select-none">s/d</span>
-                                <input type="date" id="filter_tgl_selesai" class="bg-transparent text-slate-700 font-semibold focus:outline-none text-[10px] cursor-pointer" value="${tglSelesai}" onchange="renderApp(true)">
+                                <input type="date" id="filter_tgl_selesai" class="bg-transparent text-slate-700 font-semibold focus:outline-none text-[10px] cursor-pointer" value="${tglSelesai}" onchange="currentOrderPage=1; renderApp(true);">
                             </div>
                             <button type="button" onclick="resetMonitoringFilter()" class="w-7 h-7 rounded-full bg-white border border-slate-200 hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-700 transition-colors shadow-2xs shrink-0 cursor-pointer" title="Reset Filter Tanggal Jadwal">
                                 <i class="fa-solid fa-rotate-left text-[10px]"></i>
                             </button>
 
                             <!-- Filter Shift Kerja -->
-                            <select id="filter_shift" class="bg-white border border-slate-200 text-slate-700 font-semibold rounded-full px-3 py-1 focus:outline-none focus:border-teal-600 cursor-pointer shadow-2xs shrink-0" onchange="renderApp(true)">
+                            <select id="filter_shift" class="bg-white border border-slate-200 text-slate-700 font-semibold rounded-full px-3 py-1 focus:outline-none focus:border-teal-600 cursor-pointer shadow-2xs shrink-0" onchange="currentOrderPage=1; renderApp(true);">
                                 <option value="ALL" ${filterShift === 'ALL' ? 'selected' : ''}>Semua Shift</option>
                                 <option value="Shift 1" ${filterShift === 'Shift 1' ? 'selected' : ''}>Shift 1</option>
                                 <option value="Shift 2" ${filterShift === 'Shift 2' ? 'selected' : ''}>Shift 2</option>
                             </select>
 
                             <!-- Filter Armada -->
-                            <select id="filter_admin_kategori" class="bg-white border border-slate-200 text-slate-700 font-semibold rounded-full px-3 py-1 focus:outline-none focus:border-teal-600 cursor-pointer shadow-2xs shrink-0" onchange="renderApp(true)">
+                            <select id="filter_admin_kategori" class="bg-white border border-slate-200 text-slate-700 font-semibold rounded-full px-3 py-1 focus:outline-none focus:border-teal-600 cursor-pointer shadow-2xs shrink-0" onchange="currentOrderPage=1; renderApp(true);">
                                 <option value="ALL" ${filterKategori === 'ALL' ? 'selected' : ''}>Semua Armada</option>
                                 <option value="Crane Truck" ${filterKategori === 'Crane Truck' ? 'selected' : ''}>Crane Truck</option>
                                 <option value="Big Crane" ${filterKategori === 'Big Crane' ? 'selected' : ''}>Big Crane</option>
@@ -5524,7 +5654,7 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
                 </div>
 
                 <!-- Table Container: Sticky thead and full-height scroll down to the bottom -->
-                <div class="overflow-x-auto w-full relative z-0 flex-1 overflow-y-auto border-t border-slate-100">
+                <div id="monitoringTableContainer" class="overflow-x-auto w-full relative z-0 flex-1 overflow-y-auto border-t border-slate-100">
                     <table class="w-full text-left border-collapse">
                         <thead class="bg-slate-100 text-slate-600 text-[10px] border-b border-slate-200 table-sticky-header">
                             <tr>
@@ -5541,7 +5671,7 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100 text-[11px]">
-                            ${jobs.map(job => {
+                            ${displayedJobs.map(job => {
                                 let statusColor = job.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
                                                   (job.status === 'ON PROGRESS' ? 'bg-blue-100 text-blue-700 border-blue-200' :
                                                   (job.status === 'PENDING' ? 'bg-orange-100 text-orange-700 border-orange-200' :
@@ -5550,8 +5680,8 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
                                 let isNeedValidation = (job.status === 'SCHEDULED' || job.status === 'UNSCHEDULED' || (job.status === 'PENDING' && !job.gl));
                                 
                                 let btnAksiHtml = isNeedValidation 
-                                    ? `<button onclick="openAdminEditJob('${job.no_wo}')" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-[10px] px-2 py-1 rounded-sm shadow-sm w-full md:w-auto flex justify-center items-center gap-1 font-bold" title="Validasi Job"><i class="fa-solid fa-clipboard-check"></i> <span class="hidden md:inline">Validasi</span></button>`
-                                    : `<button onclick="openAdminEditJob('${job.no_wo}')" class="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 text-[10px] px-2 py-1 rounded-sm shadow-sm w-full md:w-auto flex justify-center items-center gap-1 font-bold" title="Edit Job"><i class="fa-solid fa-pen"></i> <span class="hidden md:inline">Edit</span></button>`;
+                                    ? `<button onclick="openAdminEditJob('${job.no_wo}')" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-[10px] px-2 py-1 rounded-sm shadow-sm w-full md:w-auto flex justify-center items-center gap-1 font-bold cursor-pointer" title="Validasi Job"><i class="fa-solid fa-clipboard-check"></i> <span class="hidden md:inline">Validasi</span></button>`
+                                    : `<button onclick="openAdminEditJob('${job.no_wo}')" class="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 text-[10px] px-2 py-1 rounded-sm shadow-sm w-full md:w-auto flex justify-center items-center gap-1 font-bold cursor-pointer" title="Edit Job"><i class="fa-solid fa-pen"></i> <span class="hidden md:inline">Edit</span></button>`;
 
                                 let kendalaHtml = '';
                                 if(job.final_inspeksi) kendalaHtml += `<div class="text-[9px] bg-green-50 text-green-700 border border-green-200 rounded-sm px-1 py-0.5 mb-0.5 w-full"><i class="fa-solid fa-check-circle mr-0.5"></i>Insp: ${job.final_inspeksi}</div>`;
@@ -5576,6 +5706,24 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
                         </tbody>
                     </table>
                 </div>
+
+                <!-- BARIS FOOTER PAGINASI (HANYA JIKA TOTAL ORDER > 50) -->
+                ${totalJobsCount > ORDERS_PER_PAGE ? `
+                <div class="px-3 py-2 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2 shrink-0 select-none">
+                    <div class="text-[10px] text-slate-500 font-medium">
+                        Menampilkan <span class="font-bold text-slate-700">${startIndex + 1}</span> - <span class="font-bold text-slate-700">${endIndex}</span> dari <span class="font-bold text-cyan-700">${totalJobsCount}</span> order (Halaman ${currentOrderPage} dari ${totalPages})
+                    </div>
+                    <div class="flex items-center gap-1 overflow-x-auto hide-scrollbar py-0.5">
+                        <button type="button" onclick="goToOrderPage(${currentOrderPage - 1})" ${currentOrderPage === 1 ? 'disabled' : ''} class="px-2 py-1 rounded text-[10px] font-bold border transition-colors ${currentOrderPage === 1 ? 'bg-slate-100 text-slate-300 border-slate-200 cursor-not-allowed' : 'bg-white text-slate-700 border-slate-300 hover:bg-cyan-50 hover:text-cyan-700 cursor-pointer shadow-2xs'}">
+                            <i class="fa-solid fa-chevron-left text-[9px] mr-1"></i> Prev
+                        </button>
+                        ${generatePaginationButtons(currentOrderPage, totalPages)}
+                        <button type="button" onclick="goToOrderPage(${currentOrderPage + 1})" ${currentOrderPage === totalPages ? 'disabled' : ''} class="px-2 py-1 rounded text-[10px] font-bold border transition-colors ${currentOrderPage === totalPages ? 'bg-slate-100 text-slate-300 border-slate-200 cursor-not-allowed' : 'bg-white text-slate-700 border-slate-300 hover:bg-cyan-50 hover:text-cyan-700 cursor-pointer shadow-2xs'}">
+                            Next <i class="fa-solid fa-chevron-right text-[9px] ml-1"></i>
+                        </button>
+                    </div>
+                </div>
+                ` : ''}
             </div>`;
         }
 
@@ -5590,7 +5738,16 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
             return html;
         }
 
-        jobs.forEach(job => {
+        // Paginasi Khusus Tampilan Pengguna Biasa (User)
+        const userTotalJobs = jobs.length;
+        const userTotalPages = Math.ceil(userTotalJobs / ORDERS_PER_PAGE) || 1;
+        if (currentOrderPage > userTotalPages) currentOrderPage = userTotalPages;
+        if (currentOrderPage < 1) currentOrderPage = 1;
+        const uStartIndex = (currentOrderPage - 1) * ORDERS_PER_PAGE;
+        const uEndIndex = Math.min(uStartIndex + ORDERS_PER_PAGE, userTotalJobs);
+        const displayedUserJobs = userTotalJobs > ORDERS_PER_PAGE ? jobs.slice(uStartIndex, uEndIndex) : jobs;
+
+        displayedUserJobs.forEach(job => {
             let statusColor = job.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
                               (job.status === 'ON PROGRESS' ? 'bg-blue-50 text-blue-600 border-blue-200' :
                               (job.status === 'PENDING' ? 'bg-orange-50 text-orange-600 border-orange-200' :
@@ -5616,6 +5773,25 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
                 <div class="pt-1.5 border-t border-slate-100 flex items-center justify-between"><div class="text-[9px] text-slate-400"><i class="fa-solid fa-user-circle mr-1"></i>${job.nama_pemohon}</div><div class="text-cyan-600 text-[9px] font-semibold">Klik untuk Detail</div></div>
             </div>`;
         });
+
+        if (userTotalJobs > ORDERS_PER_PAGE) {
+            html += `
+            <div class="p-2.5 bg-white border border-slate-200 rounded-lg flex flex-col sm:flex-row items-center justify-between gap-2 mt-2 select-none shadow-2xs">
+                <div class="text-[10px] text-slate-500">
+                    Menampilkan <span class="font-bold text-slate-700">${uStartIndex + 1}</span> - <span class="font-bold text-slate-700">${uEndIndex}</span> dari <span class="font-bold text-cyan-700">${userTotalJobs}</span> order
+                </div>
+                <div class="flex items-center gap-1 overflow-x-auto hide-scrollbar py-0.5">
+                    <button type="button" onclick="goToOrderPage(${currentOrderPage - 1})" ${currentOrderPage === 1 ? 'disabled' : ''} class="px-2 py-1 rounded text-[10px] font-bold border transition-colors ${currentOrderPage === 1 ? 'bg-slate-100 text-slate-300 border-slate-200 cursor-not-allowed' : 'bg-white text-slate-700 border-slate-300 hover:bg-cyan-50 hover:text-cyan-700 cursor-pointer shadow-2xs'}">
+                        Prev
+                    </button>
+                    ${generatePaginationButtons(currentOrderPage, userTotalPages)}
+                    <button type="button" onclick="goToOrderPage(${currentOrderPage + 1})" ${currentOrderPage === userTotalPages ? 'disabled' : ''} class="px-2 py-1 rounded text-[10px] font-bold border transition-colors ${currentOrderPage === userTotalPages ? 'bg-slate-100 text-slate-300 border-slate-200 cursor-not-allowed' : 'bg-white text-slate-700 border-slate-300 hover:bg-cyan-50 hover:text-cyan-700 cursor-pointer shadow-2xs'}">
+                        Next
+                    </button>
+                </div>
+            </div>`;
+        }
+
         return html;
     }
 
