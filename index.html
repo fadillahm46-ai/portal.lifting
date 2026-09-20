@@ -2746,10 +2746,10 @@
 - *DEPARTEMEN :* ${job.departemen || '-'}
 - *SECTION :* ${job.section || '-'}
 - *KONTAK WA :* ${job.no_wa || '-'}
-- *TANGGAL REQ :* ${job.tgl_pelaksanaan || '-'}
-- *JAM REQ :* ${job.jam_pelaksanaan || '-'}
+- *TGL PELAKSANAAN :* ${job.tgl_pelaksanaan || '-'}
+- *JAM PELAKSANAAN :* ${job.jam_pelaksanaan || '-'}
 - *DURASI JOB :* ${job.durasi_request || '-'}
-${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}` : `- *LOKASI ASAL :* ${job.lokasi_angkat || '-'}
+${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}` : `- *LOKASI ANGKAT :* ${job.lokasi_angkat || '-'}
 - *LOKASI TUJUAN :* ${job.lokasi_tujuan || '-'}`}
 - *DESKRIPSI :* ${job.deskripsi || '-'}`;
 
