@@ -2746,10 +2746,10 @@
 - *DEPARTEMEN :* ${job.departemen || '-'}
 - *SECTION :* ${job.section || '-'}
 - *KONTAK WA :* ${job.no_wa || '-'}
-- *TGL PELAKSANAAN :* ${job.tgl_pelaksanaan || '-'}
-- *JAM PELAKSANAAN :* ${job.jam_pelaksanaan || '-'}
+- *TANGGAL REQ :* ${job.tgl_pelaksanaan || '-'}
+- *JAM REQ :* ${job.jam_pelaksanaan || '-'}
 - *DURASI JOB :* ${job.durasi_request || '-'}
-${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}` : `- *LOKASI ANGKAT :* ${job.lokasi_angkat || '-'}
+${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}` : `- *LOKASI ASAL :* ${job.lokasi_angkat || '-'}
 - *LOKASI TUJUAN :* ${job.lokasi_tujuan || '-'}`}
 - *DESKRIPSI :* ${job.deskripsi || '-'}`;
 
@@ -4762,29 +4762,34 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
                 </div>
             </div>
 
-            <!-- Baris 5 Kartu Status Simetris (Ukuran Teks & Angka Lebih Besar) -->
+            <!-- Baris 5 Kartu Status Simetris (Total Order Memanjang di Atas pada HP) -->
             <div class="grid grid-cols-2 sm:grid-cols-5 gap-3.5 relative z-0">
-                <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 shadow-sm relative overflow-hidden flex flex-col justify-start">
+                <!-- TOTAL ORDER: Memanjang penuh 2 kolom di baris paling atas pada mode HP -->
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 shadow-sm relative overflow-hidden flex flex-col justify-start col-span-2 sm:col-span-1">
                     <div class="text-[11px] sm:text-xs font-black text-slate-500 uppercase tracking-widest mb-1 relative z-10">Total Order</div>
                     <div class="text-3xl sm:text-4xl font-black text-slate-800 relative z-10 leading-none">${cntOrder}</div>
                     <i class="fa-solid fa-file-invoice absolute -bottom-3 -right-2 text-6xl text-slate-300 opacity-20 rotate-[-10deg]"></i>
                 </div>
+                <!-- ON PROGRESS -->
                 <div class="bg-blue-50 border border-blue-100 rounded-xl p-4 shadow-sm relative overflow-hidden flex flex-col justify-start">
                     <div class="text-[11px] sm:text-xs font-black text-blue-600 uppercase tracking-widest mb-1 relative z-10">ON PROGRESS</div>
                     <div class="text-3xl sm:text-4xl font-black text-blue-700 relative z-10 leading-none">${cntProg}</div>
                     <i class="fa-solid fa-arrows-rotate absolute -bottom-3 -right-2 text-6xl text-blue-500 opacity-10"></i>
                 </div>
+                <!-- PENDING -->
                 <div class="bg-orange-50 border border-orange-100 rounded-xl p-4 shadow-sm relative overflow-hidden flex flex-col justify-start">
                     <div class="text-[11px] sm:text-xs font-black text-orange-600 uppercase tracking-widest mb-1 relative z-10">PENDING</div>
                     <div class="text-3xl sm:text-4xl font-black text-orange-700 relative z-10 leading-none">${cntPend}</div>
                     <i class="fa-solid fa-clock absolute -bottom-3 -right-2 text-6xl text-orange-500 opacity-10"></i>
                 </div>
+                <!-- COMPLETED -->
                 <div class="bg-emerald-50 border border-emerald-100 rounded-xl p-4 shadow-sm relative overflow-hidden flex flex-col justify-start">
                     <div class="text-[11px] sm:text-xs font-black text-emerald-600 uppercase tracking-widest mb-1 relative z-10">COMPLETED</div>
                     <div class="text-3xl sm:text-4xl font-black text-emerald-700 relative z-10 leading-none">${cntDone}</div>
                     <i class="fa-solid fa-circle-check absolute -bottom-3 -right-2 text-6xl text-emerald-500 opacity-10"></i>
                 </div>
-                <div class="bg-red-50 border border-red-100 rounded-xl p-4 shadow-sm relative overflow-hidden flex flex-col justify-start col-span-2 sm:col-span-1">
+                <!-- CANCELED: Ukuran 1 kolom (sama dengan ON PROGRESS, PENDING, COMPLETED) -->
+                <div class="bg-red-50 border border-red-100 rounded-xl p-4 shadow-sm relative overflow-hidden flex flex-col justify-start">
                     <div class="text-[11px] sm:text-xs font-black text-red-600 uppercase tracking-widest mb-1 relative z-10">CANCELED</div>
                     <div class="text-3xl sm:text-4xl font-black text-red-700 relative z-10 leading-none">${cntCancel}</div>
                     <i class="fa-solid fa-xmark absolute -bottom-3 -right-2 text-6xl text-red-500 opacity-10"></i>
