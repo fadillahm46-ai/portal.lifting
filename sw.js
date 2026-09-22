@@ -1,5 +1,5 @@
 // sw.js - Service Worker Resmi Portal Lifting PPA
-const CACHE_NAME = 'portal-lifting-v5';
+const CACHE_NAME = 'portal-lifting-v6'; // Sinkronkan ke v6 agar cache v5 dibersihkan
 
 // Hanya cache aset statis inti pembungkus shell
 const ASSETS_TO_CACHE = [
@@ -48,7 +48,6 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     fetch(event.request)
       .then((networkResponse) => {
-        // Jika server memberikan file baru yang valid, perbarui simpanan cache
         if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
           const responseClone = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
@@ -58,7 +57,7 @@ self.addEventListener('fetch', (event) => {
         return networkResponse;
       })
       .catch(() => {
-        // Jika offline atau tidak ada sinyal di tambang, baru gunakan fallback cache
+        // Fallback saat sinyal blind spot / offline di lapangan
         return caches.match(event.request);
       })
   );
@@ -84,10 +83,10 @@ self.addEventListener('push', (event) => {
     body: data.body || 'Silakan cek portal untuk memproses order.',
     icon: 'https://raw.githubusercontent.com/fadillahmursyid-dev/portal-lifting/main/icon-192.png',
     badge: 'https://raw.githubusercontent.com/fadillahmursyid-dev/portal-lifting/main/icon-192.png',
-    tag: 'portal-lifting-alert', // Menggantikan notifikasi lama agar tidak menumpuk di status bar
+    tag: 'portal-lifting-alert',
     renotify: true,
-    requireInteraction: true, // Notifikasi tetap bertahan di layar HP sampai dibuka user
-    vibrate: [200, 100, 200, 100, 200], // Pola getar khas Android
+    requireInteraction: true,
+    vibrate: [200, 100, 200, 100, 200],
     data: {
       url: data.url || './#monitoring'
     },
@@ -106,7 +105,6 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
-  // Jika tombol aksi "Tutup" ditekan
   if (event.action === 'close_alert') {
     return;
   }
@@ -115,7 +113,6 @@ self.addEventListener('notificationclick', (event) => {
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // Jika tab sudah ada yang terbuka di HP, fokuskan tab tersebut
       for (let i = 0; i < clientList.length; i++) {
         const client = clientList[i];
         if (client.url && 'focus' in client) {
@@ -125,7 +122,6 @@ self.addEventListener('notificationclick', (event) => {
           return client.focus();
         }
       }
-      // Jika aplikasi belum terbuka, buka tab baru
       if (clients.openWindow) {
         return clients.openWindow(targetUrl);
       }
