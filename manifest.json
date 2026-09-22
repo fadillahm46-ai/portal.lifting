@@ -3,7 +3,7 @@
 "name": "Order Lifting PPA",
 "short_name": "Lifting PPA",
 "description": "Aplikasi Monitoring dan Penugasan Unit Support Equipment Lifting PPA Site BIB",
-"start_url": "./index.html",
+"start_url": "./",
 "scope": "./",
 "display": "standalone",
   "orientation": "portrait-primary",
