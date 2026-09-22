@@ -4718,8 +4718,9 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
             <!-- Header Simetris: Kiri Judul, Sync & Download, Kanan Filter Terpadu -->
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2.5">
                 <div class="flex items-center gap-2.5 flex-wrap">
-                    <h2 class="text-base sm:text-lg font-black text-slate-800 shrink-0 flex items-center gap-2">
-                        <i class="fa-solid fa-chart-pie text-cyan-600"></i> Dashboard Analytics
+                    <!-- Judul Utama Dashboard dibuat huruf besar -->
+                    <h2 class="text-base sm:text-lg font-black text-slate-800 shrink-0 flex items-center gap-2 uppercase">
+                        <i class="fa-solid fa-chart-pie text-cyan-600"></i> DASHBOARD ANALYTICS
                     </h2>
                     <button onclick="fetchFromSupabase(true)" class="dashboard-no-export bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-600 font-bold px-2.5 py-1 rounded-md text-[10px] flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer">
                         <i class="fa-solid fa-rotate"></i> Refresh Sync
@@ -4801,7 +4802,8 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                     <!-- Kolom 1: Donut Chart -->
                     <div class="lg:col-span-4 xl:col-span-3 flex flex-col items-center justify-start">
-                        <h3 class="text-sm sm:text-base font-black text-slate-800 mb-3 w-full text-left">Data Perusahaan</h3>
+                        <!-- Judul dibuat huruf besar (DATA PERUSAHAAN) -->
+                        <h3 class="text-sm sm:text-base font-black text-slate-800 mb-3 w-full text-left uppercase">DATA PERUSAHAAN</h3>
                         <div class="relative h-52 w-52 sm:h-60 sm:w-60 flex items-center justify-center my-auto">
                             <canvas id="companyDonutChart"></canvas>
                         </div>
@@ -4862,7 +4864,8 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
             <!-- Baris 2 Grafik Berdampingan 50% / 50% -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
                 <div class="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 shadow-sm flex flex-col">
-                    <h3 class="text-sm sm:text-base font-black text-slate-800 mb-3">Weekly Trend Order (vs Minggu Lalu)</h3>
+                    <!-- Judul grafik tren diubah tanpa tanda kurung dan huruf besar -->
+                    <h3 class="text-sm sm:text-base font-black text-slate-800 mb-3 uppercase">WEEKLY TREND ORDER VS MINGGU LALU</h3>
                     <div class="relative h-60 w-full"><canvas id="lineChart"></canvas></div>
                 </div>
                 <div class="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 shadow-sm flex flex-col">
@@ -4914,7 +4917,8 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
             <!-- Baris Performa Rigger Full Width -->
             <div class="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 shadow-sm flex flex-col w-full">
                 <h3 class="text-sm sm:text-base font-black text-slate-800 mb-3 uppercase">Performa Rigger (Total Jam Kerja)</h3>
-                <div class="relative h-68 w-full"><canvas id="riggerChart"></canvas></div>
+                <!-- Kontainer disetel ke h-80 sm:h-96 (320px–384px) agar grafik tegak proporsional dan tidak gepeng -->
+                <div class="relative h-80 sm:h-96 w-full"><canvas id="riggerChart"></canvas></div>
             </div>
             
         </div>`;
@@ -5059,12 +5063,67 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
             let sortedRiggers = Object.entries(riggerStats).sort((a, b) => b[1].total - a[1].total);
             let rLabels = sortedRiggers.map(r => r[0]); let rDataCT = sortedRiggers.map(r => r[1].CT); let rDataBC = sortedRiggers.map(r => r[1].BC); let rDataLB = sortedRiggers.map(r => r[1].LB);
 
+            // Sistem 20 Baris Skala Dinamis:
+            // Nilai jam tertinggi dibagi 20 interval.
+            // Contoh: Jika max 60 jam, step = 60 / 20 = 3 (skala: 0, 3, 6, ..., 60)
+            // Jika max <= 20 jam, step = 1 (skala: 0, 1, 2, ..., 20)
+            let maxRiggerTotal = (sortedRiggers.length > 0 && sortedRiggers[0][1].total) ? sortedRiggers[0][1].total : 0;
+            let step = Math.max(1, Math.ceil(maxRiggerTotal / 20));
+            let targetMaxY = step * 20;
+
             if(window.dashRiggerChart) window.dashRiggerChart.destroy();
             const ctxRigger = document.getElementById('riggerChart').getContext('2d');
             window.dashRiggerChart = new Chart(ctxRigger, {
                 type: 'bar',
                 data: { labels: rLabels, datasets: [{ label: 'Crane Truck', data: rDataCT, backgroundColor: '#0d9488' }, { label: 'Big Crane', data: rDataBC, backgroundColor: '#4ade80' }, { label: 'Lowboy', data: rDataLB, backgroundColor: '#a7f3d0' }] },
-                options: { animation: false, responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 12, weight: 'bold', family: "'Inter', sans-serif" }, usePointStyle: true, boxWidth: 10 } } }, scales: { x: { stacked: true, ticks: { font: { size: 11, weight: 'bold' } }, grid: { display: false } }, y: { stacked: true, ticks: { font: { size: 11, weight: 'bold' } }, grid: { color: '#f1f5f9' } } } }
+                options: { 
+                    animation: false, 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    plugins: { 
+                        legend: { 
+                            position: 'bottom', 
+                            labels: { 
+                                font: { size: 12, weight: 'bold', family: "'Inter', sans-serif" }, 
+                                usePointStyle: true, 
+                                boxWidth: 10 
+                            } 
+                        } 
+                    }, 
+                    scales: { 
+                        x: { 
+                            stacked: true, 
+                            ticks: { font: { size: 11, weight: 'bold' } }, 
+                            grid: { display: false } 
+                        }, 
+                        y: { 
+                            stacked: true, 
+                            beginAtZero: true,
+                            min: 0,
+                            max: targetMaxY,
+                            afterBuildTicks: function(axis) {
+                                const ticks = [];
+                                // Membentuk tepat 20 baris/interval dari 0 hingga targetMaxY
+                                for (let val = 0; val <= targetMaxY; val += step) {
+                                    ticks.push({ value: val, label: String(val) });
+                                }
+                                axis.ticks = ticks;
+                            },
+                            ticks: { 
+                                autoSkip: false, // Menjamin seluruh 20 baris tampil presisi tanpa ada yang terlewati
+                                stepSize: step,
+                                font: { 
+                                    size: 10,
+                                    weight: 'bold' 
+                                },
+                                callback: function(value) {
+                                    return value;
+                                }
+                            }, 
+                            grid: { color: '#f1f5f9' } 
+                        } 
+                    } 
+                }
             });
         }
 
