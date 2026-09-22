@@ -2,19 +2,28 @@
   "name": "Order Lifting PPA",
   "short_name": "Lifting",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#0891b2",
   "icons": [
     {
-      "src": "https://lh3.googleusercontent.com/d/1hQZopiZU-_bQC9aRmyZndlmEF--k4h5U",
+      "src": "URL_LOGO_ASLI_TRANSPARAN_192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "URL_LOGO_ASLI_TRANSPARAN_512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "https://lh3.googleusercontent.com/d/1k35DCuAVhiJx9vbuOTzRupb5bdgoT7QN",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
