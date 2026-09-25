@@ -449,7 +449,7 @@
        PROTEKSI ANTI-ZOMBIE DATA & CACHE VERSIONING OTOMATIS
        Membersihkan sisa orderan lama yang sudah terhapus di HP orang lain
        ======================================================== */
-    const APP_BUILD_VERSION = '2026.09.20-v4';
+    const APP_BUILD_VERSION = '2026.09.25-v1';
     (function purgeStaleZombieCache() {
         try {
             const currentVer = localStorage.getItem('lifting_app_version');
@@ -612,10 +612,10 @@
 }
 
     const defaultUsers = [
-        { nrp: 'ADMIN', nama_lengkap: 'FADILLAHM', jabatan: 'DISPATCHER', perusahaan: 'PPA', departemen: 'PLANT', section: 'SE', no_wa: '081111111', password_hash: 'admin', role: 'ADMIN', status_akun: 'ACTIVE' },
-        { nrp: 'GL', nama_lengkap: 'ACHMAD HARIYANTO', jabatan: 'GROUP LEADER', perusahaan: 'PPA', departemen: 'OPERATION', section: 'LIFTING', no_wa: '082222222', password_hash: 'gl', role: 'GL', status_akun: 'ACTIVE' },
-        { nrp: 'USER', nama_lengkap: 'ANDI REQUESTER', jabatan: 'FOREMAN', perusahaan: 'SUBKON A', departemen: 'PLANT', section: 'MAINTENANCE', no_wa: '08987654321', password_hash: 'user', role: 'USER', status_akun: 'ACTIVE' },
-        { nrp: 'MP', nama_lengkap: 'JOKO OPERATOR', jabatan: 'OPERATOR', perusahaan: 'PPA', departemen: 'OPERATION', section: 'LIFTING', no_wa: '084444444', password_hash: 'mp', role: 'MANPOWER', status_akun: 'ACTIVE' }
+        { nrp: 'ADMIN', nama_lengkap: 'FADILLAH M', jabatan: 'ADMIN', perusahaan: 'PPA', departemen: 'PLANT', section: 'SE', no_wa: '08', password_hash: 'admin123', role: 'ADMIN', status_akun: 'ACTIVE' },
+        { nrp: 'GL', nama_lengkap: 'FADILLAH M', jabatan: 'GL', perusahaan: 'PPA', departemen: 'PLANT', section: 'SE', no_wa: '08', password_hash: 'GL', role: 'GL', status_akun: 'ACTIVE' },
+        { nrp: 'USER', nama_lengkap: 'FADILLAH M', jabatan: 'ADMIN', perusahaan: 'PPA', departemen: 'PLANT', section: 'SE', no_wa: '08', password_hash: 'user', role: 'USER', status_akun: 'ACTIVE' },
+        { nrp: 'MP', nama_lengkap: 'FADILLAH M', jabatan: 'Operator', perusahaan: 'PPA', departemen: 'PLANT', section: 'SE', no_wa: '08', password_hash: 'mp', role: 'MANPOWER', status_akun: 'ACTIVE' }
     ];
 
     const defaultMasterData = {
@@ -667,22 +667,23 @@
     try {
         let storedUsers = JSON.parse(localStorage.getItem('lifting_users'));
         if (Array.isArray(storedUsers)) {
-            let adminIdx = storedUsers.findIndex(u => (u.nrp || '').toUpperCase() === 'ADMIN');
-            if (adminIdx !== -1) {
-                storedUsers[adminIdx].nama_lengkap = 'FADILLAHM';
-                storedUsers[adminIdx].perusahaan = 'PPA';
-                storedUsers[adminIdx].departemen = 'PLANT';
-                storedUsers[adminIdx].section = 'SE';
-                localStorage.setItem('lifting_users', JSON.stringify(storedUsers));
-            }
+            defaultUsers.forEach(defU => {
+                let idx = storedUsers.findIndex(u => (u.nrp || '').toUpperCase() === defU.nrp.toUpperCase());
+                if (idx !== -1) {
+                    storedUsers[idx] = { ...storedUsers[idx], ...defU };
+                } else {
+                    storedUsers.push(defU);
+                }
+            });
+            localStorage.setItem('lifting_users', JSON.stringify(storedUsers));
         }
         let curUser = JSON.parse(localStorage.getItem('lifting_user'));
-        if (curUser && (curUser.nrp || '').toUpperCase() === 'ADMIN') {
-            curUser.nama_lengkap = 'FADILLAHM';
-            curUser.perusahaan = 'PPA';
-            curUser.departemen = 'PLANT';
-            curUser.section = 'SE';
-            localStorage.setItem('lifting_user', JSON.stringify(curUser));
+        if (curUser) {
+            let matched = defaultUsers.find(defU => defU.nrp.toUpperCase() === (curUser.nrp || '').toUpperCase());
+            if (matched) {
+                curUser = { ...curUser, ...matched };
+                localStorage.setItem('lifting_user', JSON.stringify(curUser));
+            }
         }
         let storedMaster = JSON.parse(localStorage.getItem('lifting_master_data'));
         if (storedMaster && Array.isArray(storedMaster.section) && !storedMaster.section.includes('SE')) {
@@ -1523,44 +1524,63 @@
         return raw;
     }
 
-    /* Helper Penarikan Data Operator & Rigger Langsung dari Manajemen Akun (users) */
+    /* Helper Penarikan Data Operator & Rigger Langsung dari Manajemen Akun (users) Berdasarkan Jabatan */
     function getAccountOperators() {
         const users = getUsers();
-        const list = users
-            .filter(u => u.status_akun === 'ACTIVE' && (
-                (u.jabatan || '').toUpperCase().includes('OPERATOR') ||
-                (u.role || '').toUpperCase() === 'MANPOWER' ||
-                (u.role || '').toUpperCase() === 'MP'
-            ))
+        const m = getMasterData();
+        const fromUsers = users
+            .filter(u => {
+                if (u.status_akun !== 'ACTIVE') return false;
+                const jab = String(u.jabatan || '').toUpperCase().trim();
+                // Validasi ketat: Hanya yang memiliki jabatan Operator (bukan rigger)
+                const isOp = jab.includes('OPERATOR') || jab.includes('OPT') || jab.includes('OPR');
+                const isRigger = jab.includes('RIGGER') || jab.includes('RGG');
+                return isOp && !isRigger;
+            })
             .map(u => (u.nama_lengkap || '').trim().toUpperCase())
             .filter(Boolean);
-        return [...new Set(list)].sort();
+        
+        // Sertakan fallback dari master data jika ada
+        const fromMaster = (Array.isArray(m.operator) ? m.operator : []).map(o => String(o || '').trim().toUpperCase()).filter(Boolean);
+        return [...new Set([...fromUsers, ...fromMaster])].sort();
     }
 
     function getAccountRiggers() {
         const users = getUsers();
-        const list = users
-            .filter(u => u.status_akun === 'ACTIVE' && (
-                (u.jabatan || '').toUpperCase().includes('RIGGER') ||
-                (u.role || '').toUpperCase() === 'MANPOWER' ||
-                (u.role || '').toUpperCase() === 'MP'
-            ))
+        const m = getMasterData();
+        const fromUsers = users
+            .filter(u => {
+                if (u.status_akun !== 'ACTIVE') return false;
+                const jab = String(u.jabatan || '').toUpperCase().trim();
+                // Validasi ketat: Hanya yang memiliki jabatan Rigger
+                const isRigger = jab.includes('RIGGER') || jab.includes('RGG');
+                return isRigger;
+            })
             .map(u => (u.nama_lengkap || '').trim().toUpperCase())
             .filter(Boolean);
-        return [...new Set(list)].sort();
+        
+        // Sertakan fallback dari master data jika ada
+        const fromMaster = (Array.isArray(m.rigger) ? m.rigger : []).map(r => String(r || '').trim().toUpperCase()).filter(Boolean);
+        return [...new Set([...fromUsers, ...fromMaster])].sort();
     }
 
-    /* Helper Penarikan Data GL Khusus dari Akun yang Memiliki Role GL */
+    /* Helper Penarikan Data GL Khusus dari Akun yang Memiliki Role GL atau Jabatan Group Leader */
     function getAccountGLs() {
         const users = getUsers();
-        const list = users
-            .filter(u => u.status_akun === 'ACTIVE' && (
-                (u.role || '').toUpperCase().trim() === 'GL' ||
-                (u.role || '').toUpperCase().trim() === 'GROUP LEADER'
-            ))
+        const m = getMasterData();
+        const fromUsers = users
+            .filter(u => {
+                if (u.status_akun !== 'ACTIVE') return false;
+                const role = String(u.role || '').toUpperCase().trim();
+                const jab = String(u.jabatan || '').toUpperCase().trim();
+                return role === 'GL' || role === 'GROUP LEADER' || role === 'LEADER' ||
+                       jab.includes('GROUP LEADER') || jab === 'GL' || jab.includes('GL ') || jab.includes('LEADER');
+            })
             .map(u => (u.nama_lengkap || '').trim().toUpperCase())
             .filter(Boolean);
-        return [...new Set(list)].sort();
+        
+        const fromMaster = (Array.isArray(m.gl) ? m.gl : []).map(g => String(g || '').trim().toUpperCase()).filter(Boolean);
+        return [...new Set([...fromUsers, ...fromMaster])].sort();
     }
 
     function getJobOperationalDate(j) {
@@ -2749,8 +2769,8 @@
 - *TGL PELAKSANAAN :* ${job.tgl_pelaksanaan || '-'}
 - *JAM PELAKSANAAN :* ${job.jam_pelaksanaan || '-'}
 - *DURASI JOB :* ${job.durasi_request || '-'}
-${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}` : `- *LOKASI ASAL :* ${job.lokasi_angkat || '-'}
-- *LOKASI TUJUAN :* ${job.lokasi_tujuan || '-'}`}
+- *LOKASI ANGKAT/ANGKUT :* ${job.lokasi_angkat || '-'}
+- *LOKASI TUJUAN :* ${job.lokasi_tujuan || '-'}
 - *DESKRIPSI PEKERJAAN :* ${job.deskripsi || '-'}`;
 
         // Pembersihan presisi: Mencegah timbulnya teks ganda "Telat : Telat" atau "Over : Over"
@@ -4718,9 +4738,8 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
             <!-- Header Simetris: Kiri Judul, Sync & Download, Kanan Filter Terpadu -->
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2.5">
                 <div class="flex items-center gap-2.5 flex-wrap">
-                    <!-- Judul Utama Dashboard dibuat huruf besar -->
-                    <h2 class="text-base sm:text-lg font-black text-slate-800 shrink-0 flex items-center gap-2 uppercase">
-                        <i class="fa-solid fa-chart-pie text-cyan-600"></i> DASHBOARD ANALYTICS
+                    <h2 class="text-base sm:text-lg font-black text-slate-800 shrink-0 flex items-center gap-2">
+                        <i class="fa-solid fa-chart-pie text-cyan-600"></i> Dashboard Analytics
                     </h2>
                     <button onclick="fetchFromSupabase(true)" class="dashboard-no-export bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-600 font-bold px-2.5 py-1 rounded-md text-[10px] flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer">
                         <i class="fa-solid fa-rotate"></i> Refresh Sync
@@ -4802,8 +4821,7 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                     <!-- Kolom 1: Donut Chart -->
                     <div class="lg:col-span-4 xl:col-span-3 flex flex-col items-center justify-start">
-                        <!-- Judul dibuat huruf besar (DATA PERUSAHAAN) -->
-                        <h3 class="text-sm sm:text-base font-black text-slate-800 mb-3 w-full text-left uppercase">DATA PERUSAHAAN</h3>
+                        <h3 class="text-sm sm:text-base font-black text-slate-800 mb-3 w-full text-left">Data Perusahaan</h3>
                         <div class="relative h-52 w-52 sm:h-60 sm:w-60 flex items-center justify-center my-auto">
                             <canvas id="companyDonutChart"></canvas>
                         </div>
@@ -4864,8 +4882,7 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
             <!-- Baris 2 Grafik Berdampingan 50% / 50% -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
                 <div class="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 shadow-sm flex flex-col">
-                    <!-- Judul grafik tren diubah tanpa tanda kurung dan huruf besar -->
-                    <h3 class="text-sm sm:text-base font-black text-slate-800 mb-3 uppercase">WEEKLY TREND ORDER VS MINGGU LALU</h3>
+                    <h3 class="text-sm sm:text-base font-black text-slate-800 mb-3">Weekly Trend Order (vs Minggu Lalu)</h3>
                     <div class="relative h-60 w-full"><canvas id="lineChart"></canvas></div>
                 </div>
                 <div class="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 shadow-sm flex flex-col">
@@ -6307,14 +6324,18 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
 
         if (pendingActionData.status === 'PENDING') {
             // Mekanisme PENDING:
-            // 1. Job saat ini diubah statusnya menjadi COMPLETED (pekerjaan shift ini ditutup)
+            // 1. Job saat ini diubah statusnya menjadi COMPLETED (pekerjaan shift ini resmi ditutup)
             jobs[idx].status = 'COMPLETED';
             if (pendingActionData.pendingReason) {
                 jobs[idx].alasan_telat = (jobs[idx].alasan_telat ? jobs[idx].alasan_telat + ' | ' : '') + 'Dipending: ' + pendingActionData.pendingReason;
             }
 
+            // Simpan salinan objek job lama sebelum array di-unshift agar indeks tidak bergeser
+            const completedOldJob = { ...jobs[idx] };
+            const originalWo = completedOldJob.no_wo;
+
             // 2. Tentukan nomor WO lanjutan dengan suffix -L1, -L2, dst.
-            let baseWo = jobs[idx].no_wo;
+            let baseWo = originalWo;
             let nextL = 1;
             const matchL = baseWo.match(/^(.*?)-L(\d+)$/i);
             if (matchL) {
@@ -6325,32 +6346,33 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
 
             // 3. Buat job lanjutan berstatus PENDING dengan GL kosong, unit, operator, dan rigger sebelumnya tetap terisi
             const rolloverJob = {
-                ...jobs[idx],
+                ...completedOldJob,
                 no_wo: newWo,
                 timestamp: new Date().toISOString(),
                 status: 'PENDING',
                 gl: '', // GL dikosongkan agar diminta validasi ulang ke GL
-                unit: pendingActionData.unit || jobs[idx].unit,
-                operator: pendingActionData.operator || jobs[idx].operator,
-                rigger: pendingActionData.rigger || jobs[idx].rigger,
-                rigger2: pendingActionData.rigger2 || jobs[idx].rigger2 || '',
+                unit: pendingActionData.unit || completedOldJob.unit,
+                operator: pendingActionData.operator || completedOldJob.operator,
+                rigger: pendingActionData.rigger || completedOldJob.rigger,
+                rigger2: pendingActionData.rigger2 || completedOldJob.rigger2 || '',
                 jam_start_aktual: '',
                 jam_end_aktual: '',
                 durasi_aktual: '',
                 final_inspeksi: '',
-                alasan_telat: pendingActionData.pendingReason ? `Lanjutan pending dari ${jobs[idx].no_wo}: ${pendingActionData.pendingReason}` : `Lanjutan pending dari ${jobs[idx].no_wo}`,
+                alasan_telat: pendingActionData.pendingReason ? `Lanjutan pending dari ${originalWo}: ${pendingActionData.pendingReason}` : `Lanjutan pending dari ${originalWo}`,
                 alasan_overtime: ''
             };
 
-            // Masukkan tiket lanjutan ke daftar order
+            // Masukkan tiket lanjutan ke daftar order lokal
             jobs.unshift(rolloverJob);
             saveOrders(jobs);
 
-            // Sinkronkan status job lama dan tiket lanjutan baru langsung ke Supabase
-            syncSingleOrderToSupabase(jobs[idx]);
+            // Kirim status COMPLETED job lama ke Supabase
+            syncSingleOrderToSupabase(completedOldJob);
+            // Kirim tiket lanjutan baru berstatus PENDING ke Supabase
             syncSingleOrderToSupabase(rolloverJob);
 
-            showToast(`Job ${jobs[idx].no_wo} selesai. Dibuat tiket lanjutan ${newWo} (Status: PENDING) untuk validasi GL.`);
+            showToast(`Job ${originalWo} selesai. Dibuat tiket lanjutan ${newWo} (Status: PENDING) untuk validasi GL.`);
         } else {
             jobs[idx].status = pendingActionData.status;
             saveOrders(jobs);
@@ -6993,6 +7015,7 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
         // Tandai order sudah pernah dibuka oleh pengguna (kurangi badge lonceng)
         markOrderAsOpened(wo);
 
+        const currentUser = JSON.parse(localStorage.getItem('lifting_user')) || {};
         const hasFotoAttached = (job.has_foto !== false && job.has_foto !== 'false') || !!job.foto_url;
 
         let fotoHtml = hasFotoAttached ? `
@@ -7061,10 +7084,13 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
             
             ${fotoHtml}
             
-            <div class="flex gap-2 mt-2">
+            <div class="flex gap-2 mt-2 flex-wrap">
                 <button onclick="copyJobToWA('${job.no_wo}', true)" class="flex-1 bg-[#0891b2] hover:bg-cyan-700 text-white font-bold py-2 rounded-md text-[11px] flex items-center justify-center gap-1.5 shadow-sm transition-colors"><i class="fa-regular fa-copy"></i> Salin Detail Job</button>
                 ${(job.jam_start_aktual || job.operator || job.status === 'COMPLETED' || job.status === 'ON PROGRESS') ? `
                 <button onclick="copyJobToWA('${job.no_wo}', false)" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-md text-[11px] flex items-center justify-center gap-1.5 shadow-sm transition-colors"><i class="fa-brands fa-whatsapp"></i> Salin Laporan MP</button>
+                ` : ''}
+                ${(currentUser && currentUser.role === 'ADMIN') ? `
+                <button onclick="document.getElementById('detailJobModal').classList.add('hidden'); confirmHapusOrder('${job.no_wo}');" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-3 rounded-md text-[11px] flex items-center justify-center gap-1 shadow-sm transition-colors cursor-pointer" title="Hapus Order"><i class="fa-solid fa-trash"></i> Hapus</button>
                 ` : ''}
                 <button onclick="document.getElementById('detailJobModal').classList.add('hidden')" class="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-bold py-2 rounded-md text-[11px] shadow-sm transition-colors">Tutup Detail</button>
             </div>
@@ -7203,7 +7229,8 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
     }
 
     function openAdminEditJob(wo) {
-        const job = getOrders().find(j => j.no_wo === wo && j.status !== 'CANCELED');
+        // Hapus filter status !== 'CANCELED' agar Admin bisa membuka form dan menghapus job CANCELED
+        const job = getOrders().find(j => j.no_wo === wo);
         if(!job) return;
         const currentUser = JSON.parse(localStorage.getItem('lifting_user'));
         
@@ -7338,7 +7365,8 @@ ${job.kategori === 'Big Crane' ? `- *LOKASI KERJA :* ${job.lokasi_angkat || '-'}
     async function saveAdminEditJob(e, wo) {
         e.preventDefault();
         let jobs = getOrders();
-        let idx = jobs.findIndex(j => j.no_wo === wo && j.status !== 'CANCELED');
+        // Hapus filter status !== 'CANCELED' agar indeks job canceled tetap ditemukan
+        let idx = jobs.findIndex(j => j.no_wo === wo);
         if(idx === -1) return;
 
         const selectedGL = document.getElementById('edit_gl').value;
