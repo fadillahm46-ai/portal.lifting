@@ -468,69 +468,6 @@
     })();
 
     /* ========================================================
-       SISTEM DETEKSI PEMBARUAN VERSI OTOMATIS (version.json)
-       Hanya muncul jika ada versi baru di server, jika sama kosong
-       ======================================================== */
-    async function checkAppVersionUpdate() {
-        const container = document.getElementById('appUpdateNoticeContainer');
-        if (!container) return;
-        try {
-            const res = await fetch('./version.json?t=' + Date.now(), { cache: 'no-store' });
-            if (!res.ok) {
-                container.className = "hidden";
-                container.innerHTML = '';
-                return;
-            }
-            const data = await res.json();
-            const serverVersion = (data && data.version) ? String(data.version).trim() : null;
-
-            // Jika versi di server berbeda dengan versi lokal APP_BUILD_VERSION
-            if (serverVersion && serverVersion !== APP_BUILD_VERSION) {
-                container.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300 shadow-sm animate-pulse mt-1 select-none";
-                container.innerHTML = `
-                    <i class="fa-solid fa-cloud-arrow-down text-amber-600 text-xs"></i>
-                    <span>Tersedia pembaruan (v${serverVersion})</span>
-                    <button type="button" onclick="executeForceAppUpdate()" class="ml-1 bg-amber-600 hover:bg-amber-700 text-white text-[9px] px-2 py-0.5 rounded-md font-bold transition-colors shadow-2xs cursor-pointer">
-                        Perbarui Sekarang
-                    </button>
-                `;
-            } else {
-                // Versi sama: Tetap kosong dan tersembunyi total
-                container.className = "hidden";
-                container.innerHTML = '';
-            }
-        } catch (e) {
-            container.className = "hidden";
-            container.innerHTML = '';
-        }
-    }
-
-    async function executeForceAppUpdate() {
-        showToast("Memperbarui aplikasi ke versi terbaru...", "success");
-        try {
-            if ('serviceWorker' in navigator) {
-                const registrations = await navigator.serviceWorker.getRegistrations();
-                for (let reg of registrations) {
-                    await reg.unregister();
-                }
-            }
-            if ('caches' in window) {
-                const cacheNames = await caches.keys();
-                await Promise.all(cacheNames.map(name => caches.delete(name)));
-            }
-            localStorage.removeItem('lifting_orders');
-            localStorage.removeItem('orders');
-            localStorage.removeItem('portal_orders');
-            localStorage.removeItem('lifting_app_version');
-        } catch (e) {
-            console.warn("Update cache clear error:", e);
-        }
-        setTimeout(() => {
-            window.location.reload(true);
-        }, 300);
-    }
-
-    /* ========================================================
        DETEKTOR RESPONSIF GLOBAL & CACHE CLOUD REALTIME
        ======================================================== */
     var forceMobileView = false;
@@ -3401,10 +3338,6 @@
             setTimeout(initBcCalendar, 100);
         }
 
-        if (currentTab === 'profile') {
-            setTimeout(checkAppVersionUpdate, 80);
-        }
-
         setTimeout(updateNotificationBadge, 80);
         setTimeout(updateMobileBubblePosition, 25);
     }
@@ -4194,8 +4127,6 @@
                     <i class="fa-solid fa-code-branch text-cyan-600 text-[8px]"></i>
                     <span>Versi: ${APP_BUILD_VERSION}</span>
                 </div>
-                <!-- Wadah Notifikasi Pembaruan (Hanya Muncul Jika Versi Server Lebih Baru, Jika Sama Dibiarkan Kosong) -->
-                <div id="appUpdateNoticeContainer" class="hidden"></div>
             </div>
             
         </div>`;
@@ -7709,7 +7640,6 @@
                 }
             }
             renderApp(false); 
-            checkAppVersionUpdate();
             if (window.innerWidth >= 768) hideSplashScreen();
         }); 
     });
@@ -7752,9 +7682,8 @@
                 // 2. Tarik langsung data order & status terbaru dari database Supabase
                 await fetchFromSupabase(false);
                 
-                // 3. Perbarui badge indikator notifikasi & periksa pembaruan versi
+                // 3. Perbarui badge indikator notifikasi
                 updateNotificationBadge();
-                checkAppVersionUpdate();
             }
         } catch (err) {
             console.warn("Auto-resume sync error:", err);
