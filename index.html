@@ -1461,18 +1461,20 @@
         return raw;
     }
 
-    /* Helper Penarikan Data Operator & Rigger Langsung dari Manajemen Akun (users) Berdasarkan Jabatan */
+    /* Helper Penarikan Data Operator Langsung dari Akun (Role MANPOWER/MP & Jabatan Operator) */
     function getAccountOperators() {
         const users = getUsers();
         const m = getMasterData();
         const fromUsers = users
             .filter(u => {
                 if (u.status_akun !== 'ACTIVE') return false;
+                const role = String(u.role || '').toUpperCase().trim();
                 const jab = String(u.jabatan || '').toUpperCase().trim();
-                // Validasi ketat: Hanya yang memiliki jabatan Operator (bukan rigger)
-                const isOp = jab.includes('OPERATOR') || jab.includes('OPT') || jab.includes('OPR');
-                const isRigger = jab.includes('RIGGER') || jab.includes('RGG');
-                return isOp && !isRigger;
+                const isMPRole = role === 'MANPOWER' || role === 'MP' || role === 'OPERATOR';
+                // Validasi jabatan Operator (bukan rigger)
+                const isOp = jab.includes('OPERATOR') || jab.includes('OPT') || jab.includes('OPR') || role === 'OPERATOR';
+                const isRigger = jab.includes('RIGGER') || jab.includes('RGG') || role === 'RIGGER';
+                return isMPRole && isOp && !isRigger;
             })
             .map(u => (u.nama_lengkap || '').trim().toUpperCase())
             .filter(Boolean);
@@ -1482,16 +1484,19 @@
         return [...new Set([...fromUsers, ...fromMaster])].sort();
     }
 
+    /* Helper Penarikan Data Rigger Langsung dari Akun (Role MANPOWER/MP & Jabatan Rigger) */
     function getAccountRiggers() {
         const users = getUsers();
         const m = getMasterData();
         const fromUsers = users
             .filter(u => {
                 if (u.status_akun !== 'ACTIVE') return false;
+                const role = String(u.role || '').toUpperCase().trim();
                 const jab = String(u.jabatan || '').toUpperCase().trim();
-                // Validasi ketat: Hanya yang memiliki jabatan Rigger
-                const isRigger = jab.includes('RIGGER') || jab.includes('RGG');
-                return isRigger;
+                const isMPRole = role === 'MANPOWER' || role === 'MP' || role === 'RIGGER';
+                // Validasi jabatan Rigger
+                const isRigger = jab.includes('RIGGER') || jab.includes('RGG') || role === 'RIGGER';
+                return isMPRole && isRigger;
             })
             .map(u => (u.nama_lengkap || '').trim().toUpperCase())
             .filter(Boolean);
@@ -1501,7 +1506,7 @@
         return [...new Set([...fromUsers, ...fromMaster])].sort();
     }
 
-    /* Helper Penarikan Data GL Khusus dari Akun yang Memiliki Role GL atau Jabatan Group Leader */
+    /* Helper Penarikan Data GL Murni Berdasarkan Role GL (Bukan dari Jabatan) */
     function getAccountGLs() {
         const users = getUsers();
         const m = getMasterData();
@@ -1509,9 +1514,8 @@
             .filter(u => {
                 if (u.status_akun !== 'ACTIVE') return false;
                 const role = String(u.role || '').toUpperCase().trim();
-                const jab = String(u.jabatan || '').toUpperCase().trim();
-                return role === 'GL' || role === 'GROUP LEADER' || role === 'LEADER' ||
-                       jab.includes('GROUP LEADER') || jab === 'GL' || jab.includes('GL ') || jab.includes('LEADER');
+                // Hanya mengambil akun yang memiliki role GL / GROUP LEADER murni, tanpa memeriksa kolom jabatan
+                return role === 'GL' || role === 'GROUP LEADER';
             })
             .map(u => (u.nama_lengkap || '').trim().toUpperCase())
             .filter(Boolean);
