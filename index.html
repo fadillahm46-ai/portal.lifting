@@ -851,8 +851,10 @@
     function getUnitWorkload(unitName, ordersList = null) {
         if (!unitName) return { count: 0, hours: 0, isCrowded: false };
         const orders = ordersList || getOrders();
+        // HANYA hitung pekerjaan yang benar-benar sedang berjalan (ON PROGRESS)
+        // Status PENDING, SCHEDULED, & UNSCHEDULED tidak dihitung sebagai beban progres unit aktif
         const activeJobs = orders.filter(j => 
-            j.unit === unitName && ['ON PROGRESS', 'PENDING', 'SCHEDULED', 'UNSCHEDULED'].includes(j.status)
+            j.unit === unitName && j.status === 'ON PROGRESS'
         );
         let totalHours = 0;
         activeJobs.forEach(j => {
@@ -5630,7 +5632,7 @@
                                                     <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-600"></span>
                                                 </span>
                                                 <span class="text-[8px] font-bold text-red-700 whitespace-nowrap leading-none">
-                                                    ${workload.count} Job (${workload.hours}J)
+                                                    ${workload.count} Job Progres (${workload.hours}J)
                                                 </span>
                                             </div>
                                         </div>`;
@@ -6666,7 +6668,7 @@
                                                 <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-600"></span>
                                             </span>
                                             <span class="text-[8px] font-bold text-red-700 whitespace-nowrap leading-none">
-                                                ${workload.count} Job (${workload.hours}J)
+                                                ${workload.count} Job Progres (${workload.hours}J)
                                             </span>
                                         </div>
                                     </div>`;
