@@ -6536,7 +6536,7 @@
                     <div><label class="block text-[10px] font-bold text-slate-600 mb-1">Lokasi Tujuan *</label><input type="text" id="req_lok_tujuan" value="${valLokTujuan}" oninput="this.value = this.value.toUpperCase(); saveOrderDraft();" class="w-full border border-slate-300 rounded-md px-2.5 py-2 text-xs focus:outline-none focus:border-cyan-500" placeholder="Titik bongkar..." required></div>
                 </div>
                 <div><label class="block text-[10px] font-semibold text-slate-600 mb-1">Deskripsi & Tonase Beban *</label><textarea id="req_deskripsi" oninput="saveOrderDraft()" class="w-full border border-slate-300 rounded-md px-2.5 py-2 text-xs focus:outline-none focus:border-cyan-500 h-20" placeholder="Rincian barang dan perkiraan berat..." required>${valDeskripsi}</textarea></div>
-                <div><label class="block text-[10px] font-semibold text-slate-600 mb-1">Upload Foto Area (Opsional)</label><input type="file" id="req_foto" accept="image/*" class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-[10px] file:font-semibold file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100 cursor-pointer"></div>
+                <div><label class="block text-[10px] font-semibold text-slate-600 mb-1">Upload Foto Area *</label><input type="file" id="req_foto" accept="image/*" class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-[10px] file:font-semibold file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100 cursor-pointer" required></div>
             `;
         } else if (cat === 'Big Crane') {
             formFields = `
@@ -6767,6 +6767,13 @@
         const cat = userOrderFleetMode; 
         const isAdminGL = user.role === 'ADMIN' || user.role === 'GL';
         const fotoInput = document.getElementById('req_foto');
+
+        // Validasi perlindungan ganda: jika order adalah Crane Truck, pastikan file foto benar-benar sudah dipilih
+        if (cat === 'Crane Truck' && (!fotoInput || !fotoInput.files || fotoInput.files.length === 0)) {
+            showToast('Foto area kerja wajib diunggah untuk order Crane Truck (CT)!', 'error');
+            if (fotoInput) fotoInput.focus();
+            return;
+        }
 
         const btnSubmit = document.getElementById('btnSubmitOrder'); 
         if (btnSubmit) {
