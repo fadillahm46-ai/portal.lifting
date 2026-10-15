@@ -2724,62 +2724,62 @@
 - *STATUS :* ${statusEmoji}
 - *PEMOHON :* ${job.nama_pemohon || '-'}
 - *PERUSAHAAN :* ${job.perusahaan || '-'}
-- *DEPARTEMEN :* ${job.departemen || '-'}
-- *SECTION :* ${job.section || '-'}
-- *KONTAK WA :* ${job.no_wa || '-'}
-- *TGL PELAKSANAAN :* ${job.tgl_pelaksanaan || '-'}
-- *JAM PELAKSANAAN :* ${job.jam_pelaksanaan || '-'}
-- *DURASI JOB :* ${job.durasi_request || '-'}
-- *LOKASI ANGKAT/ANGKUT :* ${job.lokasi_angkat || '-'}
-- *LOKASI TUJUAN :* ${job.lokasi_tujuan || '-'}
-- *DESKRIPSI PEKERJAAN :* ${job.deskripsi || '-'}`;
-
-        // Pembersihan presisi: Mencegah timbulnya teks ganda "Telat : Telat" atau "Over : Over"
-        let telatClean = cleanKendalaText(job.alasan_telat || '');
-        let overClean = cleanKendalaText(job.alasan_overtime || '');
-        let kendalaStr = '';
-        if (telatClean && overClean) kendalaStr = `${telatClean} | ${overClean}`;
-        else if (telatClean) kendalaStr = telatClean;
-        else if (overClean) kendalaStr = overClean;
-        else kendalaStr = '-';
-
-        let mpFormat = `*PELAPORAN PROGRES JOB LIFTING*
-- *NO WO :* ${job.no_wo || '-'}
-- *STATUS :* ${statusEmoji}
-- *NAMA JOB :* ${job.deskripsi || '-'}
-- *JAM START :* ${job.jam_start_aktual || '-'}
-- *JAM FINISH :* ${job.jam_end_aktual || '-'}
-- *NO. UNIT :* ${job.unit || '-'}
-- *NAMA OPERATOR :* ${job.operator || '-'}
-- *NAMA RIGGER :* ${job.rigger || '-'}${job.rigger2 ? ', ' + job.rigger2 : ''}
-- *FINAL INSPEKSI :* ${job.final_inspeksi || '-'}
-- *KENDALA :* ${kendalaStr}`;
-
-        if (forceDetail || (currentUser && currentUser.role === 'USER') || job.status === 'SCHEDULED' || job.status === 'UNSCHEDULED' || job.status === 'OPEN') {
-            waText = detailFormat;
-        } else {
-            waText = mpFormat; 
-        }
-        copyText(waText, 'Laporan');
-    }
-
-    function generateWO(kategori) {
+    function generateWO(kategori, extraWoList = []) {
         const date = new Date();
         const yyyy = date.getFullYear(); const mm = String(date.getMonth() + 1).padStart(2, '0'); const dd = String(date.getDate()).padStart(2, '0');
         let prefix = kategori === 'Big Crane' ? 'BC-' : (kategori === 'Lowboy' ? 'LB-' : 'CT-');
         const datePrefix = `${prefix}${yyyy}${mm}${dd}-`;
         
         let maxNumber = 0;
-        getOrders().forEach(job => {
-            if (job.no_wo && job.no_wo.startsWith(datePrefix)) {
-                const parts = job.no_wo.split('-');
+        const allWos = [
+            ...getOrders().map(j => j.no_wo),
+            ...extraWoList
+        ];
+        allWos.forEach(wo => {
+            if (wo && String(wo).startsWith(datePrefix)) {
+                const parts = String(wo).split('-');
                 if (parts.length >= 3) {
-                    const num = parseInt(parts[2].split('-P')[0], 10);
+                    const cleanNumStr = parts[2].split('-P')[0].split('-L')[0];
+                    const num = parseInt(cleanNumStr, 10);
                     if (!isNaN(num) && num > maxNumber) maxNumber = num;
                 }
             }
         });
         return `${datePrefix}${maxNumber + 1}`;
+    }
+
+    // Penarikan nomor urut WO langsung dari server Supabase agar tidak bentrok walau cache HP kosong
+    async function generateSafeWO(kategori) {
+        const date = new Date();
+        const yyyy = date.getFullYear(); const mm = String(date.getMonth() + 1).padStart(2, '0'); const dd = String(date.getDate()).padStart(2, '0');
+        let prefix = kategori === 'Big Crane' ? 'BC-' : (kategori === 'Lowboy' ? 'LB-' : 'CT-');
+        const datePrefix = `${prefix}${yyyy}${mm}${dd}-`;
+        let serverWos = [];
+
+        if (SUPABASE_KEY && !SUPABASE_KEY.includes('PASTE_KUNCI')) {
+            try {
+                if (supabaseClient) {
+                    const { data } = await supabaseClient
+                        .from('orders')
+                        .select('no_wo')
+                        .ilike('no_wo', `${datePrefix}%`);
+                    if (Array.isArray(data)) {
+                        serverWos = data.map(r => r.no_wo);
+                    }
+                } else {
+                    const res = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=no_wo&no_wo=ilike.${encodeURIComponent(datePrefix + '*')}`, {
+                        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (Array.isArray(data)) serverWos = data.map(r => r.no_wo);
+                    }
+                }
+            } catch (e) {
+                console.warn("Gagal cek nomor WO terakhir dari server, menggunakan cache lokal:", e);
+            }
+        }
+        return generateWO(kategori, serverWos);
     }
 
     function showSuccessAnim(type, title, msg) {
@@ -6925,8 +6925,11 @@
             const valDelSect = isAdminGL ? resolveMasterValue('del_sect', 'del_sect_other', 'section') : (user.section || 'SE');
             const valDelWa = isAdminGL ? (document.getElementById('del_wa')?.value || user.no_wa) : (user.no_wa || '-');
 
+            // Ambil nomor WO terbaru langsung dari database Supabase agar tidak pernah duplikat
+            const generatedWoNumber = await generateSafeWO(cat);
+
             const baseOrder = {
-                no_wo: generateWO(cat), 
+                no_wo: generatedWoNumber, 
                 timestamp: new Date().toISOString(), 
                 kategori: cat, 
                 nrp_pemohon: user.nrp, 
@@ -6991,45 +6994,73 @@
 
             if (fotoInput) fotoInput.value = '';
 
-            // Pengiriman 1 Tahap Langsung ke Supabase (Direct-to-Cloud)
+            // Pengiriman 1 Tahap Langsung ke Supabase (Murni INSERT + Auto-Increment jika nomor WO bentrok)
             if (btnSubmit) btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i> Mengirim ke database server...';
 
             let serverSuccess = false;
             let serverErrorDetail = '';
 
-            try {
-                const clean = sanitizeOrderForSupabase(baseOrder);
-                if (supabaseClient) {
-                    const { data, error } = await supabaseClient
-                        .from('orders')
-                        .upsert(clean, { onConflict: 'no_wo' })
-                        .select();
-                    if (!error && Array.isArray(data) && data.length > 0) {
-                        serverSuccess = true;
-                    } else if (error) {
-                        serverErrorDetail = error.message || 'Gagal insert order ke Supabase';
-                    }
-                } else {
-                    const res = await fetch(`${SUPABASE_URL}/rest/v1/orders?on_conflict=no_wo`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'apikey': SUPABASE_KEY,
-                            'Authorization': `Bearer ${SUPABASE_KEY}`,
-                            'Prefer': 'resolution=merge-duplicates,return=representation'
-                        },
-                        body: JSON.stringify(clean)
-                    });
-                    if (res.ok) {
-                        serverSuccess = true;
+            for (let attempt = 0; attempt < 5; attempt++) {
+                try {
+                    const clean = sanitizeOrderForSupabase(baseOrder);
+                    if (supabaseClient) {
+                        // Gunakan INSERT murni (bukan UPSERT) agar order baru TIDAK PERNAH menimpa order lama
+                        const { data, error } = await supabaseClient
+                            .from('orders')
+                            .insert(clean)
+                            .select();
+                        if (!error && Array.isArray(data) && data.length > 0) {
+                            serverSuccess = true;
+                            break;
+                        } else if (error) {
+                            // Jika kode error 23505 (Duplicate Key / nomor WO sudah terpakai), naikkan nomor urut +1 lalu coba lagi
+                            if (error.code === '23505' || String(error.message || '').toLowerCase().includes('duplicate')) {
+                                const parts = baseOrder.no_wo.split('-');
+                                const nextNum = (parseInt(parts[2], 10) || 1) + 1;
+                                const oldWo = baseOrder.no_wo;
+                                baseOrder.no_wo = `${parts[0]}-${parts[1]}-${nextNum}`;
+                                const cachedImg = getPhotoCache()[oldWo];
+                                if (cachedImg) setPhotoCache(baseOrder.no_wo, cachedImg);
+                                continue;
+                            }
+                            serverErrorDetail = error.message || 'Gagal insert order ke Supabase';
+                            break;
+                        }
                     } else {
-                        const errBody = await res.json().catch(() => ({}));
-                        serverErrorDetail = errBody.message || `Status HTTP ${res.status}`;
+                        // Mode REST API: Gunakan Prefer return=representation TANPA resolution=merge-duplicates
+                        const res = await fetch(`${SUPABASE_URL}/rest/v1/orders`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'apikey': SUPABASE_KEY,
+                                'Authorization': `Bearer ${SUPABASE_KEY}`,
+                                'Prefer': 'return=representation'
+                            },
+                            body: JSON.stringify(clean)
+                        });
+                        if (res.ok) {
+                            serverSuccess = true;
+                            break;
+                        } else if (res.status === 409) {
+                            // HTTP 409 Conflict: Nomor WO sudah ada di database, otomatis naikkan +1
+                            const parts = baseOrder.no_wo.split('-');
+                            const nextNum = (parseInt(parts[2], 10) || 1) + 1;
+                            const oldWo = baseOrder.no_wo;
+                            baseOrder.no_wo = `${parts[0]}-${parts[1]}-${nextNum}`;
+                            const cachedImg = getPhotoCache()[oldWo];
+                            if (cachedImg) setPhotoCache(baseOrder.no_wo, cachedImg);
+                            continue;
+                        } else {
+                            const errBody = await res.json().catch(() => ({}));
+                            serverErrorDetail = errBody.message || `Status HTTP ${res.status}`;
+                            break;
+                        }
                     }
+                } catch(netErr) {
+                    serverSuccess = false;
+                    serverErrorDetail = netErr.message || 'Jaringan internet terputus';
+                    break;
                 }
-            } catch(netErr) {
-                serverSuccess = false;
-                serverErrorDetail = netErr.message || 'Jaringan internet terputus';
             }
 
             // Jika server gagal merespons, batalkan dan JANGAN hapus formulir
