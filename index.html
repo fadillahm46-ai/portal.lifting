@@ -2613,23 +2613,6 @@
         renderApp(true);
     }
 
-    function resetMonitoringFilter() {
-        const elStart = document.getElementById('filter_tgl_mulai');
-        const elEnd = document.getElementById('filter_tgl_selesai');
-        if (elStart) elStart.value = '';
-        if (elEnd) elEnd.value = '';
-        const elShift = document.getElementById('filter_shift');
-        if (elShift) elShift.value = 'ALL';
-        const elCat = document.getElementById('filter_admin_kategori');
-        if (elCat) elCat.value = 'ALL';
-        orderSearchQuery = '';
-        const elSearch = document.getElementById('orderSearchInput');
-        if (elSearch) elSearch.value = '';
-        sortColumn = null;
-        sortDirection = null;
-        renderApp(true);
-    }
-
     function resetDashFilter() {
         const defWeek = getWeekRangeSundayToSaturday();
         const elStart = document.getElementById('dash_tgl_mulai');
@@ -2724,6 +2707,44 @@
 - *STATUS :* ${statusEmoji}
 - *PEMOHON :* ${job.nama_pemohon || '-'}
 - *PERUSAHAAN :* ${job.perusahaan || '-'}
+- *DEPARTEMEN :* ${job.departemen || '-'}
+- *SECTION :* ${job.section || '-'}
+- *KONTAK WA :* ${job.no_wa || '-'}
+- *TGL PELAKSANAAN :* ${job.tgl_pelaksanaan || '-'}
+- *JAM PELAKSANAAN :* ${job.jam_pelaksanaan || '-'}
+- *DURASI JOB :* ${job.durasi_request || '-'}
+- *LOKASI ANGKAT/ANGKUT :* ${job.lokasi_angkat || '-'}
+- *LOKASI TUJUAN :* ${job.lokasi_tujuan || '-'}
+- *DESKRIPSI PEKERJAAN :* ${job.deskripsi || '-'}`;
+
+        let telatClean = cleanKendalaText(job.alasan_telat || '');
+        let overClean = cleanKendalaText(job.alasan_overtime || '');
+        let kendalaStr = '';
+        if (telatClean && overClean) kendalaStr = `${telatClean} | ${overClean}`;
+        else if (telatClean) kendalaStr = telatClean;
+        else if (overClean) kendalaStr = overClean;
+        else kendalaStr = '-';
+
+        let mpFormat = `*PELAPORAN PROGRES JOB LIFTING*
+- *NO WO :* ${job.no_wo || '-'}
+- *STATUS :* ${statusEmoji}
+- *NAMA JOB :* ${job.deskripsi || '-'}
+- *JAM START :* ${job.jam_start_aktual || '-'}
+- *JAM FINISH :* ${job.jam_end_aktual || '-'}
+- *NO. UNIT :* ${job.unit || '-'}
+- *NAMA OPERATOR :* ${job.operator || '-'}
+- *NAMA RIGGER :* ${job.rigger || '-'}${job.rigger2 ? ', ' + job.rigger2 : ''}
+- *FINAL INSPEKSI :* ${job.final_inspeksi || '-'}
+- *KENDALA :* ${kendalaStr}`;
+
+        if (forceDetail || (currentUser && currentUser.role === 'USER') || job.status === 'SCHEDULED' || job.status === 'UNSCHEDULED' || job.status === 'OPEN') {
+            waText = detailFormat;
+        } else {
+            waText = mpFormat; 
+        }
+        copyText(waText, 'Laporan');
+    }
+
     function generateWO(kategori, extraWoList = []) {
         const date = new Date();
         const yyyy = date.getFullYear(); const mm = String(date.getMonth() + 1).padStart(2, '0'); const dd = String(date.getDate()).padStart(2, '0');
@@ -7782,8 +7803,9 @@
 
     window.addEventListener('load', () => { 
         if (window.innerWidth >= 768) hideSplashScreen();
-        // Muat seluruh tabel (forceFull = true) hanya pada saat awal aplikasi dibuka
-        fetchFromSupabase(false, true).catch(e => console.warn(e)).finally(() => { 
+        
+        // 1. Render aplikasi seketika agar pengguna langsung bisa masuk tanpa tertahan koneksi
+        try {
             const user = JSON.parse(localStorage.getItem('lifting_user'));
             if (user) {
                 const draft = getOrderDraft();
@@ -7801,7 +7823,14 @@
                     }
                 }
             }
-            renderApp(false); 
+            renderApp(false);
+        } catch (err) {
+            console.error("Initial render error:", err);
+        }
+
+        // 2. Muat data terbaru dari Supabase di latar belakang
+        fetchFromSupabase(false, true).catch(e => console.warn(e)).finally(() => { 
+            renderApp(true); 
             if (window.innerWidth >= 768) hideSplashScreen();
         }); 
     });
