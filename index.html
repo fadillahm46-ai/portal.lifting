@@ -449,7 +449,7 @@
        PROTEKSI ANTI-ZOMBIE DATA & CACHE VERSIONING OTOMATIS
        Membersihkan sisa orderan lama yang sudah terhapus di HP orang lain
        ======================================================== */
-    const APP_BUILD_VERSION = '2026.09.25-v1';
+    const APP_BUILD_VERSION = '2026.10.15-v1';
     (function purgeStaleZombieCache() {
         try {
             const currentVer = localStorage.getItem('lifting_app_version');
@@ -1230,7 +1230,7 @@
                 const rg1 = normalizeName(j.rigger);
                 const rg2 = normalizeName(j.rigger2);
                 const isAssigned = (op === myName || rg1 === myName || rg2 === myName);
-                const isActive = ['ON PROGRESS', 'SCHEDULED', 'PENDING'].includes(j.status);
+                const isActive = ['OPEN', 'ON PROGRESS', 'SCHEDULED', 'PENDING'].includes(j.status);
                 // Hanya hitung pekerjaan hari ini atau sebelumnya agar tidak membunyikan tugas masa depan
                 const opDate = getJobOperationalDate(j);
                 const isTodayOrEarlier = !opDate || opDate <= todayShiftDate;
@@ -1567,6 +1567,7 @@
     let userSortDir = 'asc';
 
     let pendingCancelWo = null;
+    let pendingPickupWo = null;
     let currentActionWo = null;
     let currentActionStatus = null;
     let pendingActionData = null;
@@ -1803,7 +1804,7 @@
 
     function isAnyModalOpen() {
         const modalIds = [
-            'mpActionModal', 'kendalaModal', 'cancelPromptModal', 
+            'mpActionModal', 'kendalaModal', 'cancelPromptModal', 'pickupPromptModal',
             'editJobModal', 'detailJobModal', 'unitStatusModal', 
             'assignedJobModal', 'dayJobsModal', 'globalConfirmModal', 
             'resetPwdModal', 'profileBiodataModal', 'profileSettingsModal', 
@@ -1902,6 +1903,13 @@
                         'gl',
                         newRecord
                     );
+                } else if (newRecord.status === 'ON PROGRESS' && oldRecord && oldRecord.status === 'OPEN') {
+                    triggerAppNotification(
+                        "Job Di-Pickup Lapangan!",
+                        `Job ${newRecord.no_wo} (${newRecord.unit || '-'}) telah diambil dan mulai dikerjakan oleh kru.`,
+                        'gl',
+                        newRecord
+                    );
                 } else if (['SCHEDULED', 'UNSCHEDULED'].includes(newRecord.status)) {
                     triggerAppNotification(
                         "Order Butuh Validasi!",
@@ -1924,11 +1932,11 @@
                 return;
             }
 
-            const isActiveState = ['ON PROGRESS', 'SCHEDULED'].includes(newRecord.status);
+            const isActiveState = ['OPEN', 'ON PROGRESS', 'SCHEDULED'].includes(newRecord.status);
             if ((eventType === 'INSERT' || newlyAssigned || (statusChanged && isActiveState)) && isActiveState) {
                 triggerAppNotification(
                     "Penugasan Job Baru!",
-                    `Job ${newRecord.no_wo} (${newRecord.kategori || 'Armada'}) ditugaskan kepada Anda (Unit: ${newRecord.unit || '-'}). Segera laksanakan.`,
+                    `Job ${newRecord.no_wo} (${newRecord.kategori || 'Armada'}) ditugaskan kepada Anda (Unit: ${newRecord.unit || '-'}). Segera lakukan Pickup Job.`,
                     'mp',
                     newRecord
                 );
@@ -1965,8 +1973,10 @@
                 );
             } else if (statusChanged) {
                 let userMsg = '';
-                if (newRecord.status === 'ON PROGRESS') {
-                    userMsg = `Order ${newRecord.no_wo} sedang dikerjakan oleh unit ${newRecord.unit || '-'} (${newRecord.operator || 'Operator'}).`;
+                if (newRecord.status === 'OPEN') {
+                    userMsg = `Order ${newRecord.no_wo} telah divalidasi (OPEN) dengan unit ${newRecord.unit || '-'}. Menunggu pickup tim lapangan.`;
+                } else if (newRecord.status === 'ON PROGRESS') {
+                    userMsg = `Order ${newRecord.no_wo} telah di-pickup dan sedang dikerjakan oleh unit ${newRecord.unit || '-'} (${newRecord.operator || 'Operator'}).`;
                 } else if (newRecord.status === 'COMPLETED') {
                     userMsg = `Order ${newRecord.no_wo} telah selesai dikerjakan (COMPLETED). Terima kasih.`;
                 } else if (newRecord.status === 'PENDING') {
@@ -1981,7 +1991,7 @@
                     triggerAppNotification(
                         `Update Order: ${newRecord.status}`,
                         userMsg,
-                        newRecord.status === 'COMPLETED' || newRecord.status === 'ON PROGRESS' ? 'mp' : 'gl',
+                        newRecord.status === 'COMPLETED' || newRecord.status === 'ON PROGRESS' || newRecord.status === 'OPEN' ? 'mp' : 'gl',
                         newRecord
                     );
                 }
@@ -2703,6 +2713,7 @@
         else if (job.status === 'PENDING') statusEmoji += ' ⏸️';
         else if (job.status === 'CANCELED') statusEmoji += ' ❌';
         else if (job.status === 'ON PROGRESS') statusEmoji += ' 🔄';
+        else if (job.status === 'OPEN') statusEmoji += ' 🟦';
         
         let unitText = job.kategori || '-';
         if (job.unit) unitText += ` (${job.unit})`;
@@ -2744,7 +2755,7 @@
 - *FINAL INSPEKSI :* ${job.final_inspeksi || '-'}
 - *KENDALA :* ${kendalaStr}`;
 
-        if (forceDetail || (currentUser && currentUser.role === 'USER') || job.status === 'SCHEDULED' || job.status === 'UNSCHEDULED') {
+        if (forceDetail || (currentUser && currentUser.role === 'USER') || job.status === 'SCHEDULED' || job.status === 'UNSCHEDULED' || job.status === 'OPEN') {
             waText = detailFormat;
         } else {
             waText = mpFormat; 
@@ -3080,6 +3091,21 @@
                         </h2>
                     </div>
                     <div class="p-3.5 overflow-y-auto hide-scrollbar" id="cancelPromptContent"></div>
+                </div>
+            </div>
+
+            <!-- MODAL KONFIRMASI PICKUP JOB (AMBIL / TIDAK) KHUSUS MP -->
+            <div id="pickupPromptModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex justify-center items-center z-[135] hidden p-3">
+                <div class="bg-white rounded-xl shadow-2xl w-full max-w-[320px] overflow-hidden flex flex-col animate-pop-in">
+                    <div class="p-3.5 text-center border-b border-slate-100 shrink-0 relative bg-slate-50">
+                        <button onclick="document.getElementById('pickupPromptModal').classList.add('hidden')" class="absolute top-3 right-3 text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-sm"></i></button>
+                        <div class="w-11 h-11 rounded-full bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center mx-auto mb-2 text-lg shadow-2xs">
+                            <i class="fa-solid fa-hand-holding-hand"></i>
+                        </div>
+                        <h2 class="text-sm font-bold text-slate-800 tracking-tight">Konfirmasi Pickup Job</h2>
+                        <p class="text-[10px] text-slate-500 mt-0.5">Apakah Anda siap mengambil dan mengerjakan tugas ini?</p>
+                    </div>
+                    <div class="p-4" id="pickupPromptContent"></div>
                 </div>
             </div>
 
@@ -4870,7 +4896,7 @@
                 </div>
                 
                 <div class="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 shadow-sm flex flex-col">
-                    <h3 class="text-sm sm:text-base font-black text-slate-800 mb-3 uppercase">Scheduled (≥ 4 Jam) vs Unscheduled (< 4 Jam)</h3>
+                    <h3 class="text-sm sm:text-base font-black text-slate-800 mb-3 uppercase">Scheduled vs Unscheduled</h3>
                     <div class="relative h-48 w-full"><canvas id="schedChart"></canvas></div>
                 </div>
             </div>
@@ -5699,8 +5725,9 @@
                             ${displayedJobs.map(job => {
                                 let statusColor = job.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
                                                   (job.status === 'ON PROGRESS' ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                                                  (job.status === 'OPEN' ? 'bg-[#dce6f2] text-[#3b5975] border-[#b4c7dc]' :
                                                   (job.status === 'PENDING' ? 'bg-orange-100 text-orange-700 border-orange-200' :
-                                                  (job.status === 'CANCELED' ? 'bg-red-100 text-red-700 border-red-200' : 'bg-slate-100 text-slate-700 border-slate-200')));
+                                                  (job.status === 'CANCELED' ? 'bg-red-100 text-red-700 border-red-200' : 'bg-slate-100 text-slate-700 border-slate-200'))));
                                 
                                 let isNeedValidation = (job.status === 'SCHEDULED' || job.status === 'UNSCHEDULED' || (job.status === 'PENDING' && !job.gl));
                                 
@@ -5775,8 +5802,9 @@
         displayedUserJobs.forEach(job => {
             let statusColor = job.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
                               (job.status === 'ON PROGRESS' ? 'bg-blue-50 text-blue-600 border-blue-200' :
+                              (job.status === 'OPEN' ? 'bg-[#dce6f2] text-[#3b5975] border-[#b4c7dc]' :
                               (job.status === 'PENDING' ? 'bg-orange-50 text-orange-600 border-orange-200' :
-                              (job.status === 'CANCELED' ? 'bg-red-50 text-red-600 border-red-200' : 'bg-slate-50 text-slate-600 border-slate-200')));
+                              (job.status === 'CANCELED' ? 'bg-red-50 text-red-600 border-red-200' : 'bg-slate-50 text-slate-600 border-slate-200'))));
 
             const isRollover = job.no_wo && job.no_wo.includes('-L');
 
@@ -5865,7 +5893,14 @@
             });
         }
         
-        if (currentMpPanel === 'PENDING') jobs = jobs.filter(j => j.status === 'PENDING'); else jobs = jobs.filter(j => j.status === currentMpPanel);
+        if (currentMpPanel === 'PENDING') {
+            jobs = jobs.filter(j => j.status === 'PENDING');
+        } else if (currentMpPanel === 'ON PROGRESS') {
+            // Tampilkan job yang sudah divalidasi (OPEN - menunggu pickup) maupun yang sedang berjalan (ON PROGRESS)
+            jobs = jobs.filter(j => j.status === 'OPEN' || j.status === 'ON PROGRESS');
+        } else {
+            jobs = jobs.filter(j => j.status === currentMpPanel);
+        }
         if (mpFleetMode === 'Crane Truck' && filterUnit !== 'ALL') jobs = jobs.filter(j => j.unit === filterUnit);
 
         let unitFilterHtml = mpFleetMode === 'Crane Truck' ? `<select id="mp_filter_unit" onchange="renderApp(true)" class="text-[9px] font-bold bg-white border border-slate-300 text-slate-700 rounded-full px-2 py-1 outline-none shadow-sm focus:border-cyan-500 cursor-pointer ml-auto"><option value="ALL">Semua Unit</option>${unitOptions.map(u => `<option value="${u}" ${filterUnit === u ? 'selected' : ''}>${u}</option>`).join('')}</select>` : '';
@@ -5912,12 +5947,21 @@
         if (jobs.length === 0) html += `<div class="bg-white rounded-md p-4 text-center border shadow-sm"><p class="text-slate-400 text-[11px]">Tidak ada tugas pada kategori ini.</p></div>`;
 
         jobs.forEach(job => {
+            const mpBadgeHtml = job.status === 'OPEN'
+                ? `<span class="bg-[#dce6f2] text-[#3b5975] border border-[#b4c7dc] text-[9px] font-bold px-2 py-0.5 rounded-sm uppercase tracking-wider">OPEN</span>`
+                : (job.status === 'ON PROGRESS'
+                    ? `<span class="bg-blue-100 text-blue-700 border border-blue-200 text-[9px] font-bold px-2 py-0.5 rounded-sm uppercase tracking-wider">ON PROGRESS</span>`
+                    : '');
+
             html += `
             <div class="bg-white rounded-md p-3 border border-slate-200 shadow-sm relative text-[11px]">
                 <div class="flex justify-between items-center mb-2 pb-1.5 border-b border-slate-100">
-                    <div class="text-xs sm:text-sm font-mono cursor-pointer hover:underline tracking-tight flex items-center gap-1.5 ${getWoColorClass(job, 'text-cyan-700 font-black')}" onclick="viewJobDetail('${job.no_wo}')" title="Buka Detail">
-                        <i class="fa-solid fa-file-lines text-cyan-500 text-[11px]"></i>
-                        <span>${job.no_wo}</span>
+                    <div class="flex items-center gap-2">
+                        <div class="text-xs sm:text-sm font-mono cursor-pointer hover:underline tracking-tight flex items-center gap-1.5 ${getWoColorClass(job, 'text-cyan-700 font-black')}" onclick="viewJobDetail('${job.no_wo}')" title="Buka Detail">
+                            <i class="fa-solid fa-file-lines text-cyan-500 text-[11px]"></i>
+                            <span>${job.no_wo}</span>
+                        </div>
+                        ${mpBadgeHtml}
                     </div>
                     <div class="text-[13px] sm:text-sm bg-cyan-50 text-cyan-700 border border-cyan-200 px-2.5 py-1 rounded-md font-extrabold shadow-xs">
                         Unit: ${job.unit || '-'}
@@ -5926,23 +5970,89 @@
                 <div class="font-bold text-slate-800 text-xs mb-1">Req: ${job.tgl_pelaksanaan} ${job.jam_pelaksanaan || ''}</div>
                 ${job.kategori !== 'Big Crane' ? `<div class="text-[11px] text-slate-500 mb-3 truncate">Lokasi: ${job.lokasi_angkat||'-'} ➔ ${job.lokasi_tujuan||'-'}</div>` : `<div class="text-[11px] text-slate-500 mb-1 truncate"><i class="fa-solid fa-location-dot text-orange-500 mr-1"></i>Lokasi: ${job.lokasi_angkat||'-'}</div><div class="text-[11px] text-slate-500 mb-3 truncate border-l-2 border-slate-300 pl-1">${job.deskripsi}</div>`}
                 <div class="flex gap-1.5 flex-wrap">
+                    ${job.status === 'OPEN' ? `
+                        <button onclick="openPickupModal('${job.no_wo}')" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-sm text-[11px] shadow-sm flex items-center justify-center gap-1.5 transition-colors cursor-pointer">
+                            <i class="fa-solid fa-hand-pickup fa-hand-holding-hand"></i> Pickup Job
+                        </button>
+                    ` : ''}
                     ${job.status === 'ON PROGRESS' ? `
                         <button onclick="openManpowerAction('${job.no_wo}', 'COMPLETED')" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-1.5 rounded-sm text-[11px] shadow-sm"><i class="fa-solid fa-check"></i> Close Job</button>
                         <button onclick="openManpowerAction('${job.no_wo}', 'PENDING')" class="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-bold py-1.5 rounded-sm text-[11px] shadow-sm"><i class="fa-solid fa-pause"></i> Pending</button>
                         <button onclick="initiateCancelJob('${job.no_wo}')" class="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-1.5 rounded-sm text-[11px] shadow-sm"><i class="fa-solid fa-xmark"></i> Cancel</button>
+                        <button onclick="copyJobToWA('${job.no_wo}', false)" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-1.5 px-2 rounded-sm text-[11px] shadow-2xs flex items-center justify-center gap-1 transition-colors shrink-0 whitespace-nowrap" title="Salin Job">
+                            <i class="fa-regular fa-copy text-[10px]"></i> Salin Job
+                        </button>
                     ` : ''}
                     ${job.status === 'PENDING' ? `
                         <div class="text-[10px] text-orange-600 font-bold w-full text-center bg-orange-50 py-1.5 rounded-sm border border-orange-200 shadow-sm mb-1"><i class="fa-solid fa-clock mr-1"></i> Job Pending - Menunggu Validasi Lanjutan dari GL</div>
+                        <button onclick="copyJobToWA('${job.no_wo}', false)" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-1.5 px-2 rounded-sm text-[11px] shadow-2xs flex items-center justify-center gap-1 transition-colors shrink-0 whitespace-nowrap" title="Salin Job">
+                            <i class="fa-regular fa-copy text-[10px]"></i> Salin Job
+                        </button>
                     ` : ''}
-                    <button onclick="copyJobToWA('${job.no_wo}', false)" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-1.5 px-2 rounded-sm text-[11px] shadow-2xs flex items-center justify-center gap-1 transition-colors shrink-0 whitespace-nowrap" title="Salin Job">
-                        <i class="fa-regular fa-copy text-[10px]"></i> Salin Job
-                    </button>
+                    ${(job.status === 'COMPLETED' || job.status === 'CANCELED') ? `
+                        <button onclick="copyJobToWA('${job.no_wo}', false)" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-1.5 px-2 rounded-sm text-[11px] shadow-2xs flex items-center justify-center gap-1 transition-colors shrink-0 whitespace-nowrap" title="Salin Job">
+                            <i class="fa-regular fa-copy text-[10px]"></i> Salin Job
+                        </button>
+                    ` : ''}
                 </div>
             </div>`;
         });
 
         html += `</div>`;
         return html;
+    }
+
+    function openPickupModal(wo) {
+        pendingPickupWo = wo;
+        const job = getOrders().find(j => j.no_wo === wo);
+        if (!job) return;
+
+        const container = document.getElementById('pickupPromptContent');
+        if (container) {
+            container.innerHTML = `
+                <div class="bg-[#dce6f2]/60 border border-[#b4c7dc] rounded-lg p-2.5 mb-4 text-left space-y-1">
+                    <div class="flex justify-between items-center">
+                        <span class="font-mono font-bold text-[#3b5975] text-xs">${job.no_wo}</span>
+                        <span class="text-[9px] font-extrabold bg-white text-[#3b5975] px-2 py-0.5 rounded border border-[#b4c7dc]">Unit: ${job.unit || '-'}</span>
+                    </div>
+                    <div class="text-[10px] text-slate-700 font-semibold">Req: ${job.tgl_pelaksanaan} ${job.jam_pelaksanaan || ''}</div>
+                    ${job.kategori !== 'Big Crane' ? `<div class="text-[10px] text-slate-600 truncate"><i class="fa-solid fa-location-dot text-orange-500 mr-1"></i>${job.lokasi_angkat || '-'} ➔ ${job.lokasi_tujuan || '-'}</div>` : `<div class="text-[10px] text-slate-600 truncate"><i class="fa-solid fa-location-dot text-orange-500 mr-1"></i>${job.lokasi_angkat || '-'}</div>`}
+                    <div class="text-[10px] text-slate-600 line-clamp-2 pt-0.5 border-t border-[#b4c7dc]/50">${job.deskripsi || '-'}</div>
+                </div>
+                <div class="flex gap-2.5">
+                    <button type="button" onclick="handlePickupDecision('${job.no_wo}', true)" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg text-xs transition-colors shadow-sm flex items-center justify-center gap-1.5 cursor-pointer">
+                        <i class="fa-solid fa-check"></i> Ambil
+                    </button>
+                    <button type="button" onclick="handlePickupDecision('${job.no_wo}', false)" class="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-2.5 rounded-lg text-xs transition-colors shadow-sm flex items-center justify-center gap-1.5 cursor-pointer">
+                        <i class="fa-solid fa-xmark"></i> Tidak
+                    </button>
+                </div>
+            `;
+        }
+        document.getElementById('pickupPromptModal').classList.remove('hidden');
+    }
+
+    async function handlePickupDecision(wo, isTaken) {
+        const modal = document.getElementById('pickupPromptModal');
+        if (modal) modal.classList.add('hidden');
+
+        if (!isTaken) {
+            // Jika pilih TIDAK (Merah), arahkan ke modal pembatalan untuk mengisi keterangan cancel
+            initiateCancelJob(wo);
+            return;
+        }
+
+        // Jika pilih AMBIL (Biru), ubah status menjadi ON PROGRESS
+        let jobs = getOrders();
+        let idx = jobs.findIndex(j => j.no_wo === wo);
+        if (idx !== -1) {
+            jobs[idx].status = 'ON PROGRESS';
+            saveOrders(jobs);
+            await syncSingleOrderToSupabase(jobs[idx]);
+            showToast(`Job ${wo} berhasil di-pickup (ON PROGRESS)!`, 'success');
+            renderApp(true);
+        }
+        pendingPickupWo = null;
     }
 
     function openManpowerAction(wo, status) {
@@ -7001,7 +7111,7 @@
             
             <div class="grid grid-cols-2 gap-y-2 gap-x-2 text-[10px] mb-3">
                 <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">NO. WO</div><div class="font-mono text-[9px] ${getWoColorClass(job, 'text-slate-700 font-bold')}">${job.no_wo}</div><div class="text-[8px] text-slate-400 font-semibold mt-0.5">${formatLocalTimestamp(job.timestamp)}</div></div>
-                <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">STATUS</div><div class="font-bold text-cyan-600 text-[9px] uppercase">${job.status}</div></div>
+                <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">STATUS</div><div class="font-bold text-[9px] uppercase ${job.status === 'OPEN' ? 'bg-[#dce6f2] text-[#3b5975] border border-[#b4c7dc] px-1.5 py-0.5 rounded-sm inline-block' : 'text-cyan-600'}">${job.status}</div></div>
                 <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">GROUP LEADER</div><div class="font-bold text-slate-700 uppercase">${job.gl || '-'}</div></div>
                 <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">UNIT</div><div class="font-bold text-slate-700 uppercase">${job.unit || '-'}</div></div>
                 <div><div class="text-[8px] font-bold text-slate-400 uppercase mb-0.5">TGL & JAM</div><div class="font-bold text-slate-700 uppercase">${job.tgl_pelaksanaan} ${job.jam_pelaksanaan||''}</div></div>
@@ -7377,8 +7487,8 @@
         let isValidated = (selectedGL && selectedUnit);
 
         if (isValidated && (prevStatus === 'SCHEDULED' || prevStatus === 'UNSCHEDULED' || prevStatus === 'PENDING')) {
-            jobs[idx].status = 'ON PROGRESS';
-            showToast('Job divalidasi ke Manpower!');
+            jobs[idx].status = 'OPEN';
+            showToast('Job divalidasi (Status: OPEN) - Menunggu Pickup MP!');
         } else {
             showToast('Perubahan Disimpan!');
         }
@@ -7460,9 +7570,9 @@
         const jobs = getOrders().filter(j => {
             if (j.kategori !== 'Big Crane' || j.status === 'CANCELED') return false;
             if (isAdminOrGL) {
-                return true; // Tampilkan SCHEDULED, UNSCHEDULED, PENDING, ON PROGRESS, COMPLETED
+                return true; // Tampilkan SCHEDULED, UNSCHEDULED, PENDING, OPEN, ON PROGRESS, COMPLETED
             } else {
-                return ['SCHEDULED', 'UNSCHEDULED', 'PENDING', 'ON PROGRESS'].includes(j.status);
+                return ['SCHEDULED', 'UNSCHEDULED', 'PENDING', 'OPEN', 'ON PROGRESS'].includes(j.status);
             }
         });
 
@@ -7615,8 +7725,8 @@
             content = `<div class="flex flex-col items-center justify-center p-6 text-center"><i class="fa-regular fa-calendar-xmark text-4xl text-slate-300 mb-2"></i><p class="text-slate-500 font-medium text-[11px]">Jadwal Kosong</p><p class="text-slate-400 text-[9px] mt-1">Tidak ada jadwal aktif Big Crane untuk tanggal ini.</p></div>`;
         } else {
             content = jobs.map(job => {
-                let statusColor = job.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : (job.status === 'ON PROGRESS' ? 'bg-blue-100 text-blue-700 border-blue-200' : (job.status === 'PENDING' ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-slate-100 text-slate-700 border-slate-200'));
-                let statusEmoji = job.status === 'COMPLETED' ? '🟢' : (job.status === 'ON PROGRESS' ? '🔵' : '⚪');
+                let statusColor = job.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : (job.status === 'ON PROGRESS' ? 'bg-blue-100 text-blue-700 border-blue-200' : (job.status === 'OPEN' ? 'bg-[#dce6f2] text-[#3b5975] border-[#b4c7dc]' : (job.status === 'PENDING' ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-slate-100 text-slate-700 border-slate-200')));
+                let statusEmoji = job.status === 'COMPLETED' ? '🟢' : ((job.status === 'ON PROGRESS' || job.status === 'OPEN') ? '🔵' : '⚪');
                 return `<div class="bg-white border border-slate-200 rounded-md p-2.5 mb-2 cursor-pointer hover:border-cyan-400 shadow-sm transition-all" onclick="document.getElementById('dayJobsModal').classList.add('hidden'); viewJobDetail('${job.no_wo}')"><div class="flex justify-between items-center mb-1 border-b border-slate-100 pb-1"><span class="text-[10px] font-mono ${getWoColorClass(job, 'text-cyan-600 font-bold')}">${job.no_wo}</span><span class="${statusColor} text-[8px] font-bold px-1.5 py-0.5 border rounded-sm tracking-wide flex items-center gap-1"><span>${statusEmoji}</span>${job.status}</span></div><div class="text-[11px] font-bold text-slate-800 uppercase mt-1 leading-tight">${job.unit ? '['+job.unit+']' : '<span class="text-red-500">[TBA]</span>'} ${job.nama_pemohon}</div><div class="text-[9px] text-slate-600 line-clamp-2 mt-1 bg-slate-50 p-1.5 rounded border border-slate-100 leading-tight" title="${job.deskripsi || ''}">${job.deskripsi} ${statusEmoji}</div></div>`;
             }).join('');
         }
